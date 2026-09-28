@@ -122,6 +122,13 @@
             <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
 
                 <a
+                    href="{{ route('reservation.track', ['reference' => $reservation->reference_number]) }}"
+                    class="rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-700"
+                >
+                    Track Reservation
+                </a>
+
+                <a
                     href="{{ route('reservation.create') }}"
                     class="rounded-lg border border-blue-700 px-5 py-3 font-semibold text-blue-700 hover:bg-blue-50"
                 >

@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 return [
 
+    'auth' => [
+        'local_test_admin_password_only' => (bool) env('GYM_LOCAL_TEST_ADMIN_PASSWORD_ONLY', false),
+        'local_test_staff_password_only' => (bool) env('GYM_LOCAL_TEST_STAFF_PASSWORD_ONLY', false),
+    ],
+
     'reservation' => [
         'daily_limit' => (int) env('GYM_RESERVATION_DAILY_LIMIT', 5),
+        'minimum_notice_days' => (int) env('GYM_RESERVATION_MINIMUM_NOTICE_DAYS', 3),
 
         'cancellation_notice_days' => (int) env(
             'GYM_CANCELLATION_NOTICE_DAYS',
@@ -73,6 +79,13 @@ return [
 
     'equipment' => [
         'standalone_reservations_enabled' => false,
+    ],
+
+    'backup' => [
+        'disk' => env('GYM_BACKUP_DISK', 'local'),
+        'directory' => env('GYM_BACKUP_DIRECTORY', 'backups'),
+        'retention_days' => (int) env('GYM_BACKUP_RETENTION_DAYS', 30),
+        'schedule_time' => env('GYM_BACKUP_SCHEDULE_TIME', '02:00'),
     ],
 
 ];

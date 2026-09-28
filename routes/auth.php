@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\LoginCodeController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
@@ -21,6 +22,13 @@ Route::middleware('guest')->group(function () {
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+
+    Route::middleware('prevent.back.history')->group(function () {
+        Route::get('login/code', [LoginCodeController::class, 'show'])->name('login.code');
+        Route::post('login/code', [LoginCodeController::class, 'verify'])->middleware('throttle:30,1')->name('login.code.verify');
+        Route::post('login/code/resend', [LoginCodeController::class, 'resend'])->middleware('throttle:10,1')->name('login.code.resend');
+        Route::post('login/code/cancel', [LoginCodeController::class, 'cancel'])->name('login.code.cancel');
+    });
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');

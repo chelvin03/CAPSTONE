@@ -103,6 +103,8 @@
 
                     <td class="px-4 py-3 text-center">
 
+                        <div class="flex items-center justify-center gap-2">
+
                         <a
                             href="{{ route('admin.reservations.show',$reservation) }}"
                             class="btn-primary !min-h-9 !px-3 !py-1.5"
@@ -110,6 +112,16 @@
                         >
                             View
                         </a>
+
+                        <a
+                            href="{{ route('admin.reservations.edit', $reservation) }}"
+                            class="btn-secondary !min-h-9 !px-3 !py-1.5"
+                            aria-label="Edit reservation {{ $reservation->reference_number }}"
+                        >
+                            Edit
+                        </a>
+
+                        </div>
 
                     </td>
 

@@ -194,6 +194,17 @@
                     Requested Equipment
                 </h2>
 
+                @if ($reservation->requested_equipment)
+                    <div class="flex items-center justify-between rounded-lg bg-slate-50 p-4">
+                        <p class="text-sm font-semibold text-slate-900">
+                            {{ $reservation->requested_equipment }}
+                        </p>
+                        <p class="text-sm text-slate-700">
+                            Quantity: {{ $reservation->requested_equipment_quantity }}
+                        </p>
+                    </div>
+                @endif
+
                 @forelse ($reservation->equipment as $item)
                     <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-0">
                         <div>
@@ -211,9 +222,11 @@
                         </p>
                     </div>
                 @empty
-                    <p class="text-sm text-slate-500">
-                        No equipment requested.
-                    </p>
+                    @unless ($reservation->requested_equipment)
+                        <p class="text-sm text-slate-500">
+                            No equipment requested.
+                        </p>
+                    @endunless
                 @endforelse
             </section>
 
@@ -256,6 +269,16 @@
                     </div>
 
                 </div>
+            </section>
+
+            <section class="rounded-2xl border border-blue-200 bg-blue-50 p-6">
+                <h2 class="mb-2 text-lg font-bold text-blue-900">Reassign or Reschedule</h2><p class="mb-4 text-sm text-blue-700">Administrators may force-assign any slot and resolve affected reservations.</p>
+                <form method="POST" action="{{route('admin.reservations.reschedule',$reservation)}}" class="grid gap-3 sm:grid-cols-2">@csrf @method('PATCH')
+                    <select name="facility_id" required class="rounded-lg border-slate-300">@foreach(\App\Models\Facility::where('status','available')->orderBy('facility_name')->get() as $facility)<option value="{{$facility->id}}" @selected($reservation->facility_id===$facility->id)>{{$facility->facility_name}}</option>@endforeach</select>
+                    <input type="date" name="reservation_date" value="{{$reservation->reservation_date->format('Y-m-d')}}" required class="rounded-lg border-slate-300"><input type="time" name="start_time" value="{{substr($reservation->start_time,0,5)}}" required class="rounded-lg border-slate-300"><input type="time" name="end_time" value="{{substr($reservation->end_time,0,5)}}" required class="rounded-lg border-slate-300">
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="force_assign" value="1"> Force assign occupied slot</label><select name="conflict_resolution" class="rounded-lg border-slate-300"><option value="waiting_list">Move conflicts to waiting list</option><option value="cancelled">Cancel conflicts</option></select>
+                    <textarea name="reason" required rows="2" placeholder="Reason for schedule adjustment" class="sm:col-span-2 rounded-lg border-slate-300"></textarea><button class="sm:col-span-2 rounded-lg bg-blue-700 p-3 font-semibold text-white">Update Schedule & Notify</button>
+                </form>
             </section>
 
             @if (! in_array($reservation->status, ['approved', 'rejected', 'cancelled'], true))

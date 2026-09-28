@@ -34,37 +34,17 @@
         </p>
 
         @if (auth()->user()?->role === 'staff')
-            <a
-                href="{{ route('staff.dashboard') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.dashboard') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-grid" aria-hidden="true"></i>
-                <span>Dashboard</span>
-            </a>
-
-            <a
-                href="{{ route('staff.reservations.index') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.reservations.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-calendar-check" aria-hidden="true"></i>
-                <span>Reservations</span>
-            </a>
-
-            <a
-                href="{{ route('staff.facilities.index') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.facilities.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-building" aria-hidden="true"></i>
-                <span>Facilities</span>
-            </a>
-
-            <a
-                href="{{ route('staff.equipment.index') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.equipment.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-tools" aria-hidden="true"></i>
-                <span>Equipment</span>
-            </a>
+            @foreach ([
+                ['staff.dashboard', 'Dashboard', 'bi-grid'],
+                ['staff.reservations.index', 'Reservations', 'bi-calendar-check'],
+                ['staff.schedules.index', 'Schedules', 'bi-calendar3'],
+                ['staff.facilities.index', 'Facilities', 'bi-building'],
+                ['staff.equipment.index', 'Equipment', 'bi-tools'],
+            ] as [$destination, $label, $icon])
+                <a href="{{ route($destination) }}" class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs(str_replace('.index', '.*', $destination)) ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}">
+                    <i class="bi {{ $icon }}" aria-hidden="true"></i><span>{{ $label }}</span>
+                </a>
+            @endforeach
         @else
 
         {{-- Dashboard --}}
@@ -75,7 +55,7 @@
                     ? 'bg-white/10 text-white'
                     : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
         >
-            <span class="flex h-5 w-5 items-center justify-center">🏠</span>
+            <i class="bi bi-house" aria-hidden="true"></i>
             <span>Dashboard</span>
         </a>
 
@@ -87,21 +67,10 @@
                     ? 'bg-white/10 text-white'
                     : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
         >
-            <span class="flex h-5 w-5 items-center justify-center">📅</span>
+            <i class="bi bi-calendar-check" aria-hidden="true"></i>
             <span>Reservations</span>
         </a>
-
-        {{-- Facilities --}}
-        <a
-            href="{{ route('admin.facilities.index') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition
-                {{ request()->routeIs('admin.facilities.*')
-                    ? 'bg-white/10 text-white'
-                    : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-        >
-            <span class="flex h-5 w-5 items-center justify-center">🏢</span>
-            <span>Facilities</span>
-        </a>
+        <a href="{{ route('admin.schedule.index') }}" class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('admin.schedule.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-calendar3" aria-hidden="true"></i><span>Schedule</span></a>
 
         {{-- Equipment --}}
         <a
@@ -111,31 +80,21 @@
                     ? 'bg-white/10 text-white'
                     : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
         >
-            <span class="flex h-5 w-5 items-center justify-center">🧰</span>
+            <i class="bi bi-tools" aria-hidden="true"></i>
             <span>Equipment</span>
         </a>
 
-        {{-- Announcements --}}
-        @if(Route::has('admin.announcements.index'))
-            <a
-                href="{{ route('admin.announcements.index') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition
-                    {{ request()->routeIs('admin.announcements.*')
-                        ? 'bg-white/10 text-white'
-                        : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <span class="flex h-5 w-5 items-center justify-center">📢</span>
-                <span>Announcements</span>
-            </a>
-        @else
-            <span
-                class="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-blue-300 opacity-60"
-                title="Announcements module is not created yet"
-            >
-                <span class="flex h-5 w-5 items-center justify-center">📢</span>
-                <span>Announcements</span>
-            </span>
-        @endif
+        {{-- Staff --}}
+        <a
+            href="{{ route('admin.staff.index') }}"
+            class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition
+                {{ request()->routeIs('admin.staff.*')
+                    ? 'bg-white/10 text-white'
+                    : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
+        >
+            <i class="bi bi-people" aria-hidden="true"></i>
+            <span>Staff</span>
+        </a>
 
         {{-- Reports --}}
         @if(Route::has('admin.reports.index'))
@@ -146,7 +105,7 @@
                         ? 'bg-white/10 text-white'
                         : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
             >
-                <span class="flex h-5 w-5 items-center justify-center">📊</span>
+                <i class="bi bi-bar-chart" aria-hidden="true"></i>
                 <span>Reports</span>
             </a>
         @else
@@ -154,10 +113,13 @@
                 class="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-blue-300 opacity-60"
                 title="Reports module is not created yet"
             >
-                <span class="flex h-5 w-5 items-center justify-center">📊</span>
+                <i class="bi bi-bar-chart" aria-hidden="true"></i>
                 <span>Reports</span>
             </span>
         @endif
+        <a href="{{ route('admin.audit.index') }}" class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('admin.audit.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-journal-text" aria-hidden="true"></i><span>Audit Logs</span></a>
+        <a href="{{ route('admin.backups.index') }}" class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('admin.backups.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-database-check" aria-hidden="true"></i><span>Backup & Recovery</span></a>
+        <a href="{{ route('admin.settings.edit') }}" class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('admin.settings.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-gear" aria-hidden="true"></i><span>Settings</span></a>
 
         @endif
 
@@ -172,7 +134,7 @@
                 type="submit"
                 class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-blue-100 transition hover:bg-red-500/20 hover:text-white"
             >
-                <span>↪</span>
+                <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
                 <span>Logout</span>
             </button>
         </form>

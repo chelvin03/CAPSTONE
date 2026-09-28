@@ -3,6 +3,13 @@
 .env
 .env.backup
 .env.production
+.env.*
+!.env.example
+/.tmp/
+*.sql
+*.sql.gz
+*.sql.zip
+*.sqlite*
 .phpactor.json
 .phpunit.result.cache
 /.fleet

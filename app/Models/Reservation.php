@@ -31,6 +31,8 @@ class Reservation extends Model
         'end_time',
         'setup_time',
         'cleanup_time',
+        'requested_equipment',
+        'requested_equipment_quantity',
         'status',
         'priority_number',
         'admin_notes',
@@ -53,6 +55,7 @@ class Reservation extends Model
         'completed_at' => 'datetime',
         'expected_attendees' => 'integer',
         'priority_number' => 'integer',
+        'requested_equipment_quantity' => 'integer',
     ];
 
     public function user(): BelongsTo

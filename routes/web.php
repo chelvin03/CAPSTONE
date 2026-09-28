@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ReservationController;
+use App\Http\Controllers\Admin\BackupController;
+use App\Http\Controllers\Admin\StaffController;
+use App\Http\Controllers\Admin\ReportController as AdminReportController;
+use App\Http\Controllers\Admin\ScheduleController;
+use App\Http\Controllers\Admin\SystemSettingsController;
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicReservationController;
+use App\Http\Controllers\Staff\ReportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,21 +28,23 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('/reserve', [PublicReservationController::class, 'create'])
+    ->middleware('prevent.back.history')
     ->name('reservation.create');
 
 Route::post('/reserve', [PublicReservationController::class, 'store'])
     ->name('reservation.store');
 
-Route::post('/reserve/send-verification', [PublicReservationController::class, 'sendVerification'])
-    ->middleware('throttle:5,1')
-    ->name('reservation.verification.send');
+Route::post('/reserve/send-code', [PublicReservationController::class, 'sendVerificationCode'])
+    ->name('reservation.send_code');
 
-Route::post('/reserve/verify-email', [PublicReservationController::class, 'verifyEmail'])
-    ->middleware('throttle:10,1')
-    ->name('reservation.verification.verify');
+Route::post('/reserve/verify-code', [PublicReservationController::class, 'verifyVerificationCode'])
+    ->name('reservation.verify_code');
 
 Route::get('/reserve/availability', [PublicReservationController::class, 'availability'])
     ->name('reservation.availability');
+
+Route::get('/track', [PublicReservationController::class, 'track'])
+    ->name('reservation.track');
 
 Route::get(
     '/reservation/success/{referenceNumber}',
@@ -89,6 +98,34 @@ Route::middleware([
             Route::resource('facilities', FacilityController::class)
                 ->except(['show']);
 
+            Route::resource('staff', StaffController::class)
+                ->only(['index', 'create', 'store']);
+            Route::patch('/staff/{staff}/permissions', [StaffController::class, 'updatePermissions'])->name('staff.permissions');
+
+            Route::get('/reports', [AdminReportController::class, 'index'])
+                ->name('reports.index');
+            Route::get('/reports-export', [AdminReportController::class, 'export'])->name('reports.export');
+            Route::get('/reports/generate/excel', [AdminReportController::class, 'excel'])->name('reports.excel');
+            Route::get('/reports/generate/word', [AdminReportController::class, 'word'])->name('reports.word');
+            Route::get('/reports/{report}', [AdminReportController::class, 'show'])
+                ->name('reports.show');
+
+            Route::get('/schedule', [ScheduleController::class, 'index'])->name('schedule.index');
+            Route::post('/schedule/blocks', [ScheduleController::class, 'store'])->name('schedule.blocks.store');
+            Route::delete('/schedule/blocks/{block}', [ScheduleController::class, 'destroy'])->name('schedule.blocks.destroy');
+            Route::get('/settings', [SystemSettingsController::class, 'edit'])->name('settings.edit');
+            Route::put('/settings', [SystemSettingsController::class, 'update'])->name('settings.update');
+            Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit.index');
+            Route::get('/audit-logs/export', [AuditLogController::class, 'export'])->name('audit.export');
+
+            Route::get('/backups', [BackupController::class, 'index'])->name('backups.index');
+            Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
+            Route::post('/backups/import', [BackupController::class, 'import'])->name('backups.import');
+            Route::get('/backups/{backup}/download', [BackupController::class, 'download'])->name('backups.download');
+            Route::post('/backups/{backup}/verify', [BackupController::class, 'verify'])->name('backups.verify');
+            Route::post('/backups/{backup}/restore', [BackupController::class, 'restore'])->name('backups.restore');
+            Route::delete('/backups/{backup}', [BackupController::class, 'destroy'])->name('backups.destroy');
+
             Route::resource('equipment', EquipmentController::class)
                 ->except(['show']);
 
@@ -98,6 +135,8 @@ Route::middleware([
                     'create',
                     'store',
                     'show',
+                    'edit',
+                    'update',
                 ]);
 
             Route::patch(
@@ -114,6 +153,7 @@ Route::middleware([
                 '/reservations/{reservation}/cancel',
                 [ReservationController::class, 'cancel']
             )->name('reservations.cancel');
+            Route::patch('/reservations/{reservation}/reschedule', [ReservationController::class, 'reschedule'])->name('reservations.reschedule');
         });
 
     /*
@@ -122,23 +162,22 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware('role:staff')
+    Route::middleware(['role:staff', \App\Http\Middleware\StaffReadOnly::class])
         ->prefix('staff')
         ->name('staff.')
         ->group(function (): void {
 
-            Route::get('/dashboard', function () {
-                return view('staff.dashboard');
-            })->name('dashboard');
+            Route::get('/dashboard', \App\Http\Controllers\Staff\DashboardController::class)->name('dashboard');
+            Route::get('/schedules', [\App\Http\Controllers\Staff\ScheduleController::class, 'index'])->name('schedules.index');
 
             Route::get(
                 '/reservations',
-                [ReservationController::class, 'staffIndex']
+                [\App\Http\Controllers\Staff\ReservationController::class, 'index']
             )->name('reservations.index');
 
             Route::get(
                 '/reservations/{reservation}',
-                [ReservationController::class, 'staffShow']
+                [\App\Http\Controllers\Staff\ReservationController::class, 'show']
             )->name('reservations.show');
 
             Route::get(
@@ -146,10 +185,17 @@ Route::middleware([
                 [FacilityController::class, 'staffIndex']
             )->name('facilities.index');
 
-            Route::get(
-                '/equipment',
-                [EquipmentController::class, 'staffIndex']
-            )->name('equipment.index');
+            Route::get('/equipment', [EquipmentController::class, 'staffIndex'])
+                ->name('equipment.index');
+
+            Route::get('/reports', [ReportController::class, 'index'])
+                ->name('reports.index');
+
+            Route::get('/reports/export', [ReportController::class, 'export'])
+                ->name('reports.export');
+
+            Route::post('/reports', [ReportController::class, 'store'])
+                ->name('reports.store');
         });
 
     /*
