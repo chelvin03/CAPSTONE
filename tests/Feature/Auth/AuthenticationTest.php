@@ -1,6 +1,8 @@
 <?php
 
+
 use App\Models\User;
+use Illuminate\Support\Facades\Mail;
 
 test('login screen can be rendered', function () {
     $response = $this->get('/login');
@@ -9,6 +11,7 @@ test('login screen can be rendered', function () {
 });
 
 test('users can authenticate using the login screen', function () {
+    Mail::fake();
     $user = User::factory()->create();
 
     $response = $this->post('/login', [
@@ -16,8 +19,9 @@ test('users can authenticate using the login screen', function () {
         'password' => 'password',
     ]);
 
-    $this->assertAuthenticated();
-    $response->assertRedirect(route('staff.dashboard', absolute: false));
+    $response->assertRedirect(route('staff.dashboard'));
+    Mail::assertNothingSent();
+    $this->assertAuthenticatedAs($user);
 });
 
 test('users can not authenticate with invalid password', function () {

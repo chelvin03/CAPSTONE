@@ -47,8 +47,10 @@ public function reservationStatusChanges(): HasMany
         'first_name',
         'last_name',
         'email',
+        'email_verified_at',
         'password',
         'role',
+        'can_priority_override',
         'requestor_category',
         'contact_number',
         'status',
@@ -64,6 +66,7 @@ public function reservationStatusChanges(): HasMany
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'can_priority_override' => 'boolean',
         ];
     }
 

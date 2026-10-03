@@ -62,7 +62,7 @@
             </p>
 
             <p class="mt-1 text-sm text-blue-700">
-                Staff can view reservations, facilities, and equipment but
+                Staff can view reservations, facilities, and equipment and generate analytics reports, but
                 cannot approve, reject, cancel, add, edit, or delete records.
             </p>
 
@@ -104,69 +104,49 @@
                 </p>
             </a>
 
-            {{-- Facilities --}}
-            <a
-                href="{{ route('staff.facilities.index') }}"
-                class="group block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md"
-            >
-                <div class="flex items-center justify-between">
-
-                    <div>
-                        <p class="text-sm font-medium text-slate-500">
-                            Facilities
-                        </p>
-
-                        <p class="mt-3 text-lg font-bold text-slate-900">
-                            View only
-                        </p>
-                    </div>
-
-                    <div class="rounded-xl bg-blue-100 p-3 text-2xl">
-                        🏢
-                    </div>
-
-                </div>
-
-                <p class="mt-4 text-sm leading-6 text-slate-500">
-                    View facility names, descriptions, locations, capacities,
-                    and availability statuses.
-                </p>
-
-                <p class="mt-5 text-sm font-semibold text-blue-700">
-                    Open Facilities →
-                </p>
-            </a>
-
             {{-- Equipment --}}
             <a
                 href="{{ route('staff.equipment.index') }}"
                 class="group block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md"
             >
                 <div class="flex items-center justify-between">
+                    <div><p class="text-sm font-medium text-slate-500">Equipment</p><p class="mt-3 text-lg font-bold text-slate-900">View only</p></div>
+                    <div class="rounded-xl bg-blue-100 p-3 text-2xl">🧰</div>
+                </div>
+                <p class="mt-4 text-sm leading-6 text-slate-500">View available chairs, tables, lighting, sports equipment, and other inventory.</p>
+                <p class="mt-5 text-sm font-semibold text-blue-700">Open Equipment →</p>
+            </a>
+
+            {{-- Reports --}}
+            <a
+                href="{{ route('staff.reports.index') }}"
+                class="group block rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md"
+            >
+                <div class="flex items-center justify-between">
 
                     <div>
                         <p class="text-sm font-medium text-slate-500">
-                            Equipment
+                            Reports
                         </p>
 
                         <p class="mt-3 text-lg font-bold text-slate-900">
-                            View only
+                            Analytics
                         </p>
                     </div>
 
                     <div class="rounded-xl bg-blue-100 p-3 text-2xl">
-                        🧰
+                        📊
                     </div>
 
                 </div>
 
                 <p class="mt-4 text-sm leading-6 text-slate-500">
-                    View equipment names, descriptions, quantities, units, and
-                    availability statuses.
+                    Generate reservation analytics by date, review status and
+                    facility totals, and download detailed report data.
                 </p>
 
                 <p class="mt-5 text-sm font-semibold text-blue-700">
-                    Open Equipment →
+                    Open Reports →
                 </p>
             </a>
 

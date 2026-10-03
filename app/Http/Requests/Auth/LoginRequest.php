@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -38,33 +40,41 @@ class LoginRequest extends FormRequest
      *
      * @throws ValidationException
      */
-    public function authenticate(): void
-{
-    $this->ensureIsNotRateLimited();
+    public function authenticate(): User
+    {
+        $this->ensureIsNotRateLimited();
 
-    $login = Str::lower(trim((string) $this->input('email')));
+        $login = Str::lower(trim((string) $this->input('email')));
 
-    if (! Auth::attempt([
-        'email' => $login,
-        'password' => $this->input('password'),
-    ], $this->boolean('remember'))) {
-        RateLimiter::hit($this->throttleKey());
+        $credentials = [
+            'email' => $login,
+            'password' => $this->input('password'),
+        ];
+        $provider = Auth::guard('web')->getProvider();
+        $user = $provider->retrieveByCredentials($credentials);
 
-        $remainingAttempts = RateLimiter::remaining(
-            $this->throttleKey(),
-            5
-        );
+        if (! $user || ! $provider->validateCredentials($user, $credentials)) {
+            event(new Failed('web', $user, $credentials));
+            RateLimiter::hit($this->throttleKey());
 
-        throw ValidationException::withMessages([
-            'email' => $remainingAttempts > 0
-                ? 'The email or password is incorrect. You have '
-                    .$remainingAttempts.' login attempt(s) remaining.'
-                : 'Too many failed login attempts. Please wait one minute before trying again.',
-        ]);
+            $remainingAttempts = RateLimiter::remaining(
+                $this->throttleKey(),
+                5
+            );
+
+            throw ValidationException::withMessages([
+                'email' => $remainingAttempts > 0
+                    ? 'The email or password is incorrect. You have '
+                        .$remainingAttempts.' login attempt(s) remaining.'
+                    : 'Too many failed login attempts. Please wait one minute before trying again.',
+            ]);
+        }
+
+        RateLimiter::clear($this->throttleKey());
+        $provider->rehashPasswordIfRequired($user, $credentials);
+
+        return $user;
     }
-
-    RateLimiter::clear($this->throttleKey());
-}
 
     public function ensureIsNotRateLimited(): void
     {

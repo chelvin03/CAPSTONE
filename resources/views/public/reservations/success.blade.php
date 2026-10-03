@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'Reservation Submitted')
+@section('title', 'Reservation Request Received')
 
 @section('content')
 
@@ -11,17 +11,27 @@
             <div
                 class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl font-bold text-green-700"
             >
-                ✓
+                &#10003;
             </div>
 
             <h1 class="text-2xl font-bold text-slate-900">
-                Reservation Submitted
+                Reservation Request Received
             </h1>
 
             <p class="mt-3 text-slate-600">
                 Your reservation request was submitted successfully and is
                 waiting for review by the gym administrator.
             </p>
+
+            @if (session()->has('reservation_email_sent'))
+                <p class="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-700" role="status">
+                    @if (session('reservation_email_sent'))
+                        A confirmation email with your reservation details and tracking link has been sent to {{ $reservation->contact_email }}. Please check your inbox or spam folder.
+                    @else
+                        Your request is saved, but we could not send the confirmation email. Save your reference number and use Track Reservation below. You do not need to submit again.
+                    @endif
+                </p>
+            @endif
 
             <div class="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
 
@@ -122,6 +132,13 @@
             <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
 
                 <a
+                    href="{{ route('reservation.track', ['reference' => $reservation->reference_number]) }}"
+                    class="rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white hover:bg-emerald-700"
+                >
+                    Track Reservation
+                </a>
+
+                <a
                     href="{{ route('reservation.create') }}"
                     class="rounded-lg border border-blue-700 px-5 py-3 font-semibold text-blue-700 hover:bg-blue-50"
                 >
@@ -129,7 +146,7 @@
                 </a>
 
                 <a
-                    href="{{ route('home') }}"
+                    href="{{ route('reservation.create', ['step' => 1]) }}"
                     class="rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white hover:bg-blue-800"
                 >
                     Return to Home

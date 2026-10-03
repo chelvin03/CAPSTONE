@@ -114,6 +114,64 @@ test('a facility used by a reservation is retained with a helpful warning', func
     $this->assertDatabaseHas('facilities', ['id' => $facility->id]);
 });
 
+test('admin can open and update a reservation from the management actions', function () {
+    $facility = Facility::create([
+        'facility_name' => 'Editable Gym',
+        'capacity' => 200,
+        'status' => 'available',
+    ]);
+
+    $reservation = Reservation::create([
+        'reference_number' => 'QA-EDIT-RESERVATION',
+        'user_id' => $this->admin->id,
+        'facility_id' => $facility->id,
+        'reservation_type' => 'sports',
+        'event_name' => 'Original Event',
+        'purpose' => 'Original purpose',
+        'contact_person' => 'QA Tester',
+        'contact_number' => '09123456789',
+        'expected_attendees' => 20,
+        'reservation_date' => now()->addDays(5)->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '09:00',
+        'status' => 'new',
+    ]);
+
+    $this->get(route('admin.reservations.index'))
+        ->assertOk()
+        ->assertSee(route('admin.reservations.edit', $reservation), false);
+
+    $this->get(route('admin.reservations.edit', $reservation))
+        ->assertOk()
+        ->assertSee('Original Event');
+
+    $this->put(route('admin.reservations.update', $reservation), [
+        'facility_id' => $facility->id,
+        'reservation_type' => 'sports',
+        'event_name' => 'Updated Event',
+        'event_type' => 'Tournament',
+        'purpose' => 'Updated purpose',
+        'contact_person' => 'QA Tester',
+        'contact_number' => '09123456789',
+        'contact_email' => 'qa@example.com',
+        'expected_attendees' => 30,
+        'reservation_date' => now()->addDays(5)->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '10:00',
+        'requested_equipment' => 'Volleyball net',
+        'requested_equipment_quantity' => 2,
+    ])->assertRedirect(route('admin.reservations.index'))
+        ->assertSessionHas('success', 'Reservation updated successfully.');
+
+    $this->assertDatabaseHas('reservations', [
+        'id' => $reservation->id,
+        'event_name' => 'Updated Event',
+        'expected_attendees' => 30,
+        'requested_equipment' => 'Volleyball net',
+        'requested_equipment_quantity' => 2,
+    ]);
+});
+
 test('equipment maintenance supports validation and CRUD without affecting other records', function () {
     $other = Equipment::create([
         'equipment_name' => 'Existing Basketball',
@@ -234,6 +292,7 @@ test('staff can only access staff maintenance lists', function () {
         route('staff.reservations.index'),
         route('staff.facilities.index'),
         route('staff.equipment.index'),
+        route('staff.reports.index'),
     ];
 
     $this->actingAs($staff);
@@ -245,6 +304,7 @@ test('staff can only access staff maintenance lists', function () {
             ->assertSee(route('staff.reservations.index'), false)
             ->assertSee(route('staff.facilities.index'), false)
             ->assertSee(route('staff.equipment.index'), false)
+            ->assertSee(route('staff.reports.index'), false)
             ->assertDontSee(route('admin.dashboard'), false);
     }
 
