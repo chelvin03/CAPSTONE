@@ -165,23 +165,22 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware('role:staff')
+    Route::middleware(['role:staff', \App\Http\Middleware\StaffReadOnly::class])
         ->prefix('staff')
         ->name('staff.')
         ->group(function (): void {
 
-            Route::get('/dashboard', function () {
-                return view('staff.dashboard');
-            })->name('dashboard');
+            Route::get('/dashboard', \App\Http\Controllers\Staff\DashboardController::class)->name('dashboard');
+            Route::get('/schedules', [\App\Http\Controllers\Staff\ScheduleController::class, 'index'])->name('schedules.index');
 
             Route::get(
                 '/reservations',
-                [ReservationController::class, 'staffIndex']
+                [\App\Http\Controllers\Staff\ReservationController::class, 'index']
             )->name('reservations.index');
 
             Route::get(
                 '/reservations/{reservation}',
-                [ReservationController::class, 'staffShow']
+                [\App\Http\Controllers\Staff\ReservationController::class, 'show']
             )->name('reservations.show');
 
             Route::get(

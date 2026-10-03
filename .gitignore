@@ -5,6 +5,12 @@
 .enr.backup
 /.tmp/
 .env.production
+.env.*
+!.env.example
+*.sql
+*.sql.gz
+*.sql.zip
+*.sqlite*
 .phpactor.json
 .phpunit.result.cache
 /.fleet

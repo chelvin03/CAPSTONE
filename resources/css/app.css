@@ -1,3 +1,4 @@
+@import url('https://fonts.bunny.net/css?family=poppins:400,500,600,700&display=swap');
 @import 'bootstrap-icons/font/bootstrap-icons.css';
 @tailwind base;
 @tailwind components;
@@ -5,6 +6,10 @@
 
 [x-cloak] {
     display: none !important;
+}
+
+.bi-dashboard, .staff-monitoring {
+    font-family: 'Poppins', ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {

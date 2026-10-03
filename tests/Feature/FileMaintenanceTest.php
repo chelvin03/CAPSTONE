@@ -292,7 +292,7 @@ test('staff can only access staff maintenance lists', function () {
         route('staff.reservations.index'),
         route('staff.facilities.index'),
         route('staff.equipment.index'),
-        route('staff.reports.index'),
+        route('staff.schedules.index'),
     ];
 
     $this->actingAs($staff);
@@ -304,7 +304,8 @@ test('staff can only access staff maintenance lists', function () {
             ->assertSee(route('staff.reservations.index'), false)
             ->assertSee(route('staff.facilities.index'), false)
             ->assertSee(route('staff.equipment.index'), false)
-            ->assertSee(route('staff.reports.index'), false)
+            ->assertSee(route('staff.schedules.index'), false)
+            ->assertDontSee(route('staff.reports.index'), false)
             ->assertDontSee(route('admin.dashboard'), false);
     }
 

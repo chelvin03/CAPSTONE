@@ -22,14 +22,15 @@
     <form
         method="GET"
         action="{{ route('staff.equipment.index') }}"
-        class="mb-5 flex gap-3"
+        class="mb-5 flex flex-col gap-3 sm:flex-row"
     >
         <input
             type="text"
             name="search"
+            aria-label="Search equipment"
             value="{{ $search ?? '' }}"
             placeholder="Search equipment name, unit, or status"
-            class="flex-1 rounded-lg border border-slate-300 px-4 py-2"
+            class="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2"
         >
 
         <button
@@ -40,7 +41,7 @@
         </button>
     </form>
 
-    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm" tabindex="0" role="region" aria-label="Equipment records">
 
         <table class="min-w-full divide-y divide-slate-200">
 
@@ -82,7 +83,7 @@
                         </td>
 
                         <td class="px-5 py-4 text-sm text-slate-700">
-                            {{ ucfirst($item->status) }}
+                            <x-operational-status :status="$item->status" />
                         </td>
                     </tr>
 

@@ -34,45 +34,17 @@
         </p>
 
         @if (auth()->user()?->role === 'staff')
-            <a
-                href="{{ route('staff.dashboard') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.dashboard') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-grid" aria-hidden="true"></i>
-                <span>Dashboard</span>
-            </a>
-
-            <a
-                href="{{ route('staff.reservations.index') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.reservations.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-calendar-check" aria-hidden="true"></i>
-                <span>Reservations</span>
-            </a>
-
-            <a
-                href="{{ route('staff.facilities.index') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.facilities.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-building" aria-hidden="true"></i>
-                <span>Facilities</span>
-            </a>
-
-            <a
-                href="{{ route('staff.reports.index') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.reports.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-bar-chart" aria-hidden="true"></i>
-                <span>Reports</span>
-            </a>
-
-            <a
-                href="{{ route('staff.equipment.index') }}"
-                class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs('staff.equipment.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
-            >
-                <i class="bi bi-tools" aria-hidden="true"></i>
-                <span>Equipment</span>
-            </a>
+            @foreach ([
+                ['staff.dashboard', 'Dashboard', 'bi-grid'],
+                ['staff.reservations.index', 'Reservations', 'bi-calendar-check'],
+                ['staff.schedules.index', 'Schedules', 'bi-calendar3'],
+                ['staff.facilities.index', 'Facilities', 'bi-building'],
+                ['staff.equipment.index', 'Equipment', 'bi-tools'],
+            ] as [$destination, $label, $icon])
+                <a href="{{ route($destination) }}" class="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition {{ request()->routeIs(str_replace('.index', '.*', $destination)) ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}">
+                    <i class="bi {{ $icon }}" aria-hidden="true"></i><span>{{ $label }}</span>
+                </a>
+            @endforeach
         @else
 
         {{-- Dashboard --}}

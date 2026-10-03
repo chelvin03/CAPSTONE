@@ -5,90 +5,101 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Facility;
-use App\Models\Reservation;
-use Carbon\CarbonImmutable;
-use Illuminate\Http\Request;
+use App\Http\Requests\Admin\DashboardRequest;
+use App\Models\AuditLog;
+use App\Services\DashboardAnalyticsService;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): View|StreamedResponse
+    public function __invoke(DashboardRequest $request, DashboardAnalyticsService $analytics): View|StreamedResponse
     {
-        $statuses = ['new', 'pending', 'validated', 'waiting_list', 'approved', 'completed', 'rejected', 'cancelled'];
-        $filters = $request->validate([
-            'date_from' => ['nullable', 'date_format:Y-m-d'],
-            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
-            'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
-            'category' => ['nullable', 'string', 'max:50'],
-            'status' => ['nullable', 'in:'.implode(',', $statuses)],
-            'export' => ['nullable', 'in:csv'],
-        ]);
-        $now = CarbonImmutable::now();
-        $from = CarbonImmutable::parse($filters['date_from'] ?? $now->startOfMonth()->subMonths(11)->toDateString())->startOfDay();
-        $to = CarbonImmutable::parse($filters['date_to'] ?? $now->endOfMonth()->toDateString())->startOfDay();
-        if ($to->lt($from) || $from->diffInDays($to) > 1095) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['date_to' => 'Choose an end date on or after the start date, within three years.']);
-        }
-        $filters = array_merge($filters, ['date_from' => $from->toDateString(), 'date_to' => $to->toDateString()]);
-        unset($filters['export']);
-        $base = Reservation::query()
-            ->when($filters['facility_id'] ?? null, fn ($q, $id) => $q->where('facility_id', $id))
-            ->when($filters['category'] ?? null, fn ($q, $category) => $q->where('reservation_type', $category))
-            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status));
-        $query = (clone $base)->whereDate('reservation_date', '>=', $from->toDateString())->whereDate('reservation_date', '<=', $to->toDateString());
-
+        $filters = $request->filters();
+        $data = $analytics->summarize($filters);
         if ($request->input('export') === 'csv') {
-            return response()->streamDownload(function () use ($query): void {
-                $file = fopen('php://output', 'w');
-                fputcsv($file, ['Reference', 'Event', 'Facility', 'Reservation date', 'Category', 'Status', 'Expected attendees']);
-                foreach ((clone $query)->with('facility')->orderBy('id')->lazy(500) as $row) {
-                    $values = [$row->reference_number, $row->event_name, $row->facility?->facility_name ?? 'Unknown facility', $row->reservation_date->toDateString(), $row->reservation_type, $row->status, $row->expected_attendees];
-                    fputcsv($file, array_map(fn ($value) => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'".$value : $value, $values));
-                }
-                fclose($file);
-            }, 'dashboard-reservations.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+            AuditLog::recordEvent('analytics.export', newValues: ['filters' => $filters, 'format' => 'csv', 'matching_records' => $data['totalReservations']]);
+
+            return $this->csv($analytics, $data, $request->user()->full_name);
         }
 
-        $records = (clone $query)->get(['facility_id', 'reservation_date', 'status', 'expected_attendees', 'created_at']);
-        $totalReservations = $records->count();
-        $counts = $records->countBy('status');
-        $previousTo = $from->subDay();
-        $previousFrom = $from->subDays((int) $from->diffInDays($to) + 1);
-        $previousTotal = (clone $base)->whereDate('reservation_date', '>=', $previousFrom->toDateString())->whereDate('reservation_date', '<=', $previousTo->toDateString())->count();
-        $change = $previousTotal > 0 ? round(($totalReservations - $previousTotal) / $previousTotal * 100, 1) : null;
-        $byMonth = $records->countBy(fn ($r) => $r->reservation_date->format('Y-m'));
-        $monthlyActivity = collect();
-        for ($month = $from->startOfMonth(); $month->lte($to); $month = $month->addMonth()) {
-            $monthlyActivity->push(['label' => $month->format('M'), 'year' => $month->format('Y'), 'count' => $byMonth->get($month->format('Y-m'), 0), 'from' => $month->max($from)->toDateString(), 'to' => $month->endOfMonth()->min($to)->toDateString()]);
-        }
-        $facilities = Facility::orderBy('facility_name')->get();
-        $facilityDemand = $records->countBy('facility_id')->map(fn ($count, $id) => ['id' => $id, 'label' => $facilities->firstWhere('id', $id)?->facility_name ?? 'Unknown facility', 'count' => $count])->sortByDesc('count')->values();
-        $weekdays = $records->countBy(fn ($r) => $r->reservation_date->dayOfWeekIso);
-        $weekdayDemand = collect(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])->map(fn ($label, $index) => ['label' => $label, 'count' => $weekdays->get($index + 1, 0)]);
-        $pending = $records->whereIn('status', ['new', 'pending', 'validated', 'waiting_list']);
-        $oldPending = $pending->filter(fn ($r) => $r->created_at && $r->created_at->lte($now->subDays(7)))->count();
-
-        return view('dashboard.admin', [
-            'filters' => $filters, 'statuses' => $statuses, 'facilities' => $facilities,
-            'categories' => Reservation::distinct()->orderBy('reservation_type')->pluck('reservation_type'),
-            'totalReservations' => $totalReservations,
-            'approvedReservations' => $counts->get('approved', 0),
-            'completedEvents' => $counts->get('completed', 0),
-            'pendingReservations' => $pending->count(),
-            'cancelledReservations' => $counts->get('cancelled', 0),
-            'approvalRate' => $totalReservations ? (int) round($counts->get('approved', 0) / $totalReservations * 100) : 0,
-            'cancellationRate' => $totalReservations ? round($counts->get('cancelled', 0) / $totalReservations * 100, 1) : null,
-            'expectedAttendees' => $records->whereIn('status', ['approved', 'completed'])->sum('expected_attendees'),
-            'thisMonthReservations' => $records->filter(fn ($r) => $r->reservation_date->format('Y-m') === $now->format('Y-m'))->count(),
-            'thisMonthCancellations' => $records->filter(fn ($r) => $r->status === 'cancelled' && $r->reservation_date->format('Y-m') === $now->format('Y-m'))->count(),
-            'monthlyActivity' => $monthlyActivity, 'monthlyMaximum' => max(1, $monthlyActivity->max('count')),
-            'facilityDemand' => $facilityDemand, 'weekdayDemand' => $weekdayDemand,
-            'statusBreakdown' => collect($statuses)->map(fn ($status) => ['status' => $status, 'count' => $counts->get($status, 0)]),
-            'previousTotal' => $previousTotal, 'previousFrom' => $previousFrom, 'previousTo' => $previousTo, 'change' => $change,
-            'oldPending' => $oldPending,
-            'recentReservations' => (clone $query)->with('facility')->latest('updated_at')->orderByDesc('id')->paginate(10)->withQueryString(),
+        return view('dashboard.admin', $data + [
+            'recentReservations' => $analytics->records($filters)->paginate(10)->appends($filters),
         ]);
+    }
+
+    private function csv(DashboardAnalyticsService $analytics, array $data, string $administrator): StreamedResponse
+    {
+        return response()->streamDownload(function () use ($analytics, $data, $administrator): void {
+            $file = fopen('php://output', 'w');
+            $write = function (array $values) use ($file): void {
+                fputcsv($file, array_map(fn ($value) => preg_match('/^[\s]*[=+@-]/u', (string) $value) ? "'".$value : $value, $values), ',', '"', '');
+            };
+            $write(['MCST Gymnasium Business Intelligence Report']);
+            $write(['Scheduled date range', $data['filters']['date_from'], $data['filters']['date_to']]);
+            $write(['Generated at', $data['generatedAt']->format('Y-m-d H:i:s T')]);
+            $write(['Generated by administrator', $administrator]);
+            foreach ($data['filterLabels'] as $name => $value) {
+                $write([$name, $value]);
+            }
+            $write([]);
+            $write(['Summary metric', 'Value']);
+            foreach ([
+                'Total requests' => $data['totalReservations'], 'Pending review (new + validated)' => $data['pendingReservations'],
+                'Overdue requests (at least 7 days)' => $data['oldPending'], 'Approved reservations' => $data['approvedReservations'],
+                'Completed events' => $data['completedEvents'], 'Cancellation rate (%)' => $data['cancellationRate'],
+                'Scheduled utilization rate (%)' => $data['utilizationRate'], 'Scheduled occupied hours (overlaps merged)' => $data['utilizedHours'],
+                'Available operating hours' => $data['availableHours'], 'Average processing time (hours)' => $data['processingHours'],
+                'Records with decision timestamps' => $data['processingCount'], 'Previous period requests' => $data['previousTotal'],
+                'Previous period change (%)' => $data['change'], 'Expected attendees (approved + completed)' => $data['expectedAttendees'],
+                'Feedback responses' => $data['feedbackCount'], 'Average recorded satisfaction rating' => $data['feedbackAverage'],
+                'Currently waiting' => $data['waitingCount'], 'Ever waitlisted (history)' => $data['waitingEver'],
+                'Promoted to approved (history)' => $data['waitingPromoted'], 'Waiting-list conversion (%)' => $data['waitingConversion'],
+                'Completed events with completion timestamp' => $data['completionRecorded'],
+                'Peak weekday' => $data['peakWeekday']['label'], 'Peak weekday requests' => $data['peakWeekday']['count'],
+                'Peak time slot' => $data['peakTimeSlot']['label'], 'Peak time slot requests' => $data['peakTimeSlot']['count'],
+                'Busiest month' => $data['busiestMonth']['label'], 'Busiest month requests' => $data['busiestMonth']['count'],
+            ] as $name => $value) {
+                $write([$name, $value ?? 'N/A']);
+            }
+            $write(['Previous reporting period', $data['previousFrom']->toDateString(), $data['previousTo']->toDateString()]);
+            $write(['Utilization scope', 'Approved + completed scheduled times, clipped to configured operating hours. Overlaps merged per facility/day. Calendar-day capacity; closures not deducted. Not actual attendance or usage.']);
+            $write(['Operating hours', $data['operatingHours'] ? $data['operatingHours']['open'].' - '.$data['operatingHours']['close'] : 'Not configured']);
+            $write(['Processing definition', 'Submission to first approval, rejection or cancellation from timestamps/history; records without a valid decision timestamp excluded.']);
+            $write([]);
+            $write(['Reservation outcomes', 'Count', 'Percentage']);
+            foreach ($data['statusBreakdown'] as $row) {
+                $write([DashboardAnalyticsService::label($row['status']), $row['count'], $row['percentage'] ?? 'N/A']);
+            }
+            $write(['Trend period start', 'Trend period end', 'Reservations', 'Partial period']);
+            foreach ($data['trendActivity'] as $row) {
+                $write([$row['from'], $row['to'], $row['count'], $row['partial'] ? 'Yes' : 'No']);
+            }
+            $write(['Event type', 'Count', 'Percentage']);
+            foreach ($data['eventDemand'] as $row) {
+                $write([$row['label'], $row['count'], $row['percentage'] ?? 'N/A']);
+            }
+            foreach (['requestorDemand' => 'Requestor type', 'weekdayDemand' => 'Weekday', 'timeSlots' => 'Hourly slot (booking overlaps, not utilization)'] as $key => $label) {
+                $write([$label, 'Reservations']);
+                foreach ($data[$key] as $row) {
+                    $write([$row['label'], $row['count']]);
+                }
+            }
+            $write(['Equipment', 'Bookings', 'Requested units', 'Allocated units']);
+            foreach ($data['equipmentDemand'] as $row) {
+                $write([$row->equipment_name, $row->bookings, $row->requested, $row->allocated]);
+            }
+            $write(['Cancellation reason group', 'Count']);
+            foreach ($data['cancellationReasons'] as $row) {
+                $write([$row->reason_group, $row->total]);
+            }
+            $write([]);
+            $write(['Matching records (scheduled date, start time, ID ascending)']);
+            $write(['Reference', 'Event', 'Event type', 'Requestor type', 'Facility', 'Scheduled date', 'Start time', 'End time', 'Expected attendees', 'Status']);
+            foreach ($analytics->records($data['filters'])->lazy(500) as $row) {
+                $write([$row->reference_number, DashboardAnalyticsService::label($row->event_name), DashboardAnalyticsService::label($row->event_type), DashboardAnalyticsService::label($row->reservation_type), $row->facility?->facility_name, $row->reservation_date->toDateString(), $row->start_time, $row->end_time, $row->expected_attendees, DashboardAnalyticsService::label($row->status)]);
+            }
+            fclose($file);
+        }, 'dashboard-reservations.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
     }
 }

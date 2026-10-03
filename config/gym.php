@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 return [
 
+    'auth' => [
+        'local_test_admin_password_only' => (bool) env('GYM_LOCAL_TEST_ADMIN_PASSWORD_ONLY', false),
+        'local_test_staff_password_only' => (bool) env('GYM_LOCAL_TEST_STAFF_PASSWORD_ONLY', false),
+    ],
+
     'reservation' => [
         'daily_limit' => (int) env('GYM_RESERVATION_DAILY_LIMIT', 5),
         'minimum_notice_days' => (int) env('GYM_RESERVATION_MINIMUM_NOTICE_DAYS', 3),

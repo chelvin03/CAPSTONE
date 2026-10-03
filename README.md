@@ -1,3 +1,42 @@
+# MCST Gymnasium Reservation and Utilization System
+
+Web-based reservation management and descriptive utilization analytics for Mandaluyong College of Science and Technology.
+
+- Public requestors submit and track reservations without an account.
+- Administrators manage reservations, facilities, equipment, reports and BI analytics.
+- Approved staff monitor reservations, schedules, facilities and equipment through read-only pages.
+
+## Project documentation
+
+- [Repository inventory and GitHub readiness](docs/github-readiness.md)
+- [Staff dashboard behavior, permissions and verification](docs/staff-dashboard-review.md)
+- [BI metrics and data availability](docs/bi-dashboard-review.md)
+- [Login email verification and local test accounts](docs/login-email-verification.md)
+
+## Development setup
+
+Requirements: PHP 8.2 or newer with the extensions required by `composer.lock`, Composer, Node/npm compatible with the locked Vite version, and either MariaDB/MySQL or SQLite. The existing XAMPP installation uses MariaDB; tests use isolated in-memory SQLite.
+
+For a **new checkout**, install locked dependencies with `composer install` and `npm ci`. Copy `.env.example` to `.env` only if `.env` does not already exist. Configure the database, application URL/timezone and SMTP credentials, then generate an application key only for that new environment. Run `php artisan migrate` against the intended development database and `npm run build`. Serve Laravel with a web root pointing at `public/`, or use `php artisan serve`.
+
+Existing installations must retain their `.env`, application key, uploaded files and database. Do not use `migrate:fresh` or rerun sample seeders against existing data. The sample seeder does not provision the application's production administrator; account provisioning is a separate administrative step.
+
+Run checks:
+
+```shell
+php artisan test --compact
+npm run build
+php artisan view:cache
+```
+
+Do not commit environment secrets, live database dumps, approval-letter uploads or backup archives. Earlier repository history contains an environment file and a database dump; the updated source tree excludes these. Historical cleanup and any necessary secret rotation remain separate tasks.
+
+For another computer, follow the [second-device setup guide](docs/second-device-setup.md). GitHub provides the source code; it does not host this Laravel application or copy its live database automatically.
+
+---
+
+The original Laravel framework information follows.
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
