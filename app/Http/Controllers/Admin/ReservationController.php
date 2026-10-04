@@ -24,9 +24,23 @@ class ReservationController extends Controller
     {
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->trim()->toString();
+        $dashboardFilters = $request->validate([
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'month' => ['nullable', 'integer', 'between:1,12'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
+            'requestor_type' => ['nullable', 'string', 'max:50'],
+        ]);
 
         $reservations = Reservation::query()
             ->with(['user', 'facility', 'equipment'])
+            ->when($dashboardFilters['date_from'] ?? null, fn ($q, $date) => $q->whereDate('reservation_date', '>=', $date))
+            ->when($dashboardFilters['date_to'] ?? null, fn ($q, $date) => $q->whereDate('reservation_date', '<=', $date))
+            ->when($dashboardFilters['month'] ?? null, fn ($q, $month) => $q->whereMonth('reservation_date', $month))
+            ->when($dashboardFilters['category'] ?? null, fn ($q, $type) => $q->where('event_type', $type))
+            ->when($dashboardFilters['facility_id'] ?? null, fn ($q, $id) => $q->where('facility_id', $id))
+            ->when($dashboardFilters['requestor_type'] ?? null, fn ($q, $type) => $q->where('reservation_type', $type))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($subQuery) use ($search): void {
                     $subQuery

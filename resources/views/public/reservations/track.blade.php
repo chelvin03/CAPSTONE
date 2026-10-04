@@ -24,7 +24,7 @@
             <div class="mt-8 border-t border-slate-200 pt-6">
                 <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                     <div><p class="text-sm text-slate-500">Reference Code</p><p class="text-xl font-bold text-slate-900">{{ $reservation->reference_number }}</p></div>
-                    <span @class(['self-start rounded-full px-3 py-1.5 text-sm font-semibold', 'bg-amber-100 text-amber-800' => in_array($reservation->status, ['new', 'pending', 'validated', 'waiting_list'], true), 'bg-emerald-100 text-emerald-800' => in_array($reservation->status, ['approved', 'completed'], true), 'bg-rose-100 text-rose-800' => in_array($reservation->status, ['rejected', 'cancelled'], true)])>{{ ucwords(str_replace('_', ' ', $reservation->status)) }}</span>
+                    <span @class(['self-start rounded-full px-3 py-1.5 text-sm font-semibold', 'bg-amber-100 text-amber-800' => in_array($reservation->status, ['new', 'pending', 'validated', 'waiting_list'], true), 'bg-emerald-100 text-emerald-800' => in_array($reservation->status, ['approved', 'completed'], true), 'bg-rose-100 text-rose-800' => in_array($reservation->status, ['rejected', 'cancelled'], true)])>{{ $reservation->status === 'new' ? 'Request Received' : ucwords(str_replace('_', ' ', $reservation->status)) }}</span>
                 </div>
 
                 <dl class="mt-6 grid gap-5 rounded-xl bg-slate-50 p-5 sm:grid-cols-2">
@@ -37,7 +37,7 @@
                 <h2 class="mt-7 font-semibold text-slate-900">Status History</h2>
                 <div class="mt-3 space-y-3">
                     @foreach ($reservation->statusHistories->sortByDesc('created_at') as $history)
-                        <div class="rounded-lg border border-slate-200 p-4"><div class="flex justify-between gap-3"><span class="font-semibold text-slate-800">{{ ucwords(str_replace('_', ' ', $history->new_status)) }}</span><time class="text-xs text-slate-500">{{ $history->created_at->format('M d, Y g:i A') }}</time></div>@if($history->remarks)<p class="mt-1 text-sm text-slate-600">{{ $history->remarks }}</p>@endif</div>
+                        <div class="rounded-lg border border-slate-200 p-4"><div class="flex justify-between gap-3"><span class="font-semibold text-slate-800">{{ $history->new_status === 'new' ? 'Request Received' : ucwords(str_replace('_', ' ', $history->new_status)) }}</span><time class="text-xs text-slate-500">{{ $history->created_at->format('M d, Y g:i A') }}</time></div>@if($history->remarks)<p class="mt-1 text-sm text-slate-600">{{ $history->remarks }}</p>@endif</div>
                     @endforeach
                 </div>
             </div>

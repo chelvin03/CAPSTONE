@@ -184,7 +184,7 @@ test('public submission ignores forged browser verification and consumes real pr
         ->assertRedirect(route('reservation.success', Reservation::sole()->reference_number));
     expect(Reservation::sole()->user_id)->toBeNull();
     $this->assertGuest();
-    $this->get('/reserve?step=3')->assertRedirect(route('reservation.create'));
+    $this->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));
 });
 
 test('confirmation mail failure preserves the reservation and tracking page', function () {
@@ -208,6 +208,6 @@ test('verified event form submits the calendar date and restores it after valida
         'public_reservation_details' => ['contact_email' => 'juan@example.com'],
         'public_email_verified' => ['email' => 'juan@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp],
         '_old_input' => ['reservation_date' => $date],
-    ])->get('/reserve?step=3')->assertOk()
+    ])->get(route('reservation.create', ['step' => 3]))->assertOk()
         ->assertSee('name="reservation_date" x-model="date" value="'.$date.'"', false);
 });

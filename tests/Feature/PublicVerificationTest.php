@@ -56,17 +56,17 @@ test('public details are validated before any email is sent', function () {
 });
 
 test('step three is rendered only for verified requests and details survive reload', function () {
-    $this->get('/reserve?step=3')->assertRedirect(route('reservation.create'));
-    $this->get('/reserve')->assertOk()->assertDontSee('name="event_name"', false);
+    $this->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));
+    $this->get(route('reservation.create'))->assertOk()->assertDontSee('name="event_name"', false);
     $this->postJson('/reserve/send-code', publicOtpDetails())->assertOk();
     $code = Mail::sent(PublicRegistrationCode::class)->sole()->code;
     Mail::assertSent(PublicRegistrationCode::class, fn ($mail) => $mail->hasTo('public@example.com') && $mail->mailer === 'smtp');
     expect(\Illuminate\Support\Facades\Hash::check($code, session('public_email_challenge.hash')))->toBeTrue();
     $this->postJson('/reserve/verify-code', ['email' => 'public@example.com', 'code' => $code])->assertOk();
-    $this->get('/reserve?step=3')->assertOk()->assertSee('name="event_name"', false)->assertSee('Public Requestor');
+    $this->get(route('reservation.create', ['step' => 3]))->assertOk()->assertSee('name="event_name"', false)->assertSee('Public Requestor');
     $this->postJson('/reserve/edit-details')->assertOk()->assertSessionMissing('public_email_verified');
-    $this->get('/reserve')->assertOk()->assertSee('Public Requestor')->assertDontSee('name="event_name"', false);
-    $this->get('/reserve?step=3')->assertRedirect(route('reservation.create'));
+    $this->get(route('reservation.create'))->assertOk()->assertSee('Public Requestor')->assertDontSee('name="event_name"', false);
+    $this->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));
 });
 
 test('resend replaces the old code and limits repeated sends', function () {
@@ -105,7 +105,7 @@ test('changed email invalidates prior verification and must be verified again', 
     $this->postJson('/reserve/verify-code', ['email' => 'public@example.com', 'code' => $code])->assertOk();
     $this->postJson('/reserve/send-code', [...publicOtpDetails(), 'email' => 'new@example.com'])
         ->assertOk()->assertSessionMissing('public_email_verified');
-    $this->get('/reserve?step=3')->assertRedirect(route('reservation.create'));
+    $this->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));
     $this->postJson('/reserve/verify-code', ['email' => 'new@example.com', 'code' => $code])->assertUnprocessable();
     $fresh = Mail::sent(PublicRegistrationCode::class)->last()->code;
     $this->postJson('/reserve/verify-code', ['email' => 'new@example.com', 'code' => $fresh])->assertOk();
@@ -115,7 +115,7 @@ test('expired verified proof cannot access step three', function () {
     $this->withSession([
         'public_email_verified' => ['email' => 'public@example.com', 'verified' => true, 'expires_at' => now()->subSecond()->timestamp],
         'public_reservation_details' => ['contact_email' => 'public@example.com'],
-    ])->get('/reserve?step=3')->assertRedirect(route('reservation.create'));
+    ])->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));
 });
 
 test('mail exceptions are logged without credentials or message contents', function () {

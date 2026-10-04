@@ -24,7 +24,8 @@ class DashboardController extends Controller
         }
 
         return view('dashboard.admin', $data + [
-            'recentReservations' => $analytics->records($filters)->paginate(10)->appends($filters),
+            'selectedPeriod' => $request->input('period'),
+            'overviewReservations' => $analytics->records($filters)->reorder()->orderByDesc('reservation_date')->orderByDesc('start_time')->orderByDesc('id')->limit(5)->get(),
         ]);
     }
 

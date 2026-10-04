@@ -11,7 +11,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="min-h-screen bg-slate-50 text-slate-900 {{ auth()->user()->role === 'staff' ? 'staff-monitoring' : '' }}" x-data="{ navigationOpen: false }">
+<body class="min-h-screen bg-slate-50 text-slate-900 {{ auth()->user()->role === 'staff' ? 'staff-monitoring' : 'admin-workspace' }}" x-data="{ navigationOpen: false }">
     <a href="#main-content" class="sr-only z-[60] rounded bg-white p-3 text-blue-700 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to main content</a>
 
     <div class="flex min-h-screen">

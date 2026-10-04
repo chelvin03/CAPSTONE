@@ -1,0 +1,64 @@
+﻿.reservation-page { background: #f8fafc; }
+.reservation-page #main-content { padding-block: 30px; }
+.reservation-wizard { font-family: 'Poppins', sans-serif; color: #1e293b; max-width: 1040px; }
+.wizard-intro { text-align: center; margin-bottom: 26px; }
+.wizard-intro h1 { font-size: clamp(28px, 3vw, 38px); line-height: 1.25; font-weight: 700; color: #1e3a8a; letter-spacing: -.7px; }
+.wizard-intro p { max-width: 720px; margin: 12px auto 0; font-size: 15px; line-height: 1.8; color: #64748b; }
+.wizard-progress { margin: 0 auto 28px; max-width: 850px; }
+.wizard-progress ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; padding: 0; }
+.wizard-progress li { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; color: #64748b; }
+.wizard-progress li:not(:last-child)::after { content: ''; position: absolute; left: calc(50% + 29px); right: calc(-50% + 29px); top: 23px; height: 2px; background: #e2e8f0; }
+.wizard-progress li.is-complete::after { background: #10b981; }
+.step-circle { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; border: 2px solid #cbd5e1; background: #fff; font-size: 18px; font-weight: 600; }
+.step-label { font-size: 14px; font-weight: 600; line-height: 1.5; }
+.step-label small { display: block; font-size: 11px; font-weight: 400; margin-bottom: 2px; }
+.is-current .step-circle { background: #2563eb; color: #fff; border-color: #2563eb; box-shadow: 0 0 0 5px #dbeafe; }
+.is-current .step-label { color: #1e3a8a; }
+.is-complete .step-circle { background: #ecfdf5; border-color: #10b981; color: #047857; }
+.is-complete .step-label { color: #047857; }
+.wizard-card { border-radius: 18px; border-color: #e2e8f0; box-shadow: 0 8px 30px rgb(15 23 42 / 5%); }
+.wizard-card-heading { display: flex; align-items: center; gap: 18px; }
+.wizard-heading-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; height: 52px; width: 52px; color: #2563eb; background: #eff6ff; border-radius: 14px; font-size: 28px; }
+.wizard-step-caption { color: #2563eb; font-size: 12px; font-weight: 500; margin-bottom: 6px; }
+.wizard-card-heading h2, #event-heading { font-size: 23px; font-weight: 600; color: #1e293b; line-height: 1.4; }
+.wizard-heading-description { font-size: 14px; color: #64748b; margin-top: 5px; }
+.wizard-card > .p-6 { padding: 28px 32px; }
+.wizard-card label { font-size: 14px; }
+.wizard-card input:not([type=checkbox]):not([type=hidden]), .wizard-card select, .wizard-card textarea { font-family: inherit; font-size: 15px; min-height: 48px; border-color: #cbd5e1; border-radius: 10px; }
+.wizard-card input::placeholder, .wizard-card textarea::placeholder { color: #94a3b8; }
+.wizard-card input:focus, .wizard-card select:focus, .wizard-card textarea:focus { border-color: #2563eb; outline: 2px solid #bfdbfe; outline-offset: 2px; }
+.wizard-card input[aria-invalid=true], .wizard-card select[aria-invalid=true], .wizard-card textarea[aria-invalid=true] { border-color: #dc2626; }
+.required-marker { color: #b91c1c; }
+.wizard-field-help { font-size: 12px; line-height: 1.6; color: #64748b; margin-top: 6px; }
+.wizard-field-error { color: #b91c1c; font-size: 12px; line-height: 1.6; margin-top: 6px; }
+.wizard-info { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #dbeafe; background: #eff6ff; border-radius: 10px; padding: 16px 18px; color: #1e3a8a; font-size: 13px; line-height: 1.7; }
+.wizard-info i { font-size: 19px; flex-shrink: 0; }
+.wizard-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding-top: 18px; border-top: 1px solid #e2e8f0; }
+.wizard-primary { min-height: 50px; font-size: 15px; font-weight: 600; box-shadow: 0 3px 8px #2563eb20; }
+.wizard-primary:hover { background: #1e3a8a; }
+.wizard-privacy { display: flex; align-items: flex-start; gap: 8px; max-width: 820px; margin: 18px auto 0; font-size: 12px; color: #64748b; line-height: 1.8; text-align: left; }
+.wizard-privacy i { flex-shrink: 0; margin-top: 2px; }
+.wizard-verification-heading { padding-block: 26px; }
+.wizard-verification-heading svg { width: 52px; height: 52px; margin-bottom: 12px; margin-top: 12px; }
+.wizard-verification-heading h2 { font-size: 26px; }
+.wizard-card #public-verification-code { max-width: 380px; margin-inline: auto; letter-spacing: .5em; font-size: 26px; }
+@media (max-width: 640px) {
+    .reservation-page #main-content { padding-block: 22px; }
+    .wizard-intro { margin-bottom: 22px; }
+    .wizard-intro p { font-size: 13px; }
+    .wizard-progress { margin-bottom: 22px; }
+    .step-circle { width: 40px; height: 40px; font-size: 16px; }
+    .wizard-progress li:not(:last-child)::after { top: 19px; left: calc(50% + 24px); right: calc(-50% + 24px); }
+    .step-label { font-size: 11px; padding-inline: 4px; }
+    .step-label small { font-size: 10px; }
+    .wizard-card > .p-6 { padding: 22px 18px; }
+    .wizard-card-heading { gap: 12px; }
+    .wizard-heading-icon { width: 42px; height: 42px; font-size: 24px; }
+    .wizard-card-heading h2, #event-heading { font-size: 20px; }
+    .wizard-heading-description { font-size: 12px; }
+    .wizard-actions { align-items: stretch; flex-direction: column; }
+    .wizard-actions button { width: 100%; }
+    .wizard-card .grid-cols-3 { grid-template-columns: 1fr; }
+    .wizard-card table { min-width: 380px; }
+    .wizard-card div:has(> table) { overflow-x: auto; }
+}

@@ -20,6 +20,9 @@
     </div>
 
     <form method="GET" class="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(12rem,1fr)_12rem_auto_auto]" role="search">
+        @foreach (['date_from', 'date_to', 'month', 'category', 'facility_id', 'requestor_type'] as $filter)
+            @if(request()->filled($filter))<input type="hidden" name="{{ $filter }}" value="{{ request($filter) }}">@endif
+        @endforeach
 
         <input
             type="text"
@@ -37,7 +40,7 @@
         >
             <option value="">All Status</option>
 
-            @foreach(['new','approved','rejected','cancelled','completed'] as $item)
+            @foreach(['new','validated','approved','rejected','waiting_list','cancelled','completed','pending'] as $item)
                 <option
                     value="{{ $item }}"
                     @selected(request('status')==$item)
@@ -52,11 +55,14 @@
             <i class="bi bi-search" aria-hidden="true"></i> Search
         </button>
 
-        @if(request()->filled('search') || request()->filled('status'))
+        @if(request()->hasAny(['search', 'status', 'date_from', 'date_to', 'month', 'category', 'facility_id', 'requestor_type']))
             <a href="{{ route('admin.reservations.index') }}" class="btn-secondary">Clear</a>
         @endif
 
     </form>
+    @if(request()->filled('date_from') || request()->filled('category'))
+        <p class="mb-4 text-sm text-slate-600">Dashboard filters: {{ request('date_from') }} – {{ request('date_to') }}@if(request()->filled('month')) · Month {{ request('month') }}@endif @if(request()->filled('category')) · {{ request('category') }}@endif</p>
+    @endif
 
     <div class="card overflow-x-auto">
 

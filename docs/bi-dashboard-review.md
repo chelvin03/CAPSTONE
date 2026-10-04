@@ -1,5 +1,7 @@
 # BI dashboard implementation review
 
+The current compact dashboard is documented in [gymnasium-bi-dashboard.md](gymnasium-bi-dashboard.md). It uses current-year/month filters, five summary cards, a latest-five table, and an SVG status doughnut. The sections below describe the earlier expanded dashboard and its retained supporting CSV calculations. Current utilization counts **Approved only** and subtracts existing global/facility blackout intervals from both occupied and available hours. The earlier Approved + Completed and calendar-day-only capacity descriptions below are superseded.
+
 ## Architecture and scope
 
 The existing `admin.dashboard` GET route (`/admin/dashboard`) remains inside the authenticated administrator route group. The same route serves the filtered CSV with `export=csv`. Staff and public routes are unchanged. No authentication or database records were changed for this task.

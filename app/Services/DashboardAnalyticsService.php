@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Facility;
 use App\Models\Reservation;
+use App\Models\ScheduleBlock;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -15,8 +16,8 @@ use Illuminate\Support\Str;
 class DashboardAnalyticsService
 {
     public const STATUS_COLORS = [
-        'new' => '#2563eb', 'validated' => '#7c3aed', 'approved' => '#15803d',
-        'rejected' => '#dc2626', 'waiting_list' => '#c2410c', 'cancelled' => '#64748b',
+        'new' => '#2563eb', 'validated' => '#7c3aed', 'approved' => '#10b981',
+        'rejected' => '#ef4444', 'waiting_list' => '#f59e0b', 'cancelled' => '#64748b',
         'completed' => '#0f766e', 'pending' => '#64748b',
     ];
 
@@ -27,6 +28,7 @@ class DashboardAnalyticsService
             ->when($filters['category'] ?? null, fn ($q, $value) => $q->where('event_type', $value))
             ->when($filters['requestor_type'] ?? null, fn ($q, $value) => $q->where('reservation_type', $value))
             ->when($filters['status'] ?? null, fn ($q, $value) => $q->where('status', $value))
+            ->when($filters['month'] ?? null, fn ($q, $value) => $q->whereMonth('reservation_date', $value))
             ->when($withDates, fn ($q) => $q->where('reservation_date', '>=', $filters['date_from'])
                 ->where('reservation_date', '<', CarbonImmutable::parse($filters['date_to'])->addDay()->toDateString()));
     }
@@ -52,13 +54,13 @@ class DashboardAnalyticsService
         $to = CarbonImmutable::parse($filters['date_to']);
         $counts = (clone $query)->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status');
         $total = (int) $counts->sum();
-        $statuses = array_values(array_unique(array_merge(array_diff(array_keys(self::STATUS_COLORS), ['pending']), $counts->keys()->all())));
+        $statuses = array_values(array_unique(array_merge(['new', 'validated', 'approved', 'rejected', 'waiting_list', 'cancelled'], $counts->keys()->all())));
         $oldPending = (clone $query)->whereIn('status', ['new', 'validated'])->where('created_at', '<=', $now->subDays(7))->count();
         $previousTo = $from->subDay();
         $previousFrom = $from->subDays((int) $from->diffInDays($to) + 1);
         $previousTotal = $this->query(array_merge($filters, ['date_from' => $previousFrom->toDateString(), 'date_to' => $previousTo->toDateString()]))->count();
 
-        // At most 1,096 daily aggregate rows, never the full reservation dataset.
+        // Aggregate by reservation date; all-years filters may span more than three years.
         $daily = (clone $query)->selectRaw('reservation_date, COUNT(*) AS total')->groupBy('reservation_date')->orderBy('reservation_date')->pluck('total', 'reservation_date');
         $monthlyActivity = $this->trend($daily, $from, $to, 'monthly');
         $trendActivity = $this->trend($daily, $from, $to, $filters['grouping']);
@@ -75,7 +77,7 @@ class DashboardAnalyticsService
             ->map(fn ($row) => ['label' => self::label($row->reservation_type), 'count' => (int) $row->total]);
         $facilities = Facility::orderBy('facility_name')->get(['id', 'facility_name']);
         $operating = $this->operatingHours();
-        $utilization = $this->utilization($query, $operating, (int) $from->diffInDays($to) + 1, isset($filters['facility_id']) ? 1 : $facilities->count());
+        $utilization = $this->utilization($query, $operating, $from, $to, $facilities, $filters);
         $processing = $this->processing($query);
         $timeSlots = $this->timeSlots($query);
         $extras = $this->supplementary($query);
@@ -89,6 +91,10 @@ class DashboardAnalyticsService
 
         return array_merge($extras, $utilization, [
             'filters' => $filters, 'filterLabels' => $filterLabels, 'generatedAt' => $now,
+            'years' => Reservation::select('reservation_date')->distinct()->pluck('reservation_date')
+                ->map(fn ($date) => (int) CarbonImmutable::parse($date)->year)->push((int) $now->year)->unique()->sortDesc()->values(),
+            'mostCommonEventType' => $eventDemand->first()['label'] ?? 'N/A',
+            'statusOptions' => array_values(array_unique(array_merge(['new', 'validated', 'approved', 'rejected', 'waiting_list', 'cancelled'], Reservation::distinct()->pluck('status')->all()))),
             'statuses' => $statuses, 'statusColors' => self::STATUS_COLORS, 'facilities' => $facilities,
             'categories' => Reservation::whereNotNull('event_type')->where('event_type', '<>', '')->distinct()->orderBy('event_type')->pluck('event_type'),
             'requestorTypes' => Reservation::distinct()->orderBy('reservation_type')->pluck('reservation_type'),
@@ -173,25 +179,73 @@ class DashboardAnalyticsService
         return ['open' => $open, 'close' => $close, 'start' => $seconds($open), 'end' => $seconds($close)];
     }
 
-    private function utilization(Builder $query, ?array $operating, int $days, int $facilities): array
+    private function utilization(Builder $query, ?array $operating, CarbonImmutable $from, CarbonImmutable $to, Collection $facilities, array $filters): array
     {
         $unavailable = ['utilizationRate' => null, 'utilizedHours' => null, 'availableHours' => null];
-        if (! $operating || ! $facilities) {
+        $facilities = $facilities->when(isset($filters['facility_id']), fn ($rows) => $rows->where('id', $filters['facility_id']));
+        if (! $operating || $facilities->isEmpty()) {
             return $unavailable;
         }
-        $start = $this->seconds('start_time');
-        $end = $this->seconds('end_time');
-        $intervals = (clone $query)->whereIn('status', ['approved', 'completed'])->whereColumn('end_time', '>', 'start_time')
-            ->select(['id', 'facility_id', 'reservation_date'])
-            ->selectRaw("CASE WHEN $start < ? THEN ? ELSE $start END AS begins, CASE WHEN $end > ? THEN ? ELSE $end END AS ends", [$operating['start'], $operating['start'], $operating['end'], $operating['end']]);
-        // Running maximum merges nested/overlapping reservations per facility and date.
-        $windows = DB::query()->fromSub($intervals, 'intervals')->whereColumn('ends', '>', 'begins')
-            ->selectRaw('*, MAX(ends) OVER (PARTITION BY facility_id, reservation_date ORDER BY begins, ends, id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS previous_end');
-        $uncovered = 'CASE WHEN previous_end IS NULL OR begins >= previous_end THEN ends - begins WHEN ends > previous_end THEN ends - previous_end ELSE 0 END';
-        $seconds = (float) DB::query()->fromSub($windows, 'coverage')->selectRaw("COALESCE(SUM($uncovered), 0) AS seconds")->value('seconds');
-        $available = ($operating['end'] - $operating['start']) * $days * $facilities;
+        $blocks = ScheduleBlock::whereDate('starts_on', '<=', $to)->whereDate('ends_on', '>=', $from)->get();
+        $bookings = (clone $query)->where('status', 'approved')->whereColumn('end_time', '>', 'start_time')
+            ->get(['facility_id', 'reservation_date', 'start_time', 'end_time'])
+            ->groupBy(fn ($row) => $row->facility_id.'|'.$row->reservation_date->toDateString());
+        $available = $occupied = 0;
+        for ($day = $from; $day->lte($to); $day = $day->addDay()) {
+            if (isset($filters['month']) && $day->month !== (int) $filters['month']) {
+                continue;
+            }
+            foreach ($facilities as $facility) {
+                $closed = $blocks->filter(fn ($block) => ($block->facility_id === null || (int) $block->facility_id === (int) $facility->id)
+                    && $block->starts_on->toDateString() <= $day->toDateString() && $block->ends_on->toDateString() >= $day->toDateString())
+                    ->map(fn ($block) => [$block->start_time ? $this->timeSeconds($block->start_time) : $operating['start'], $block->end_time ? $this->timeSeconds($block->end_time) : $operating['end']])->all();
+                $closed[] = [0, $operating['start']];
+                $closed[] = [$operating['end'], 86400];
+                $windows = $this->subtractIntervals([[$operating['start'], $operating['end']]], $closed);
+                $available += $this->intervalDuration($windows);
+                $intervals = $bookings->get($facility->id.'|'.$day->toDateString(), collect())
+                    ->map(fn ($row) => [$this->timeSeconds($row->start_time), $this->timeSeconds($row->end_time)])->all();
+                $occupied += $this->intervalDuration($this->subtractIntervals($intervals, $closed));
+            }
+        }
 
-        return ['utilizationRate' => round($seconds / $available * 100, 1), 'utilizedHours' => round($seconds / 3600, 2), 'availableHours' => round($available / 3600, 2)];
+        return ['utilizationRate' => $available ? round($occupied / $available * 100, 1) : null,
+            'utilizedHours' => round($occupied / 3600, 2), 'availableHours' => round($available / 3600, 2)];
+    }
+
+    private function timeSeconds(string $time): int
+    {
+        $parts = array_map('intval', explode(':', $time));
+        return $parts[0] * 3600 + $parts[1] * 60 + ($parts[2] ?? 0);
+    }
+
+    private function subtractIntervals(array $intervals, array $closed): array
+    {
+        foreach ($closed as [$start, $end]) {
+            $remaining = [];
+            foreach ($intervals as [$left, $right]) {
+                if ($end <= $left || $start >= $right) {
+                    $remaining[] = [$left, $right];
+                } else {
+                    if ($left < $start) $remaining[] = [$left, $start];
+                    if ($right > $end) $remaining[] = [$end, $right];
+                }
+            }
+            $intervals = $remaining;
+        }
+        return $intervals;
+    }
+
+    private function intervalDuration(array $intervals): int
+    {
+        usort($intervals, fn ($a, $b) => $a[0] <=> $b[0]);
+        $seconds = 0;
+        $previousEnd = 0;
+        foreach ($intervals as [$start, $end]) {
+            $seconds += max(0, $end - max($start, $previousEnd));
+            $previousEnd = max($previousEnd, $end);
+        }
+        return $seconds;
     }
 
     private function timeSlots(Builder $query): Collection

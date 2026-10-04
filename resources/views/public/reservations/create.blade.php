@@ -1,15 +1,28 @@
 @extends('layouts.public')
 
-@section('title', 'Reserve the Gym')
+@section('title', 'Reserve the Gymnasium')
+@section('body-class', 'reservation-page')
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/reservation-wizard.css') }}">
+@endpush
 
 @section('content')
-<div class="mx-auto max-w-6xl" x-data="reservationFlow()" x-cloak>
+<div class="reservation-wizard mx-auto max-w-6xl" x-data="reservationFlow()" x-cloak>
+    <div class="wizard-intro">
+        <h1>Reserve the Gymnasium</h1>
+        <p>Provide your contact details, verify your email, and tell us about your event. All requests are subject to review and approval.</p>
+    </div>
 
     <!-- Steps nav -->
-    <nav class="mb-6 flex items-center gap-4">
-        <div class="flex-1 text-left"><span :class="step === 1 ? 'text-blue-600 font-bold' : 'text-emerald-600'"><span x-show="step > 1" aria-hidden="true">&#10003; </span>Contact Info</span></div>
-        <div class="flex-1 text-center"><span :class="step === 2 ? 'text-blue-600 font-bold' : 'text-slate-400'">Step 2: Verification</span></div>
-        <div class="flex-1 text-right"><span :class="step === 3 ? 'text-blue-600 font-bold' : 'text-slate-400'">Step 3: Event Info</span></div>
+    <nav class="wizard-progress" aria-label="Reservation progress">
+        <ol>
+            @foreach ([1 => 'Contact Information', 2 => 'Email Verification', 3 => 'Event Information'] as $number => $label)
+            <li :class="{ 'is-current': step === {{ $number }}, 'is-complete': step > {{ $number }} }" :aria-current="step === {{ $number }} ? 'step' : null">
+                <span class="step-circle" aria-hidden="true"><span x-show="step <= {{ $number }}">{{ $number }}</span><i x-show="step > {{ $number }}" class="bi bi-check-lg"></i></span>
+                <span class="step-label"><small>Step {{ $number }}</small>{{ $label }}<span class="sr-only" x-text="step > {{ $number }} ? ' (completed)' : (step === {{ $number }} ? ' (current)' : ' (upcoming)')"></span></span>
+            </li>
+            @endforeach
+        </ol>
     </nav>
 
     @if ($errors->any())
@@ -27,34 +40,42 @@
         @csrf
 
         <!-- Step 1 -->
-        <section x-show="step === 1" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-200 p-6">
-                <h1 class="text-2xl font-bold">Step 1: Requestor Details</h1>
-                <p class="mt-2 text-slate-500">Provide your contact details to begin the reservation request.</p>
+        <section x-show="step === 1" class="wizard-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="requestor-heading">
+            <div class="wizard-card-heading border-b border-slate-200 p-6">
+                <span class="wizard-heading-icon" aria-hidden="true"><i class="bi bi-person"></i></span>
+                <div><p class="wizard-step-caption">Step 1 of 3 · Contact Information</p><h2 id="requestor-heading">Requestor Information</h2>
+                <p class="wizard-heading-description">Provide your contact details to begin your reservation request.</p></div>
             </div>
             <div class="grid gap-5 p-6 sm:grid-cols-2">
                 <div>
-                    <label class="mb-2 block font-semibold">Full Name *</label>
-                    <input id="contact_person" name="contact_person" x-model="contactPerson" value="{{ old('contact_person') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <label for="contact_person" class="mb-2 block font-semibold">Full Name <span class="required-marker" aria-hidden="true">*</span></label>
+                    <input id="contact_person" name="contact_person" x-model="contactPerson" value="{{ old('contact_person') }}" placeholder="Enter your full name" autocomplete="name" aria-describedby="contact_person-error" :aria-invalid="Boolean(fieldErrors.contact_person)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <p id="contact_person-error" class="wizard-field-error" x-show="fieldErrors.contact_person" x-text="fieldErrors.contact_person"></p>
                 </div>
                 <div>
-                    <label class="mb-2 block font-semibold">Email Address *</label>
-                    <input id="contact_email" name="contact_email" type="email" x-model="email" value="{{ old('contact_email') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <label for="contact_email" class="mb-2 block font-semibold">Email Address <span class="required-marker" aria-hidden="true">*</span></label>
+                    <input id="contact_email" name="contact_email" type="email" x-model="email" value="{{ old('contact_email') }}" placeholder="you@example.com" autocomplete="email" aria-describedby="contact_email-error" :aria-invalid="Boolean(fieldErrors.contact_email)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <p id="contact_email-error" class="wizard-field-error" x-show="fieldErrors.contact_email" x-text="fieldErrors.contact_email"></p>
                 </div>
                 <div>
-                    <label class="mb-2 block font-semibold">Contact Number *</label>
-                    <input id="contact_number" name="contact_number" type="tel" x-model="contactNumber" value="{{ old('contact_number') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <label for="contact_number" class="mb-2 block font-semibold">Contact Number <span class="required-marker" aria-hidden="true">*</span></label>
+                    <input id="contact_number" name="contact_number" type="tel" x-model="contactNumber" minlength="11" maxlength="11" pattern="[0-9]{11}" @input="$event.target.value = $event.target.value.replace(/[^0-9]/g, '').slice(0, 11); contactNumber = $event.target.value" value="{{ old('contact_number') }}" placeholder="09XXXXXXXXX" autocomplete="tel" inputmode="numeric" aria-describedby="contact-number-help contact_number-error" :aria-invalid="Boolean(fieldErrors.contact_number)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <p id="contact-number-help" class="wizard-field-help">Enter your 11-digit contact number.</p>
+                    <p id="contact_number-error" class="wizard-field-error" x-show="fieldErrors.contact_number" x-text="fieldErrors.contact_number"></p>
                 </div>
                 <div>
-                    <label class="mb-2 block font-semibold">Requestor Type *</label>
-                    <select id="reservation_type" name="reservation_type" x-model="requestorType" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <label for="reservation_type" class="mb-2 block font-semibold">Requestor Type <span class="required-marker" aria-hidden="true">*</span></label>
+                    <select id="reservation_type" name="reservation_type" x-model="requestorType" aria-describedby="reservation_type-error" :aria-invalid="Boolean(fieldErrors.reservation_type)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
                         @foreach (['student' => 'Student', 'faculty' => 'Faculty', 'organization' => 'Organization', 'community' => 'Community'] as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
+                    <p id="reservation_type-error" class="wizard-field-error" x-show="fieldErrors.reservation_type" x-text="fieldErrors.reservation_type"></p>
                 </div>
-                <div class="sm:col-span-2 text-right">
-                    <button type="button" @click="goToVerification" class="rounded-lg bg-blue-600 px-6 py-3 font-bold text-white">Continue to Verification &rarr;</button>
+                <div class="wizard-info sm:col-span-2"><i class="bi bi-info-circle" aria-hidden="true"></i><p>Use an email address you can access. We will send a verification code and reservation updates to this address.</p></div>
+                <div class="wizard-actions sm:col-span-2 text-right">
+                    <span class="wizard-field-help">Fields marked <span class="required-marker">*</span> are required.</span>
+                    <button type="button" @click="goToVerification" class="wizard-primary rounded-lg bg-blue-600 px-6 py-3 font-bold text-white">Continue to Verification &rarr;</button>
                 </div>
             </div>
         </section>
@@ -65,8 +86,9 @@
                 <p>A 6-digit verification code has been sent to your email:<br><span class="break-all" x-text="emailVerification.sentTo"></span></p>
                 <button type="button" aria-label="Dismiss notification" @click="emailVerification.showNotice = false" class="text-3xl leading-none text-slate-500">&times;</button>
             </div>
-            <div class="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
-                <div class="border-b border-slate-200 px-6 py-10 text-center">
+            <div class="wizard-card overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
+                <div class="wizard-verification-heading border-b border-slate-200 px-6 py-10 text-center">
+                    <p class="wizard-step-caption">Step 2 of 3 · Email Verification</p>
                     <svg class="mx-auto mb-5 h-16 w-16 text-blue-600" viewBox="0 0 64 64" fill="none" aria-hidden="true">
                         <rect x="5" y="10" width="52" height="38" rx="5" stroke="currentColor" stroke-width="3"/>
                         <path d="m7 17 24 16 24-16M7 43l16-12" stroke="currentColor" stroke-width="3"/>
@@ -93,9 +115,10 @@
         @if ($emailVerified)
         <!-- Step 3: Event Info -->
         <input type="hidden" name="reservation_date" x-model="date" value="{{ old('reservation_date') }}">
-        <section x-show="step === 3" class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section x-show="step === 3" class="wizard-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="event-heading">
             <div class="border-b border-slate-200 p-6">
-                <h1 class="text-xl font-bold">Event Details & Requests</h1>
+                <p class="wizard-step-caption">Step 3 of 3 · Event Information</p>
+                <h2 id="event-heading" class="text-xl font-bold">Event Details & Requests</h2>
                 <button type="button" @click="editDetails" class="mt-3 text-sm font-semibold text-blue-600">Edit Contact Details</button>
                 <p class="mt-1 text-sm text-slate-500">Booking as: <strong x-text="contactPerson"></strong></p>
             </div>
@@ -104,29 +127,34 @@
                     <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">1. Event Schedule</h2>
                     <div class="grid gap-5 md:grid-cols-2">
                         <div>
-                            <label class="mb-2 block text-sm font-semibold">Event Title *</label>
-                            <input name="event_name" value="{{ old('event_name') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            <label for="event_name" class="mb-2 block text-sm font-semibold">Event Title *</label>
+                            <input placeholder="e.g. School sports program" name="event_name" id="event_name" aria-describedby="event_name-error" aria-invalid="{{ $errors->has('event_name') ? 'true' : 'false' }}" value="{{ old('event_name') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            @error('event_name')<p id="event_name-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
                         <div>
-                            <label class="mb-2 block text-sm font-semibold">Event Type</label>
-                            <input name="event_type" value="{{ old('event_type') }}" class="w-full rounded-lg border-slate-300 px-3 py-2" placeholder="Sports Event">
+                            <label for="event_type" class="mb-2 block text-sm font-semibold">Event Type</label>
+                            <input name="event_type" id="event_type" aria-describedby="event_type-error" aria-invalid="{{ $errors->has('event_type') ? 'true' : 'false' }}" value="{{ old('event_type') }}" class="w-full rounded-lg border-slate-300 px-3 py-2" placeholder="Sports Event">
+                            @error('event_type')<p id="event_type-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
                         <div>
-                            <label class="mb-2 block text-sm font-semibold">Facility *</label>
-                            <select name="facility_id" x-model="facility" @change="loadAvailability" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            <label for="facility_id" class="mb-2 block text-sm font-semibold">Facility *</label>
+                            <select name="facility_id" id="facility_id" aria-describedby="facility_id-error" aria-invalid="{{ $errors->has('facility_id') ? 'true' : 'false' }}" x-model="facility" @change="loadAvailability" required class="w-full rounded-lg border-slate-300 px-3 py-2">
                                 <option value="">Select facility</option>
                                 @foreach($facilities as $facility)
                                     <option value="{{ $facility->id }}">{{ $facility->facility_name }}</option>
                                 @endforeach
                             </select>
+                            @error('facility_id')<p id="facility_id-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
                         <div>
-                            <label class="mb-2 block text-sm font-semibold">Estimated Participants *</label>
-                            <input name="expected_attendees" type="number" min="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            <label for="expected_attendees" class="mb-2 block text-sm font-semibold">Estimated Participants *</label>
+                            <input placeholder="Enter expected number of attendees" name="expected_attendees" id="expected_attendees" aria-describedby="expected_attendees-error" aria-invalid="{{ $errors->has('expected_attendees') ? 'true' : 'false' }}" type="number" min="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            @error('expected_attendees')<p id="expected_attendees-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
                         <div class="md:col-span-2">
-                            <label class="mb-2 block text-sm font-semibold">Purpose *</label>
-                            <textarea name="purpose" rows="3" required class="w-full rounded-lg border-slate-300 px-3 py-2">{{ old('purpose') }}</textarea>
+                            <label for="purpose" class="mb-2 block text-sm font-semibold">Purpose *</label>
+                            <textarea placeholder="Briefly describe your event and why you need the gymnasium" name="purpose" id="purpose" aria-describedby="purpose-error" aria-invalid="{{ $errors->has('purpose') ? 'true' : 'false' }}" rows="3" required class="w-full rounded-lg border-slate-300 px-3 py-2">{{ old('purpose') }}</textarea>
+                            @error('purpose')<p id="purpose-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
                     </div>
                 </div>
@@ -158,6 +186,7 @@
                             <p class="text-slate-500">Please select a date from the calendar above</p>
                             <p x-show="date" class="font-semibold text-blue-700">Selected: <span x-text="selectedDateLabel"></span></p>
                         </div>
+                        @error('reservation_date')<p class="wizard-field-error" role="alert">{{ $message }}</p>@enderror
 
                         <div class="mt-4 text-center text-sm text-slate-500" x-show="!date">Click a calendar date to load available and occupied hours.</div>
                         <div class="mt-4" x-show="occupied.length == 0 && date">
@@ -167,12 +196,14 @@
 
                         <div class="mt-4 grid grid-cols-3 gap-3">
                             <div>
-                                <label class="mb-2 block text-sm font-semibold">Start Time *</label>
-                                <input name="start_time" type="time" x-model="startTime" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                                <label for="start_time" class="mb-2 block text-sm font-semibold">Start Time *</label>
+                                <input name="start_time" id="start_time" aria-describedby="start_time-error" aria-invalid="{{ $errors->has('start_time') ? 'true' : 'false' }}" type="time" x-model="startTime" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            @error('start_time')<p id="start_time-error" class="wizard-field-error">{{ $message }}</p>@enderror
                             </div>
                             <div>
-                                <label class="mb-2 block text-sm font-semibold">End Time *</label>
-                                <input name="end_time" type="time" x-model="endTime" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                                <label for="end_time" class="mb-2 block text-sm font-semibold">End Time *</label>
+                                <input name="end_time" id="end_time" aria-describedby="end_time-error" aria-invalid="{{ $errors->has('end_time') ? 'true' : 'false' }}" type="time" x-model="endTime" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            @error('end_time')<p id="end_time-error" class="wizard-field-error">{{ $message }}</p>@enderror
                             </div>
                             <div>
                                 <label class="mb-2 block text-sm font-semibold">Total Hours</label>
@@ -185,8 +216,9 @@
                 <!-- Attachment -->
                 <div>
                     <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">2. Attachment</h2>
-                    <label class="mb-2 block text-sm font-semibold">Upload Formal Request Letter / Permit *</label>
-                    <input name="permit" type="file" accept=".pdf,.jpg,.jpeg,.png" required class="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <label for="permit" class="mb-2 block text-sm font-semibold">Upload Formal Request Letter / Permit *</label>
+                    <input name="permit" id="permit" aria-describedby="permit-error" aria-invalid="{{ $errors->has('permit') ? 'true' : 'false' }}" type="file" accept=".pdf,.jpg,.jpeg,.png" required class="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                            @error('permit')<p id="permit-error" class="wizard-field-error">{{ $message }}</p>@enderror
                     <p class="mt-1 text-xs text-slate-500">Supported Formats: PDF, PNG, JPG (Max: 5MB)</p>
                 </div>
 
@@ -206,6 +238,7 @@
 
                 <p x-show="hasSelectedConflict" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The selected time overlaps a pending or reserved slot. Choose another time.</p>
                 <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-sm text-blue-900"><input name="agreement" value="1" type="checkbox" required class="mt-1 rounded border-blue-300"><span>I confirm that the information is correct and understand that this request still requires administrator approval.</span></label>
+                @error('agreement')<p class="wizard-field-error" role="alert">{{ $message }}</p>@enderror
                 <div class="flex justify-end">
                     <button :disabled="!date || hasSelectedConflict || availabilityLoading || !emailVerification.verified" class="rounded-lg bg-emerald-600 px-6 py-3 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Submit Final Reservation</button>
                 </div>
@@ -214,6 +247,7 @@
 
         @endif
     </form>
+    <p class="wizard-privacy"><i class="bi bi-info-circle" aria-hidden="true"></i> Privacy reminder: provide only the personal information needed for this request. Personal data should be handled in accordance with the Data Privacy Act of 2012 (RA 10173).</p>
 
     <dialog x-ref="conflictDialog" aria-labelledby="conflict-title" aria-describedby="conflict-description"
         @cancel.prevent="closeConflictWarning" class="w-full max-w-md rounded-2xl border-0 bg-white p-6 shadow-xl"
@@ -254,6 +288,7 @@ function reservationFlow() {
         availabilityLoading: false,
         availabilityError: '',
         message: '',
+        fieldErrors: @js(collect($errors->messages())->map(fn ($messages) => $messages[0])->all()),
         occupied: [],
         contactPerson: @js(old('contact_person', $requestorDetails['contact_person'] ?? '')),
         email: @js(old('contact_email', $requestorDetails['contact_email'] ?? '')),
@@ -278,20 +313,27 @@ function reservationFlow() {
 
         async goToVerification() {
             this.message = '';
+            this.fieldErrors = {};
             const fields = this.$refs.reservationForm.elements;
             this.contactPerson = fields.namedItem('contact_person').value.trim();
             this.email = fields.namedItem('contact_email').value.trim();
             this.contactNumber = fields.namedItem('contact_number').value.trim();
             this.requestorType = fields.namedItem('reservation_type').value;
             if (!this.contactPerson || !this.email || !this.contactNumber || !this.requestorType) {
+                if (!this.contactPerson) this.fieldErrors.contact_person = 'Enter your full name.';
+                if (!this.email) this.fieldErrors.contact_email = 'Enter your email address.';
+                if (!this.contactNumber) this.fieldErrors.contact_number = 'Enter your contact number.';
+                if (!this.requestorType) this.fieldErrors.reservation_type = 'Select your requestor type.';
                 this.message = 'Complete all required contact fields before continuing.';
                 return;
             }
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email)) {
+                this.fieldErrors.contact_email = 'Enter a valid email address.';
                 this.message = 'Enter a valid email address.';
                 return;
             }
             if (!/^[0-9]{11}$/.test(this.contactNumber)) {
+                this.fieldErrors.contact_number = 'Contact number must contain exactly 11 digits.';
                 this.message = 'Contact number must contain exactly 11 digits.';
                 return;
             }
@@ -346,6 +388,9 @@ function reservationFlow() {
                     body: JSON.stringify({ email: this.email, contact_person: this.contactPerson, contact_number: this.contactNumber, reservation_type: this.requestorType })
                 });
                 const data = await res.json();
+                if (data.errors) {
+                    this.fieldErrors = Object.fromEntries(Object.entries(data.errors).map(([key, errors]) => [key === 'email' ? 'contact_email' : key, errors[0]]));
+                }
                 this.startCooldown(data.retry_after || (res.status === 429 ? 60 : 0));
                 if (!res.ok) throw new Error(data.message || 'Unable to send code');
                 this.emailVerification.sent = true;

@@ -1,0 +1,5 @@
+@extends('layouts.landing')
+@section('title', 'Public Schedule | MCST Gymnasium')
+@section('content')
+<section class="landing-section"><div class="landing-container"><div class="section-heading"><p class="eyebrow">PUBLIC GYMNASIUM SCHEDULE</p><h1>Check Gymnasium Schedule</h1><p>Occupied schedules and blocked periods for {{ $monthLabel }}. Unlisted times require availability checks.</p></div><form class="month-filter" method="GET" action="{{ route('public.schedule') }}"><label for="schedule-month">Select month</label><input id="schedule-month" type="month" name="month" value="{{ $month }}" required><button class="landing-button" type="submit">View Schedule</button></form>@error('month')<p role="alert">{{ $message }}</p>@enderror @include('public.partials.schedule')<div class="button-row schedule-actions"><a class="landing-button" href="{{ route('reservation.create') }}">Book the Gymnasium <span aria-hidden="true">→</span></a><a class="text-link" href="{{ route('home') }}">Back to Home</a></div></div></section>
+@endsection

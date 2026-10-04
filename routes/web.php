@@ -23,11 +23,12 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function () {
-    return redirect()->route('login');
-})->name('home');
+Route::get('/', [\App\Http\Controllers\PublicHomeController::class, 'index'])->name('home');
+Route::get('/schedule', [\App\Http\Controllers\PublicHomeController::class, 'schedule'])->name('public.schedule');
 
-Route::get('/reserve', [PublicReservationController::class, 'create'])
+Route::get('/reserve', [\App\Http\Controllers\PublicHomeController::class, 'index'])->name('reservation.landing');
+
+Route::get('/reserve/request', [PublicReservationController::class, 'create'])
     ->middleware('prevent.back.history')
     ->name('reservation.create');
 
