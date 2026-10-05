@@ -3,20 +3,21 @@
 @section('title', 'Reserve the Gymnasium')
 @section('body-class', 'reservation-page')
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/reservation-wizard.css') }}">
+<link rel="stylesheet" href="{{ asset('css/reservation-wizard.css') }}?v={{ filemtime(public_path('css/reservation-wizard.css')) }}">
 @endpush
 
 @section('content')
-<div class="reservation-wizard mx-auto max-w-6xl" x-data="reservationFlow()" x-cloak>
+@php($gym = $facilities->firstWhere('facility_name', 'MCST Gymnasium') ?? $facilities->first())
+<div class="reservation-wizard" x-data="reservationFlow()" x-cloak>
     <div class="wizard-intro">
-        <h1>Reserve the Gymnasium</h1>
-        <p>Provide your contact details, verify your email, and tell us about your event. All requests are subject to review and approval.</p>
+        <h1>RESERVE THE GYMNASIUM</h1>
+        <p>Provide your requestor information, reservation details, and review your confirmation. All requests are subject to review and approval.</p>
     </div>
 
     <!-- Steps nav -->
     <nav class="wizard-progress" aria-label="Reservation progress">
         <ol>
-            @foreach ([1 => 'Contact Information', 2 => 'Email Verification', 3 => 'Event Information'] as $number => $label)
+            @foreach ([1 => 'REQUESTOR INFORMATION', 2 => 'RESERVATION DETAILS', 3 => 'FACILITY & CONFIRMATION'] as $number => $label)
             <li :class="{ 'is-current': step === {{ $number }}, 'is-complete': step > {{ $number }} }" :aria-current="step === {{ $number }} ? 'step' : null">
                 <span class="step-circle" aria-hidden="true"><span x-show="step <= {{ $number }}">{{ $number }}</span><i x-show="step > {{ $number }}" class="bi bi-check-lg"></i></span>
                 <span class="step-label"><small>Step {{ $number }}</small>{{ $label }}<span class="sr-only" x-text="step > {{ $number }} ? ' (completed)' : (step === {{ $number }} ? ' (current)' : ' (upcoming)')"></span></span>
@@ -36,14 +37,14 @@
 
     <div x-show="message" x-text="message" role="alert" class="mb-5 rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-red-700"></div>
 
-    <form x-ref="reservationForm" method="POST" action="{{ route('reservation.store') }}" enctype="multipart/form-data">
+    <form @submit="if (step !== 3 || !bookingCanSubmit) $event.preventDefault()" x-ref="reservationForm" method="POST" action="{{ route('reservation.store') }}" enctype="multipart/form-data">
         @csrf
 
         <!-- Step 1 -->
-        <section x-show="step === 1" class="wizard-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="requestor-heading">
+        <section x-show="step === 1 && !verificationOpen" class="wizard-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="requestor-heading">
             <div class="wizard-card-heading border-b border-slate-200 p-6">
                 <span class="wizard-heading-icon" aria-hidden="true"><i class="bi bi-person"></i></span>
-                <div><p class="wizard-step-caption">Step 1 of 3 · Contact Information</p><h2 id="requestor-heading">Requestor Information</h2>
+                <div><p class="wizard-step-caption">STEP 1 ? REQUESTOR INFORMATION</p><h2 id="requestor-heading">Requestor Information</h2>
                 <p class="wizard-heading-description">Provide your contact details to begin your reservation request.</p></div>
             </div>
             <div class="grid gap-5 p-6 sm:grid-cols-2">
@@ -64,31 +65,38 @@
                     <p id="contact_number-error" class="wizard-field-error" x-show="fieldErrors.contact_number" x-text="fieldErrors.contact_number"></p>
                 </div>
                 <div>
-                    <label for="reservation_type" class="mb-2 block font-semibold">Requestor Type <span class="required-marker" aria-hidden="true">*</span></label>
+                    <label for="reservation_type" class="mb-2 block font-semibold">User Type <span class="required-marker" aria-hidden="true">*</span></label>
                     <select id="reservation_type" name="reservation_type" x-model="requestorType" aria-describedby="reservation_type-error" :aria-invalid="Boolean(fieldErrors.reservation_type)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                        @foreach (['student' => 'Student', 'faculty' => 'Faculty', 'organization' => 'Organization', 'community' => 'Community'] as $value => $label)
+                        @foreach (['student' => 'Student', 'faculty' => 'Faculty', 'staff' => 'Staff', 'organization' => 'Recognized Organization'] as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
                     <p id="reservation_type-error" class="wizard-field-error" x-show="fieldErrors.reservation_type" x-text="fieldErrors.reservation_type"></p>
                 </div>
+                <div><label for="organization_department" class="mb-2 block font-semibold">Organization / Department</label><input name="organization_department" id="organization_department" x-model="organization" class="w-full rounded-lg border-slate-300 px-3 py-2"></div>
+                        <div class="sm:col-span-2">
+                            <label for="purpose" class="mb-2 block text-sm font-semibold">Purpose of Reservation *</label>
+                            <textarea placeholder="Briefly describe your event and why you need the gymnasium" x-model="purpose" name="purpose" id="purpose" aria-describedby="purpose-error" aria-invalid="{{ $errors->has('purpose') ? 'true' : 'false' }}" rows="3" required class="w-full rounded-lg border-slate-300 px-3 py-2">{{ old('purpose') }}</textarea>
+                            @error('purpose')<p id="purpose-error" class="wizard-field-error">{{ $message }}</p>@enderror
+                        </div>
+
                 <div class="wizard-info sm:col-span-2"><i class="bi bi-info-circle" aria-hidden="true"></i><p>Use an email address you can access. We will send a verification code and reservation updates to this address.</p></div>
                 <div class="wizard-actions sm:col-span-2 text-right">
                     <span class="wizard-field-help">Fields marked <span class="required-marker">*</span> are required.</span>
-                    <button type="button" @click="goToVerification" class="wizard-primary rounded-lg bg-blue-600 px-6 py-3 font-bold text-white">Continue to Verification &rarr;</button>
+                    <button type="button" @click="goToVerification" class="wizard-primary rounded-lg bg-blue-600 px-6 py-3 font-bold text-white">Next &rarr;</button>
                 </div>
             </div>
         </section>
 
         <!-- Step 2: Verification -->
-        <section x-show="step === 2" class="space-y-5" aria-labelledby="verification-heading">
+        <section x-show="step === 1 && verificationOpen" class="space-y-5" aria-labelledby="verification-heading">
             <div x-show="emailVerification.sent && emailVerification.showNotice" role="status" class="flex items-start justify-between gap-4 rounded-lg border border-cyan-200 bg-cyan-100 px-6 py-5 text-lg text-cyan-900">
                 <p>A 6-digit verification code has been sent to your email:<br><span class="break-all" x-text="emailVerification.sentTo"></span></p>
                 <button type="button" aria-label="Dismiss notification" @click="emailVerification.showNotice = false" class="text-3xl leading-none text-slate-500">&times;</button>
             </div>
             <div class="wizard-card overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
                 <div class="wizard-verification-heading border-b border-slate-200 px-6 py-10 text-center">
-                    <p class="wizard-step-caption">Step 2 of 3 · Email Verification</p>
+                    <p class="wizard-step-caption">STEP 1 ? EMAIL VERIFICATION</p>
                     <svg class="mx-auto mb-5 h-16 w-16 text-blue-600" viewBox="0 0 64 64" fill="none" aria-hidden="true">
                         <rect x="5" y="10" width="52" height="38" rx="5" stroke="currentColor" stroke-width="3"/>
                         <path d="m7 17 24 16 24-16M7 43l16-12" stroke="currentColor" stroke-width="3"/>
@@ -115,10 +123,10 @@
         @if ($emailVerified)
         <!-- Step 3: Event Info -->
         <input type="hidden" name="reservation_date" x-model="date" value="{{ old('reservation_date') }}">
-        <section x-show="step === 3" class="wizard-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="event-heading">
+        <section x-show="step === 2" class="wizard-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="event-heading">
             <div class="border-b border-slate-200 p-6">
-                <p class="wizard-step-caption">Step 3 of 3 · Event Information</p>
-                <h2 id="event-heading" class="text-xl font-bold">Event Details & Requests</h2>
+                <p class="wizard-step-caption">STEP 2 ? RESERVATION DETAILS</p>
+                <h2 id="event-heading" class="text-xl font-bold">Reservation Details</h2>
                 <button type="button" @click="editDetails" class="mt-3 text-sm font-semibold text-blue-600">Edit Contact Details</button>
                 <p class="mt-1 text-sm text-slate-500">Booking as: <strong x-text="contactPerson"></strong></p>
             </div>
@@ -127,124 +135,77 @@
                     <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">1. Event Schedule</h2>
                     <div class="grid gap-5 md:grid-cols-2">
                         <div>
-                            <label for="event_name" class="mb-2 block text-sm font-semibold">Event Title *</label>
+                            <label for="event_name" class="mb-2 block text-sm font-semibold">Event Name *</label>
                             <input placeholder="e.g. School sports program" name="event_name" id="event_name" aria-describedby="event_name-error" aria-invalid="{{ $errors->has('event_name') ? 'true' : 'false' }}" value="{{ old('event_name') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
                             @error('event_name')<p id="event_name-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label for="event_type" class="mb-2 block text-sm font-semibold">Event Type</label>
-                            <input name="event_type" id="event_type" aria-describedby="event_type-error" aria-invalid="{{ $errors->has('event_type') ? 'true' : 'false' }}" value="{{ old('event_type') }}" class="w-full rounded-lg border-slate-300 px-3 py-2" placeholder="Sports Event">
+                            <select name="event_type" id="event_type" required class="w-full rounded-lg border-slate-300 px-3 py-2"><option value="">Select event type</option>@foreach (['Basketball','Volleyball','Practice','Community Event','Meeting','Others'] as $type)<option @selected(old('event_type') === $type)>{{ $type }}</option>@endforeach</select>
                             @error('event_type')<p id="event_type-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
+<input type="hidden" name="facility_id" x-model="facility">
                         <div>
-                            <label for="facility_id" class="mb-2 block text-sm font-semibold">Facility *</label>
-                            <select name="facility_id" id="facility_id" aria-describedby="facility_id-error" aria-invalid="{{ $errors->has('facility_id') ? 'true' : 'false' }}" x-model="facility" @change="loadAvailability" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                                <option value="">Select facility</option>
-                                @foreach($facilities as $facility)
-                                    <option value="{{ $facility->id }}">{{ $facility->facility_name }}</option>
-                                @endforeach
-                            </select>
-                            @error('facility_id')<p id="facility_id-error" class="wizard-field-error">{{ $message }}</p>@enderror
-                        </div>
-                        <div>
-                            <label for="expected_attendees" class="mb-2 block text-sm font-semibold">Estimated Participants *</label>
+                            <label for="expected_attendees" class="mb-2 block text-sm font-semibold">Number of Participants *</label>
                             <input placeholder="Enter expected number of attendees" name="expected_attendees" id="expected_attendees" aria-describedby="expected_attendees-error" aria-invalid="{{ $errors->has('expected_attendees') ? 'true' : 'false' }}" type="number" min="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
                             @error('expected_attendees')<p id="expected_attendees-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
-                        <div class="md:col-span-2">
-                            <label for="purpose" class="mb-2 block text-sm font-semibold">Purpose *</label>
-                            <textarea placeholder="Briefly describe your event and why you need the gymnasium" name="purpose" id="purpose" aria-describedby="purpose-error" aria-invalid="{{ $errors->has('purpose') ? 'true' : 'false' }}" rows="3" required class="w-full rounded-lg border-slate-300 px-3 py-2">{{ old('purpose') }}</textarea>
-                            @error('purpose')<p id="purpose-error" class="wizard-field-error">{{ $message }}</p>@enderror
-                        </div>
                     </div>
                 </div>
 
-                <div class="rounded-xl border border-slate-200">
-                    <div class="border-b border-slate-200 bg-slate-50 p-4 flex items-center justify-between">
-                        <div class="text-sm font-semibold">Gymnasium Operational Slots (8:00 AM - 9:00 PM)</div>
-                        <button type="button" class="rounded-md bg-slate-100 px-3 py-1 text-sm">Select a Date</button>
-                    </div>
-                    <div class="p-4">
-                        <div class="mb-5 grid grid-cols-[2.5rem_1fr_2.5rem] items-center">
-                            <button type="button" @click="changeMonth(-1)" :disabled="!canMoveMonth(-1)" class="rounded-lg p-2 text-xl font-bold text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300" aria-label="Previous month">&lsaquo;</button>
-                            <h3 class="text-center text-lg font-bold text-slate-900" x-text="calendarMonthLabel"></h3>
-                            <button type="button" @click="changeMonth(1)" :disabled="!canMoveMonth(1)" class="rounded-lg p-2 text-xl font-bold text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300" aria-label="Next month">&rsaquo;</button>
-                        </div>
-                        <div class="mb-2 grid grid-cols-7 gap-1 text-center text-[0.65rem] font-bold uppercase text-slate-500 sm:gap-2 sm:text-xs" style="grid-template-columns: repeat(7, minmax(0, 1fr));">
-                            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-                        </div>
-                        <div class="grid grid-cols-7 gap-1 sm:gap-2" style="grid-template-columns: repeat(7, minmax(0, 1fr));">
-                            <template x-for="(day, index) in calendarDays" :key="index">
-                                <div>
-                                    <span x-show="!day" class="block h-10 sm:h-11"></span>
-                                    <button x-show="day" type="button" @click="selectDate(day.date)" :disabled="!day.selectable" :class="date === day.date ? 'border-blue-600 bg-blue-600 font-bold text-white shadow-sm' : (day.selectable ? 'border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50' : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300')" class="h-10 w-full rounded-md border text-sm transition sm:h-11" :aria-label="day.label" :aria-pressed="date === day.date" x-text="day.number"></button>
-                                </div>
-                            </template>
-                        </div>
 
-                        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-                            <p class="text-slate-500">Please select a date from the calendar above</p>
-                            <p x-show="date" class="font-semibold text-blue-700">Selected: <span x-text="selectedDateLabel"></span></p>
-                        </div>
-                        @error('reservation_date')<p class="wizard-field-error" role="alert">{{ $message }}</p>@enderror
-
-                        <div class="mt-4 text-center text-sm text-slate-500" x-show="!date">Click a calendar date to load available and occupied hours.</div>
-                        <div class="mt-4" x-show="occupied.length == 0 && date">
-                            <div class="text-emerald-700 text-sm">No existing reservations for this date.</div>
-                        </div>
-                        <div x-show="occupied.length" class="overflow-x-auto mt-4"><table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-2 text-left">Occupied Time</th><th class="p-2 text-left">Status</th></tr></thead><tbody><template x-for="slot in occupied"><tr class="border-t"><td class="p-2" x-text="formatSlot(slot)"></td><td class="p-2 capitalize" x-text="slot.status.replace('_', ' ')"></td></tr></template></tbody></table></div>
-
-                        <div class="mt-4 grid grid-cols-3 gap-3">
-                            <div>
-                                <label for="start_time" class="mb-2 block text-sm font-semibold">Start Time *</label>
-                                <input name="start_time" id="start_time" aria-describedby="start_time-error" aria-invalid="{{ $errors->has('start_time') ? 'true' : 'false' }}" type="time" x-model="startTime" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                            @error('start_time')<p id="start_time-error" class="wizard-field-error">{{ $message }}</p>@enderror
-                            </div>
-                            <div>
-                                <label for="end_time" class="mb-2 block text-sm font-semibold">End Time *</label>
-                                <input name="end_time" id="end_time" aria-describedby="end_time-error" aria-invalid="{{ $errors->has('end_time') ? 'true' : 'false' }}" type="time" x-model="endTime" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                            @error('end_time')<p id="end_time-error" class="wizard-field-error">{{ $message }}</p>@enderror
-                            </div>
-                            <div>
-                                <label class="mb-2 block text-sm font-semibold">Total Hours</label>
-                                <input readonly class="w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-2" :value="totalHours ? totalHours + ' hours' : ''">
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<div class="booking-calendar" aria-labelledby="booking-calendar-heading" :aria-busy="bookingLoading">
+    <h3 id="booking-calendar-heading">Reservation Calendar / Facility Availability</h3>
+    <p>Select an available date, then choose a time. Your selection updates the summary below.</p>
+    <ul class="booking-legend" aria-label="Date availability legend"><li><span class="legend-dot legend-full" aria-hidden="true"></span>Fully Booked</li><li><span class="legend-dot legend-partial" aria-hidden="true"></span>Partially Booked &ndash; Available Time</li><li><span class="legend-dot legend-available" aria-hidden="true"></span>No Color &ndash; Fully Available</li></ul>
+    <div class="booking-month-nav"><button type="button" @click="bookingMoveMonth(-1)" :disabled="!bookingCanMove(-1) || bookingLoading" aria-label="Previous calendar month">&larr;</button><h4 x-text="bookingMonthLabel"></h4><button type="button" @click="bookingMoveMonth(1)" :disabled="!bookingCanMove(1) || bookingLoading" aria-label="Next calendar month">&rarr;</button></div>
+    <p x-show="bookingLoading" role="status">Loading date availability...</p>
+    <div x-show="bookingError" role="alert"><p x-text="bookingError"></p><button type="button" @click="loadBookingMonth" class="wizard-secondary">Retry availability</button></div>
+    <div class="booking-calendar-scroll" tabindex="0" role="region" aria-label="Monthly reservation calendar; scroll horizontally on small screens">
+        <div class="booking-weekdays"><span>Sunday</span><span>Monday</span><span>Tuesday</span><span>Wednesday</span><span>Thursday</span><span>Friday</span><span>Saturday</span></div>
+        <div class="booking-day-grid"><template x-for="(day, index) in bookingCells" :key="day ? day.date : 'blank-' + index"><div><template x-if="day"><button type="button" class="booking-day" :class="{'day-full': day.status === 'full', 'day-partial': day.status === 'partial', 'day-selected': date === day.date}" :disabled="bookingLoading || !!bookingError || !day.selectable || day.status === 'full'" @click="bookingSelectDate(day)" :aria-pressed="date === day.date" :aria-label="day.date + ': ' + (day.label || 'Loading') + (!day.selectable ? ', outside booking window' : '')"><span class="booking-day-number" x-text="day.number"></span><span class="booking-day-status" x-text="day.label || 'Loading...'"></span><span x-show="date === day.date">Selected date</span></button></template></div></template></div>
+    </div>
+    <p class="booking-notice" x-show="bookingOpening && !bookingError">Gymnasium Operating Hours: <span x-text="bookingTime(bookingOpening) + ' - ' + bookingTime(bookingClosing)"></span></p>
+    <div class="booking-slot-section"><h4>Booking Time Slots <span x-show="date" x-text="' - ' + selectedDateLabel"></span></h4>
+        <p x-show="!date">Select a date to see available and reserved times.</p>
+        <p x-show="date && !bookingSelectedDay && !bookingLoading && !bookingError">View the selected date's month to see its time slots.</p>
+        <p x-show="bookingSelectedDay?.status === 'full'">Fully Booked &mdash; no remaining gym time slots on this date.</p>
+        <div class="booking-slot-grid"><template x-for="slot in (bookingSelectedDay?.slots || [])" :key="slot.start_time"><button type="button" class="booking-slot" :class="{'slot-reserved': !slot.available, 'slot-selected': startTime === slot.start_time && endTime === slot.end_time}" :disabled="!slot.available || bookingLoading || !!bookingError || !bookingSelectedDay?.selectable" @click="bookingSelectSlot(slot)" :aria-pressed="startTime === slot.start_time && endTime === slot.end_time"><span class="booking-slot-time" x-text="bookingTime(slot.start_time) + ' - ' + bookingTime(slot.end_time)"></span><span x-text="slot.label"></span><span x-show="slot.available && startTime === slot.start_time && endTime === slot.end_time">Selected time</span></button></template></div>
+        <div class="booking-custom-times" x-show="bookingSelectedDay && !bookingLoading && !bookingError">
+            <div class="booking-full-period">
+                <div x-show="bookingAvailablePeriods.length > 1"><label for="booking-period">Available period</label><select id="booking-period" x-model="bookingPeriod"><option value="">Choose a period</option><template x-for="period in bookingAvailablePeriods" :key="period.start_time"><option :value="period.start_time" x-text="bookingTime(period.start_time) + ' - ' + bookingTime(period.end_time)"></option></template></select><p>Choose one uninterrupted available period. Reserved hours between periods cannot be included.</p></div>
+                <button type="button" @click="bookingFullAvailable" :disabled="!bookingAvailablePeriods.length" class="wizard-secondary">Reserve Full Available Time</button>
+            </div>
+            <div><label for="start_time">Start Time</label><input type="time" id="start_time" name="start_time" x-model="startTime" min="08:00" max="21:00" step="60" required @change="updateBookingSummary" aria-describedby="booking-time-status"></div>
+            <div><label for="end_time">End Time</label><input type="time" id="end_time" name="end_time" x-model="endTime" min="08:00" max="21:00" step="60" required @change="updateBookingSummary" aria-describedby="booking-time-status"></div>
+            <p id="booking-time-status" class="booking-time-status" role="status" x-text="bookingTimeError ? 'Time Unavailable - ' + bookingTimeError : (bookingCanSubmit ? 'Time Available' : 'Choose your Start Time and End Time.')"></p>
+        </div>
+        <p class="booking-notice" x-show="startTime && endTime">Selected Reservation Time: <strong x-text="bookingTime(startTime) + ' - ' + bookingTime(endTime)"></strong></p>
+        <p class="booking-notice" x-show="date && !bookingCanSubmit && !bookingLoading && !bookingError">Choose an available time slot before submitting.</p>
+    </div>
+</div>
 
                 <!-- Attachment -->
                 <div>
                     <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">2. Attachment</h2>
-                    <label for="permit" class="mb-2 block text-sm font-semibold">Upload Formal Request Letter / Permit *</label>
-                    <input name="permit" id="permit" aria-describedby="permit-error" aria-invalid="{{ $errors->has('permit') ? 'true' : 'false' }}" type="file" accept=".pdf,.jpg,.jpeg,.png" required class="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <label for="permit" class="mb-2 block text-sm font-semibold">Upload Supporting Letter / Approval Document *</label>
+                    <p class="mb-3">Upload valid approval letter or supporting document</p><input name="permit" id="permit" aria-describedby="permit-error" aria-invalid="{{ $errors->has('permit') ? 'true' : 'false' }}" type="file" accept=".pdf,.jpg,.jpeg,.png" required class="w-full rounded-lg border border-slate-300 p-2 text-sm">
                             @error('permit')<p id="permit-error" class="wizard-field-error">{{ $message }}</p>@enderror
                     <p class="mt-1 text-xs text-slate-500">Supported Formats: PDF, PNG, JPG (Max: 5MB)</p>
                 </div>
 
-                <!-- Equipment -->
-                <div>
-                    <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">3. Equipment Request (Optional)</h2>
-                    <div class="rounded-lg border border-slate-200 p-4">
-                        <table class="w-full text-sm">
-                            <thead class="bg-slate-100"><tr><th class="p-2 text-left">Select</th><th class="p-2 text-left">Item Description</th><th class="p-2 text-left">Quantity</th></tr></thead>
-                            <tbody>
-                                <tr class="border-t"><td class="p-2"><input type="checkbox" name="equipment[sound]" value="1"></td><td class="p-2">Sound System & Microphones</td><td class="p-2"><input name="equipment_qty[sound]" type="number" min="1" value="1" class="w-24 rounded border-slate-300 px-2 py-1"></td></tr>
-                                <tr class="border-t"><td class="p-2"><input type="checkbox" name="equipment[chairs]" value="1"></td><td class="p-2">Monobloc Chairs</td><td class="p-2"><input name="equipment_qty[chairs]" type="number" min="1" value="50" class="w-24 rounded border-slate-300 px-2 py-1"></td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
+<div><label for="additional_notes" class="mb-2 block font-semibold">Additional Notes</label><textarea name="additional_notes" id="additional_notes" rows="3" class="w-full rounded-lg border-slate-300">{{ old('additional_notes') }}</textarea></div>
                 <p x-show="hasSelectedConflict" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The selected time overlaps a pending or reserved slot. Choose another time.</p>
-                <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-sm text-blue-900"><input name="agreement" value="1" type="checkbox" required class="mt-1 rounded border-blue-300"><span>I confirm that the information is correct and understand that this request still requires administrator approval.</span></label>
-                @error('agreement')<p class="wizard-field-error" role="alert">{{ $message }}</p>@enderror
-                <div class="flex justify-end">
-                    <button :disabled="!date || hasSelectedConflict || availabilityLoading || !emailVerification.verified" class="rounded-lg bg-emerald-600 px-6 py-3 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Submit Final Reservation</button>
-                </div>
-            </div>
-        </section>
+<p class="wizard-info">Please make sure all reservation details are correct before proceeding.</p>
+<div class="wizard-actions"><button type="button" @click="step = 1" class="wizard-secondary">&larr; Back</button><button type="button" @click="reviewReservation" :disabled="!bookingCanSubmit || !date || hasSelectedConflict || availabilityLoading || !!availabilityError || !facility" class="wizard-primary">Next &rarr;</button></div>
+</div></section>
+<section x-show="step === 3" class="wizard-card bg-white p-6" aria-labelledby="confirmation-heading"><p class="wizard-step-caption">STEP 3 OF 3</p><h2 id="confirmation-heading">Facility &amp; Confirmation</h2><p class="wizard-heading-description">Please review your reservation details carefully before submitting your request.</p>
 
+
+<h3 class="confirmation-subheading">Facility Information</h3><dl class="facility-information"><div><dt>Facility</dt><dd>MCST Gymnasium</dd></div><div><dt>Location</dt><dd>MCST Gymnasium</dd></div><div><dt>Capacity</dt><dd>{{ $gym?->capacity ? number_format($gym->capacity).' participants' : 'Not specified' }}</dd></div><div><dt>Facility Status</dt><dd x-text="facilityStatus"></dd></div></dl>
+<h3 class="confirmation-subheading">Reservation Summary</h3><dl class="reservation-summary"><template x-for="item in summary" :key="item.label"><div><dt x-text="item.label"></dt><dd x-text="item.value || '?'"></dd></div></template></dl>
+<label class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-blue-900"><input name="agreement" value="1" type="checkbox" required class="mt-1 rounded border-blue-300"><span>I confirm that the information is correct and understand that this request still requires administrator approval.</span></label>
+<div class="wizard-actions"><button type="button" @click="step = 2" class="wizard-secondary">&larr; Back</button><button type="submit" :disabled="!bookingCanSubmit || hasSelectedConflict || availabilityLoading || !!availabilityError || !emailVerification.verified || facilityStatus !== 'Available'" class="wizard-primary">Submit Reservation</button></div></section>
         @endif
     </form>
     <p class="wizard-privacy"><i class="bi bi-info-circle" aria-hidden="true"></i> Privacy reminder: provide only the personal information needed for this request. Personal data should be handled in accordance with the Data Privacy Act of 2012 (RA 10173).</p>
@@ -259,18 +220,39 @@
     <style>dialog::backdrop { background: rgb(15 23 42 / 60%); }</style>
 </div>
 
+<script src="{{ asset('js-reservation-calendar.js') }}?v={{ filemtime(public_path('js-reservation-calendar.js')) }}"></script>
 <script>
 function reservationFlow() {
-    return {
-        step: {{ $initialStep }},
+    return Object.defineProperties({
+        bookingAvailabilityUrl: @js(route('reservation.availability')),
+        maximumDate: @js(now()->addDays((int) \App\Models\SystemSetting::getValue('maximum_advance_days', 365))->toDateString()),
+        step: {{ $emailVerified ? 2 : 1 }},
+verificationOpen: @js(!$emailVerified && session()->has('public_email_challenge')),
+organization: @js(old('organization_department', $requestorDetails['organization_department'] ?? '')),
+purpose: @js(old('purpose', $requestorDetails['purpose'] ?? '')),
+summary: [],
+get facilityStatus() { return @js($gym?->status ?? 'unavailable') === 'maintenance' ? 'Maintenance' : (this.hasSelectedConflict ? (this.occupied.some(slot => slot.status === 'blackout' && this.startTime < slot.end_time.slice(0,5) && this.endTime > slot.start_time.slice(0,5)) ? 'Maintenance' : 'Reserved') : (@js($gym?->status ?? 'unavailable') === 'available' ? 'Available' : 'Reserved')); },
+reviewReservation() {
+this.message = '';
+if (!this.bookingCanSubmit) { this.message = 'Select an available date and time slot before continuing.'; return; }
+for (const field of this.$refs.reservationForm.querySelector('[aria-labelledby="event-heading"]').querySelectorAll('input,select,textarea')) { if (!field.reportValidity()) return; }
+if (this.endTime <= this.startTime) { this.message = 'End time must be after start time.'; return; }
+const fields = this.$refs.reservationForm.elements;
+const value = name => fields.namedItem(name)?.value || '';
+const time = t => new Date('2000-01-01T' + t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+if (!this.date) { this.message = "Select a reservation date."; return; }
+this.summary = [ ['Requestor Name',this.contactPerson], ['User Type',fields.namedItem('reservation_type').selectedOptions[0].text], ['Event Name',value('event_name')], ['Event Type',value('event_type')], ['Reservation Date',this.selectedDateLabel], ['Start Time',time(this.startTime)], ['End Time',time(this.endTime)], ['Number of Participants',value('expected_attendees')], ['Facility','MCST Gymnasium'], ['Uploaded Supporting Document',fields.namedItem('permit').files[0]?.name], ['Purpose',this.purpose], ['Organization / Department',this.organization], ['Additional Notes',value('additional_notes')] ].map(([label,value])=>({label,value}));
+this.step = 3;
+},
         init() {
+            this.$watch('step', step => { if (step === 2 || step === 3) this.openBookingCalendar(); });
             this.$watch('conflictWarningKey', key => {
                 if (key) this.$nextTick(() => {
                     if (this.conflictWarningKey && !this.$refs.conflictDialog.open) this.$refs.conflictDialog.showModal();
                 });
                 else if (this.$refs.conflictDialog.open) this.$refs.conflictDialog.close();
             });
-            if (this.step === 3) this.loadAvailability();
+            if (this.step === 2) this.openBookingCalendar();
             this.$watch('email', () => {
                 this.emailVerification.verified = false;
                 this.emailVerification.sent = false;
@@ -283,7 +265,7 @@ function reservationFlow() {
         },
         closeConflictWarning() {
             this.$refs.conflictDialog.close();
-            this.$nextTick(() => this.$refs.reservationForm.elements.namedItem('start_time').focus());
+            this.$nextTick(() => { if (this.step === 3) this.step = 2; this.$refs.reservationForm.querySelector('.booking-slot:not(:disabled)')?.focus(); });
         },
         availabilityLoading: false,
         availabilityError: '',
@@ -295,7 +277,7 @@ function reservationFlow() {
         contactNumber: @js(old('contact_number', $requestorDetails['contact_number'] ?? '')),
         requestorType: @js(old('reservation_type', $requestorDetails['reservation_type'] ?? 'student')),
         emailVerification: { sent: @js(session()->has('public_email_challenge')), sentTo: '', showNotice: false, verified: @js($emailVerified), sending: false, verifying: false, code: '', cooldown: 0, cooldownTimer: null },
-        facility: @js(old('facility_id', '')),
+        facility: @js((string) ($gym?->id ?? '')),
         date: @js(old('reservation_date', '')),
         startTime: @js(old('start_time', '')),
         endTime: @js(old('end_time', '')),
@@ -338,11 +320,13 @@ function reservationFlow() {
                 return;
             }
             await this.$nextTick();
-            this.step = 2;
+            if (!this.purpose.trim()) { this.message = 'Enter the purpose of your reservation.'; return; }
+            if (this.emailVerification.verified) { this.step = 2; return; }
+            this.verificationOpen = true;
             if (!this.emailVerification.sent || this.emailVerification.sentTo !== this.email) this.sendCode();
         },
 
-        continueToEvent() { this.message = ''; if (!this.emailVerification.verified) { this.message = 'Please verify your email before continuing.'; return; } this.step = 3; this.loadAvailability(); },
+        continueToEvent() { this.message = ''; if (!this.emailVerification.verified) { this.message = 'Please verify your email before continuing.'; return; } this.step = 2; this.openBookingCalendar(); },
 
         startCooldown(seconds) {
             if (this.emailVerification.cooldownTimer) clearInterval(this.emailVerification.cooldownTimer);
@@ -367,7 +351,7 @@ function reservationFlow() {
                 this.emailVerification.verified = false;
                 this.emailVerification.sent = false;
                 this.emailVerification.code = '';
-                this.step = 1;
+                this.step = 1; this.verificationOpen = false;
             } catch (error) { this.message = error.message; }
         },
 
@@ -385,7 +369,7 @@ function reservationFlow() {
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('input[name="_token"]')?.value || ''
                     },
-                    body: JSON.stringify({ email: this.email, contact_person: this.contactPerson, contact_number: this.contactNumber, reservation_type: this.requestorType })
+                    body: JSON.stringify({ email: this.email, contact_person: this.contactPerson, contact_number: this.contactNumber, reservation_type: this.requestorType, organization_department: this.organization, purpose: this.purpose })
                 });
                 const data = await res.json();
                 if (data.errors) {
@@ -447,7 +431,7 @@ function reservationFlow() {
 
         async loadAvailability() { this.availabilityError = ''; if (!this.facility || !this.date) { this.occupied = []; return; } this.availabilityLoading = true; try { const url = new URL(@js(route('reservation.availability')), window.location.origin); url.searchParams.set('facility_id', this.facility); url.searchParams.set('date', this.date); const response = await fetch(url, {headers: {'Accept': 'application/json'}}); if (!response.ok) throw new Error('Availability could not be loaded. Please try again.'); this.occupied = await response.json(); } catch (error) { this.occupied = []; this.availabilityError = error.message; } finally { this.availabilityLoading = false; } },
         formatSlot(slot) { const format = time => new Date(`2000-01-01T${time}`).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); return `${format(slot.start_time)} - ${format(slot.end_time)}`; }
-    }
+    }, Object.getOwnPropertyDescriptors(gymBookingCalendar()));
 }
 </script>
 @endsection

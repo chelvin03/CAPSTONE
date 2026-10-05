@@ -130,3 +130,17 @@ test('mail exceptions are logged without credentials or message contents', funct
             && ! str_contains(json_encode($context), '123456');
     });
 });
+
+test('reservation confirmation presents facility information without a selector', function () {
+    $facility = \App\Models\Facility::create(['facility_name' => 'MCST Gymnasium', 'location' => 'MCST Gymnasium', 'capacity' => 500, 'status' => 'available']);
+    $this->withSession([
+        'public_email_verified' => ['email' => 'public@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp],
+        'public_reservation_details' => ['contact_email' => 'public@example.com', 'contact_person' => 'Public Requestor', 'purpose' => 'Sports practice', 'organization_department' => 'Athletics'],
+    ])->get(route('reservation.create'))
+        ->assertOk()
+        ->assertSee('FACILITY &amp; CONFIRMATION', false)
+        ->assertSee('500 participants')
+        ->assertSee('class="facility-information"', false)
+        ->assertSee('Upload valid approval letter or supporting document')
+        ->assertDontSee('<select name="facility_id"', false);
+});

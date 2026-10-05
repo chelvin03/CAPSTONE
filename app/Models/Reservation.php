@@ -23,6 +23,8 @@ class Reservation extends Model
         'event_name',
         'event_type',
         'purpose',
+        'organization_department',
+        'additional_notes',
         'contact_person',
         'contact_number',
         'expected_attendees',

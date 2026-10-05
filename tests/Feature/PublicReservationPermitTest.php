@@ -17,6 +17,8 @@ function validPublicReservationData(Facility $facility): array
         'event_name' => 'Community Sports Day',
         'event_type' => 'Sports',
         'purpose' => 'Community recreation',
+        'organization_department' => 'Student Affairs',
+        'additional_notes' => 'Please allow time for registration',
         'contact_person' => 'Juan Dela Cruz',
         'contact_email' => 'juan@example.com',
         'contact_number' => '09123456789',
@@ -59,12 +61,19 @@ test('a public reservation stores its required permit', function () {
             && str_contains($mail->render(), $reservation->reference_number)
             && str_contains($mail->render(), 'Awaiting administrator review');
     });
+    expect($reservation->organization_department)->toBe('Student Affairs');
+    expect($reservation->additional_notes)->toBe('Please allow time for registration');
+    $response->assertSessionHas('public_reservation_references', [$reservation->reference_number]);
     $response->assertSessionHas('reservation_email_sent', true);
+    $response->assertSessionHas('reservation_submitted', $reservation->reference_number);
+    $this->followRedirects($response)->assertOk()
+        ->assertSee('Reservation Submitted Successfully')->assertSee('Reservation Tracking')
+        ->assertSee($reservation->reference_number)->assertSee('Copy Reference Number');
     $this->get(route('reservation.success', $reservation->reference_number))->assertOk()
-        ->assertSee('Reservation Request Received')->assertSee('Track Reservation');
+        ->assertSee('Reservation Request Submitted Successfully')->assertSee('Track Reservation');
 
     $response->assertRedirect(
-        route('reservation.success', $reservation->reference_number)
+        route('reservation.track', ['reference' => $reservation->reference_number])
     );
     expect($document->document_type)->toBe('permit')
         ->and($document->original_filename)->toBe('gym-permit.pdf')
@@ -181,7 +190,7 @@ test('public submission ignores forged browser verification and consumes real pr
     $this->post(route('reservation.store'), $data)->assertSessionHasNoErrors()
         ->assertSessionMissing('public_email_verified')->assertSessionMissing('public_email_challenge')
         ->assertSessionMissing('public_reservation_details')
-        ->assertRedirect(route('reservation.success', Reservation::sole()->reference_number));
+        ->assertRedirect(route('reservation.track', ['reference' => Reservation::sole()->reference_number]));
     expect(Reservation::sole()->user_id)->toBeNull();
     $this->assertGuest();
     $this->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));

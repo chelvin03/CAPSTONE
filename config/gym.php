@@ -23,9 +23,9 @@ return [
             'MCST-GYM'
         ),
 
-        'opening_time' => env('GYM_OPENING_TIME', '06:00'),
+        'opening_time' => env('GYM_OPENING_TIME', '08:00'),
 
-        'closing_time' => env('GYM_CLOSING_TIME', '22:00'),
+        'closing_time' => env('GYM_CLOSING_TIME', '21:00'),
     ],
 
     'statuses' => [

@@ -30,8 +30,15 @@ class PublicReservationController extends Controller
     {
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
-            'date' => ['required', 'date'],
+            'date' => ['required_without:month', 'date'],
+            'month' => ['sometimes', 'required', 'date_format:Y-m'],
         ]);
+
+        if (isset($validated['month'])) {
+            return response()->json(app(\App\Services\PublicCalendarService::class)->month(
+                Facility::findOrFail($validated['facility_id']), $validated['month']
+            ));
+        }
 
         $occupied = Reservation::query()
             ->where('facility_id', $validated['facility_id'])
@@ -58,7 +65,6 @@ class PublicReservationController extends Controller
         $requestorDetails = $request->session()->get('public_reservation_details', []);
         $initialStep = $emailVerified ? 3 : ($request->session()->has('public_email_challenge') ? 2 : 1);
         $facilities = Facility::query()
-            ->where('status', 'available')
             ->orderBy('facility_name')
             ->get();
 
@@ -71,10 +77,12 @@ class PublicReservationController extends Controller
     {
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
-            'reservation_type' => ['required', 'in:student,faculty,organization,community'],
+            'reservation_type' => ['required', 'in:student,faculty,staff,organization,community'],
             'event_name' => ['required', 'string', 'max:255'],
             'event_type' => ['nullable', 'string', 'max:100'],
             'purpose' => ['required', 'string'],
+            'organization_department' => ['nullable', 'string', 'max:255'],
+            'additional_notes' => ['nullable', 'string', 'max:5000'],
             'contact_person' => ['required', 'string', 'max:255'],
             'contact_email' => ['required', 'email:rfc', 'max:255'],
             'contact_number' => ['required', 'digits:11'],
@@ -103,9 +111,12 @@ class PublicReservationController extends Controller
             ]);
         }
 
-        $durationMinutes = (strtotime($validated['end_time']) - strtotime($validated['start_time'])) / 60;
-        if ($durationMinutes > ((int) SystemSetting::getValue('maximum_booking_hours', 8) * 60)) {
-            return back()->withInput()->withErrors(['end_time' => 'The booking exceeds the maximum allowed duration.']);
+        if (Facility::findOrFail($validated['facility_id'])->status !== 'available') {
+            return back()->withInput()->withErrors(['facility_id' => 'The gymnasium is currently unavailable.']);
+        }
+
+        if ($validated['start_time'] < '08:00' || $validated['end_time'] > '21:00') {
+            return back()->withInput()->withErrors(['start_time' => 'Reservations must be within 8:00 AM - 9:00 PM.']);
         }
 
         $hasConflict = Reservation::query()
@@ -123,7 +134,7 @@ class PublicReservationController extends Controller
             return back()
                 ->withInput()
                 ->withErrors([
-                    'reservation_date' => 'The selected facility is unavailable during the chosen schedule.',
+                    'reservation_date' => 'Selected time overlaps with an existing reservation. Please choose from the remaining available time.',
                 ]);
         }
 
@@ -136,6 +147,18 @@ class PublicReservationController extends Controller
 
         try {
             $reservation = DB::transaction(function () use ($validated, &$storedPermitPath): Reservation {
+                // Serialize submissions for this facility before the final overlap check.
+                $facility = Facility::whereKey($validated['facility_id'])->lockForUpdate()->firstOrFail();
+                $unavailable = $facility->status !== 'available'
+                    || Reservation::where('facility_id', $facility->id)->whereDate('reservation_date', $validated['reservation_date'])
+                        ->whereNotIn('status', ['rejected', 'cancelled'])->where('start_time', '<', $validated['end_time'])
+                        ->where('end_time', '>', $validated['start_time'])->exists()
+                    || ScheduleBlock::whereDate('starts_on', '<=', $validated['reservation_date'])->whereDate('ends_on', '>=', $validated['reservation_date'])
+                        ->where(fn ($q) => $q->whereNull('facility_id')->orWhere('facility_id', $facility->id))
+                        ->where(fn ($q) => $q->whereNull('start_time')->orWhere(fn ($times) => $times->where('start_time', '<', $validated['end_time'])->where('end_time', '>', $validated['start_time'])))->exists();
+                if ($unavailable) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['reservation_date' => 'Selected time overlaps with an existing reservation. Please choose from the remaining available time.']);
+                }
                 $reservation = Reservation::create([
                     'reference_number' => $this->generateReferenceNumber(),
                     'user_id' => null,
@@ -144,6 +167,8 @@ class PublicReservationController extends Controller
                     'event_name' => $validated['event_name'],
                     'event_type' => $validated['event_type'] ?? null,
                     'purpose' => $validated['purpose'],
+                    'organization_department' => $validated['organization_department'] ?? null,
+                    'additional_notes' => $validated['additional_notes'] ?? null,
                     'contact_person' => $validated['contact_person'],
                     'contact_email' => $validated['contact_email'],
                     'contact_number' => $validated['contact_number'],
@@ -216,10 +241,13 @@ class PublicReservationController extends Controller
             ]);
         }
 
+        $references = $request->session()->get('public_reservation_references', []);
+        $request->session()->put('public_reservation_references', array_values(array_unique([...$references, $reservation->reference_number])));
         $request->session()->forget(['public_email_verified', 'public_email_challenge', 'public_reservation_details']);
 
         return redirect()
-            ->route('reservation.success', $reservation->reference_number);
+            ->route('reservation.track', ['reference' => $reservation->reference_number])
+            ->with('reservation_submitted', $reservation->reference_number);
     }
 
     public function sendVerificationCode(Request $request): JsonResponse
@@ -228,7 +256,9 @@ class PublicReservationController extends Controller
             'email' => ['required', 'email:rfc', 'max:255'],
             'contact_person' => ['required', 'string', 'max:255'],
             'contact_number' => ['required', 'digits:11'],
-            'reservation_type' => ['required', 'in:student,faculty,organization,community'],
+            'reservation_type' => ['required', 'in:student,faculty,staff,organization,community'],
+            'organization_department' => ['nullable', 'string', 'max:255'],
+            'purpose' => ['nullable', 'string'],
         ]);
         $email = Str::lower(trim($validated['email']));
         $previous = $request->session()->get('public_email_challenge');
@@ -340,7 +370,7 @@ class PublicReservationController extends Controller
     public function success(string $referenceNumber): View
     {
         $reservation = Reservation::query()
-            ->with('facility')
+            ->with(['facility', 'statusHistories'])
             ->where('reference_number', $referenceNumber)
             ->firstOrFail();
 
@@ -350,7 +380,7 @@ class PublicReservationController extends Controller
         );
     }
 
-    public function track(Request $request): View
+    public function track(Request $request): View|JsonResponse
     {
         $reference = Str::upper(trim((string) $request->query('reference', '')));
         $reservation = null;
@@ -362,13 +392,21 @@ class PublicReservationController extends Controller
                 ->first();
         }
 
-        return view('public.reservations.track', compact('reference', 'reservation'));
+        if ($request->expectsJson()) {
+            abort_unless($reservation, 404);
+            $html = view('public.reservations.partials.tracking', compact('reservation'))->render();
+            return response()->json(['status' => $reservation->status, 'html' => $html, 'version' => hash('sha256', $html)])
+                ->header('Cache-Control', 'no-store, private');
+        }
+        $recentReservations = Reservation::whereIn('reference_number', $request->session()->get('public_reservation_references', []))
+            ->latest()->get();
+        return view('public.reservations.track', compact('reference', 'reservation', 'recentReservations'));
     }
 
     private function generateReferenceNumber(): string
     {
         do {
-            $reference = 'MCST-'.
+            $reference = 'MCST-GYM-'.
                 now()->format('Ymd').
                 '-'.
                 Str::upper(Str::random(6));
