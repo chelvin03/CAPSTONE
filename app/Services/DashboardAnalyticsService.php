@@ -179,6 +179,11 @@ class DashboardAnalyticsService
         return ['open' => $open, 'close' => $close, 'start' => $seconds($open), 'end' => $seconds($close)];
     }
 
+    public function reportUtilization(array $filters): array
+    {
+        return $this->utilization($this->query($filters), $this->operatingHours(), CarbonImmutable::parse($filters['date_from']), CarbonImmutable::parse($filters['date_to']), Facility::orderBy('facility_name')->get(['id', 'facility_name']), $filters);
+    }
+
     private function utilization(Builder $query, ?array $operating, CarbonImmutable $from, CarbonImmutable $to, Collection $facilities, array $filters): array
     {
         $unavailable = ['utilizationRate' => null, 'utilizedHours' => null, 'availableHours' => null];
@@ -187,14 +192,16 @@ class DashboardAnalyticsService
             return $unavailable;
         }
         $blocks = ScheduleBlock::whereDate('starts_on', '<=', $to)->whereDate('ends_on', '>=', $from)->get();
-        $bookings = (clone $query)->where('status', 'approved')->whereColumn('end_time', '>', 'start_time')
-            ->get(['facility_id', 'reservation_date', 'start_time', 'end_time'])
-            ->groupBy(fn ($row) => $row->facility_id.'|'.$row->reservation_date->toDateString());
+        $bookingQuery = (clone $query)->where('status', 'approved')->whereColumn('end_time', '>', 'start_time');
         $available = $occupied = 0;
         for ($day = $from; $day->lte($to); $day = $day->addDay()) {
             if (isset($filters['month']) && $day->month !== (int) $filters['month']) {
                 continue;
             }
+            // Only retain one day's intervals, rather than the entire report period.
+            $bookings = (clone $bookingQuery)->where('reservation_date', '>=', $day->toDateString())
+                ->where('reservation_date', '<', $day->addDay()->toDateString())
+                ->select(['facility_id', 'start_time', 'end_time'])->get()->groupBy('facility_id');
             foreach ($facilities as $facility) {
                 $closed = $blocks->filter(fn ($block) => ($block->facility_id === null || (int) $block->facility_id === (int) $facility->id)
                     && $block->starts_on->toDateString() <= $day->toDateString() && $block->ends_on->toDateString() >= $day->toDateString())
@@ -203,7 +210,7 @@ class DashboardAnalyticsService
                 $closed[] = [$operating['end'], 86400];
                 $windows = $this->subtractIntervals([[$operating['start'], $operating['end']]], $closed);
                 $available += $this->intervalDuration($windows);
-                $intervals = $bookings->get($facility->id.'|'.$day->toDateString(), collect())
+                $intervals = $bookings->get($facility->id, collect())
                     ->map(fn ($row) => [$this->timeSeconds($row->start_time), $this->timeSeconds($row->end_time)])->all();
                 $occupied += $this->intervalDuration($this->subtractIntervals($intervals, $closed));
             }

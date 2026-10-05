@@ -8,7 +8,7 @@
     display: none !important;
 }
 
-.bi-dashboard, .staff-monitoring {
+.bi-dashboard, .staff-monitoring, .admin-reports {
     font-family: 'Poppins', ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -45,6 +45,16 @@
     width: 100%;
     max-width: none;
     margin-inline: 0;
+}
+
+/* Keep page titles consistent across every Admin screen. */
+.admin-workspace #main-content h1 {
+    color: #000;
+    font-family: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.875rem;
+    font-weight: 700;
+    line-height: 2.25rem;
+    letter-spacing: -0.025em;
 }
 
 /* Scoped gymnasium BI layout; shared navigation and other pages retain their styles. */

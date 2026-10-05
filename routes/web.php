@@ -110,6 +110,7 @@ Route::middleware([
                 ->name('reports.index');
             Route::get('/reports-export', [AdminReportController::class, 'export'])->name('reports.export');
             Route::get('/reports/generate/excel', [AdminReportController::class, 'excel'])->name('reports.excel');
+            Route::get('/reports/generate/pdf', [AdminReportController::class, 'pdf'])->name('reports.pdf');
             Route::get('/reports/generate/word', [AdminReportController::class, 'word'])->name('reports.word');
             Route::get('/reports/{report}', [AdminReportController::class, 'show'])
                 ->name('reports.show');

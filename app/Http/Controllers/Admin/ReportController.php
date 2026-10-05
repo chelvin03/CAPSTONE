@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AnalyticsReport;
 use App\Models\Reservation;
-use App\Models\User;
 use App\Services\ReservationReportService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -22,24 +21,15 @@ use PhpOffice\PhpWord\IOFactory as WordIOFactory;
 
 class ReportController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, ReservationReportService $service): View
     {
-        $type = (string) $request->query('type', '');
-        abort_unless($type === '' || in_array($type, ['weekly', 'monthly', 'annual'], true), 422);
-
-        $reports = AnalyticsReport::with('submitter')
-            ->when($type !== '', fn ($query) => $query->where('report_type', $type))
-            ->latest('submitted_at')->paginate(15)->withQueryString();
-
-        $total = Reservation::count();
-        $cancelled = Reservation::where('status', 'cancelled')->count();
-        return view('admin.reports.index', compact('reports', 'type') + [
-            'reservationTotal' => $total,
-            'cancellationRate' => $total ? (int) round($cancelled / $total * 100) : 0,
-            'priorityOverrides' => Reservation::whereNotNull('priority_number')->count(),
-            'peakDate' => Reservation::selectRaw('reservation_date, COUNT(*) as total')->groupBy('reservation_date')->orderByDesc('total')->first(),
-            'reportUsers' => User::whereIn('role', ['admin', 'staff'])->orderBy('first_name')->get(),
-            'categories' => Reservation::whereNotNull('reservation_type')->distinct()->orderBy('reservation_type')->pluck('reservation_type'),
+        $defaults = ['report_type' => 'reservation', 'date_from' => now()->startOfMonth()->toDateString(), 'date_to' => now()->endOfMonth()->toDateString()];
+        $filters = $request->hasAny(['report_type', 'date_from', 'date_to']) ? $service->reportFilters($request) : $defaults;
+        $data = $request->hasAny(['report_type', 'date_from', 'date_to']) ? $service->reportData($filters) : null;
+        return view('admin.reports.index', [
+            'types' => ReservationReportService::TYPES, 'filters' => $filters, 'defaults' => $defaults, 'data' => $data,
+            'records' => $data && $data['rows'] === null ? $service->reportQuery($filters)->paginate(25)->withQueryString() : null,
+            'service' => $service,
         ]);
     }
 
@@ -61,6 +51,9 @@ class ReportController extends Controller
 
     public function excel(Request $request, ReservationReportService $service): BinaryFileResponse
     {
+        if (array_key_exists((string) $request->query('report_type'), ReservationReportService::TYPES)) {
+            return app(\App\Services\AdminReportExportService::class)->excel($service->reportData($service->reportFilters($request)), $service);
+        }
         $filters = $service->filters($request);
         $records = $service->records($filters);
         $summary = $service->summary($records);
@@ -86,19 +79,22 @@ class ReportController extends Controller
         $summarySheet->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
 
         $sheet = $spreadsheet->createSheet(); $sheet->setTitle('Records');
-        $headers = ['Reference','Date','Start','End','Event','Category','Facility','Requestor','Email','Attendees','Status','Priority','Created By'];
+        $headers = ['Reference','Date','Start','End','Event','Category','Facility','Attendees','Status','Priority'];
         $sheet->fromArray($headers, null, 'A1');
         $row = 2;
         foreach ($records as $record) {
-            $sheet->fromArray([$record->reference_number, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($record->reservation_date), substr($record->start_time,0,5), substr($record->end_time,0,5), $record->event_name, $record->reservation_type, $record->facility?->facility_name ?? 'Unassigned', $record->contact_person, $record->contact_email, $record->expected_attendees, ucwords(str_replace('_',' ',$record->status)), $record->priority_number ? 'Yes' : 'No', $record->user?->full_name ?? 'Public Requestor'], null, 'A'.$row++);
+            $sheet->fromArray([$record->reference_number, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($record->reservation_date), substr($record->start_time,0,5), substr($record->end_time,0,5), $record->event_name, $record->reservation_type, $record->facility?->facility_name ?? 'Unassigned', $record->expected_attendees, ucwords(str_replace('_',' ',$record->status)), $record->priority_number ? 'Yes' : 'No'], null, 'A'.$row++);
+            foreach (['A' => $record->reference_number, 'E' => $record->event_name, 'F' => $record->reservation_type, 'G' => $record->facility?->facility_name ?? 'Unassigned'] as $column => $value) {
+                $sheet->setCellValueExplicit($column.($row - 1), $value, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            }
         }
         $lastRow = max(2, $row - 1);
-        $sheet->setAutoFilter("A1:M{$lastRow}"); $sheet->freezePane('A2');
-        $sheet->getStyle('A1:M1')->applyFromArray(['font'=>['bold'=>true,'color'=>['rgb'=>'FFFFFF']], 'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'1E3A8A']], 'alignment'=>['horizontal'=>Alignment::HORIZONTAL_CENTER]]);
+        $sheet->setAutoFilter("A1:J{$lastRow}"); $sheet->freezePane('A2');
+        $sheet->getStyle('A1:J1')->applyFromArray(['font'=>['bold'=>true,'color'=>['rgb'=>'FFFFFF']], 'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'1E3A8A']], 'alignment'=>['horizontal'=>Alignment::HORIZONTAL_CENTER]]);
         $sheet->getStyle("B2:B{$lastRow}")->getNumberFormat()->setFormatCode('yyyy-mm-dd');
-        $sheet->getStyle("J2:J{$lastRow}")->getNumberFormat()->setFormatCode('#,##0');
-        foreach (range('A','M') as $column) $sheet->getColumnDimension($column)->setAutoSize(true);
-        $sheet->getColumnDimension('E')->setWidth(30); $sheet->getColumnDimension('H')->setWidth(24); $sheet->getColumnDimension('I')->setWidth(28);
+        $sheet->getStyle("H2:H{$lastRow}")->getNumberFormat()->setFormatCode('#,##0');
+        foreach (range('A','J') as $column) $sheet->getColumnDimension($column)->setAutoSize(true);
+        $sheet->getColumnDimension('E')->setWidth(30);
         $sheet->getPageSetup()->setOrientation('landscape')->setFitToWidth(1)->setFitToHeight(0);
         $sheet->getPageMargins()->setTop(.4)->setBottom(.4)->setLeft(.3)->setRight(.3);
         $sheet->getHeaderFooter()->setOddFooter('&LMCST Gym Reservation System&CPage &P of &N&RGenerated '.now()->format('Y-m-d'));
@@ -108,8 +104,14 @@ class ReportController extends Controller
         return response()->download($path, 'mcst-reservation-report-'.now()->format('Y-m-d-His').'.xlsx')->deleteFileAfterSend(true);
     }
 
+    public function pdf(Request $request, ReservationReportService $service): BinaryFileResponse
+    {
+        return app(\App\Services\AdminReportExportService::class)->pdf($service->reportData($service->reportFilters($request)), $service);
+    }
+
     public function word(Request $request, ReservationReportService $service): BinaryFileResponse
     {
+        \PhpOffice\PhpWord\Settings::setOutputEscapingEnabled(true);
         $filters = $service->filters($request); $records = $service->records($filters); $summary = $service->summary($records);
         $word = new PhpWord();
         $word->setDefaultFontName('Arial'); $word->setDefaultFontSize(9);
@@ -121,9 +123,9 @@ class ReportController extends Controller
         $section->addTextBreak(); $section->addTitle('Reservation Records', 2);
         $table = $section->addTable(['borderSize'=>4,'borderColor'=>'CBD5E1','cellMargin'=>70]);
         $table->addRow(null, ['tblHeader'=>true]);
-        foreach (['Reference','Date / Time','Event','Facility','Requestor','Attendees','Status'] as $header) $table->addCell(1500,['bgColor'=>'1E3A8A'])->addText($header,['bold'=>true,'color'=>'FFFFFF']);
-        foreach ($records as $record) { $table->addRow(); foreach ([$record->reference_number,$record->reservation_date->format('Y-m-d').' '.substr($record->start_time,0,5).'-'.substr($record->end_time,0,5),$record->event_name,$record->facility?->facility_name ?? 'Unassigned',$record->contact_person,(string)$record->expected_attendees,ucwords(str_replace('_',' ',$record->status))] as $value) $table->addCell(1500)->addText((string)$value); }
-        if ($records->isEmpty()) { $table->addRow(); $table->addCell(10500,['gridSpan'=>7])->addText('No records matched the selected criteria.', ['italic'=>true,'color'=>'64748B']); }
+        foreach (['Reference','Date / Time','Event','Facility','Attendees','Status'] as $header) $table->addCell(1750,['bgColor'=>'1E3A8A'])->addText($header,['bold'=>true,'color'=>'FFFFFF']);
+        foreach ($records as $record) { $table->addRow(); foreach ([$record->reference_number,$record->reservation_date->format('Y-m-d').' '.substr($record->start_time,0,5).'-'.substr($record->end_time,0,5),$record->event_name,$record->facility?->facility_name ?? 'Unassigned',(string)$record->expected_attendees,ucwords(str_replace('_',' ',$record->status))] as $value) $table->addCell(1750)->addText((string)$value); }
+        if ($records->isEmpty()) { $table->addRow(); $table->addCell(10500,['gridSpan'=>6])->addText('No records matched the selected criteria.', ['italic'=>true,'color'=>'64748B']); }
         $footer = $section->addFooter(); $footer->addPreserveText('MCST Gym Reservation System | Page {PAGE} of {NUMPAGES}', ['size'=>8,'color'=>'64748B'], ['alignment'=>'center']);
         $path = tempnam(sys_get_temp_dir(), 'mcst-report-').'.docx'; WordIOFactory::createWriter($word, 'Word2007')->save($path);
         return response()->download($path, 'mcst-reservation-report-'.now()->format('Y-m-d-His').'.docx')->deleteFileAfterSend(true);
