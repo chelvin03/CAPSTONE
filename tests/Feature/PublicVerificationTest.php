@@ -8,7 +8,7 @@ beforeEach(fn () => Mail::fake());
 
 function publicOtpDetails(): array
 {
-    return ['email' => 'public@example.com', 'contact_person' => 'Public Requestor', 'contact_number' => '09123456789', 'reservation_type' => 'community'];
+    return ['email' => 'public@example.com', 'contact_person' => 'Public Requestor', 'contact_number' => '09123456789', 'reservation_type' => 'external'];
 }
 
 test('public verification sends a code and verifies only in its browser session', function () {
@@ -139,7 +139,11 @@ test('reservation confirmation presents facility information without a selector'
     ])->get(route('reservation.create'))
         ->assertOk()
         ->assertSee('FACILITY &amp; CONFIRMATION', false)
-        ->assertSee('500 participants')
+        ->assertSee('2,000 persons')
+        ->assertSee('<option value="">Select Requestor Type</option>', false)
+        ->assertSee('<option value="internal">Internal</option>', false)
+        ->assertSee('<option value="external">External</option>', false)
+        ->assertDontSee('<option value="student">', false)
         ->assertSee('class="facility-information"', false)
         ->assertSee('Upload valid approval letter or supporting document')
         ->assertDontSee('<select name="facility_id"', false);

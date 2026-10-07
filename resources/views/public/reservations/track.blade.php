@@ -5,6 +5,8 @@
 @endpush
 @section('content')
 <div class="tracking-page"><div class="tracking-shell">
+    @if(session('success'))<p class="tracking-message" role="status">{{ session('success') }}</p>@endif
+    @if($errors->any())<div class="tracking-message" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
     @if($reservation && session('reservation_submitted') === $reservation->reference_number)
     <div class="tracking-success" role="status"><span aria-hidden="true">&#10003;</span><h1>Reservation Submitted Successfully</h1><p>Your reservation is saved. Follow its progress below.</p></div>
     @else

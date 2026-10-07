@@ -13,7 +13,7 @@ function validPublicReservationData(Facility $facility): array
 
     return [
         'facility_id' => $facility->id,
-        'reservation_type' => 'community',
+        'reservation_type' => 'internal',
         'event_name' => 'Community Sports Day',
         'event_type' => 'Sports',
         'purpose' => 'Community recreation',
@@ -27,6 +27,7 @@ function validPublicReservationData(Facility $facility): array
         'start_time' => '09:00',
         'end_time' => '11:00',
         'agreement' => '1',
+        'agreement_accepted' => '1',
         'email_verified' => '1',
     ];
 }
@@ -49,10 +50,14 @@ test('a public reservation stores its required permit', function () {
     );
     $data['requested_equipment'] = 'Volleyball net';
     $data['requested_equipment_quantity'] = 2;
+    $data['agreement_accepted_at'] = '2000-01-01 00:00:00';
+    $this->travelTo(now()->startOfSecond());
 
     $response = $this->post(route('reservation.store'), $data);
 
     $reservation = Reservation::firstOrFail();
+    expect($reservation->agreement_accepted)->toBeTrue()
+        ->and($reservation->agreement_accepted_at->equalTo(now()))->toBeTrue();
     $document = $reservation->documents()->firstOrFail();
     Mail::assertSent(\App\Mail\ReservationSubmitted::class, function ($mail) use ($reservation) {
         return $mail->hasTo($reservation->contact_email)
@@ -85,6 +90,102 @@ test('a public reservation stores its required permit', function () {
         ->assertOk()
         ->assertSee($reservation->reference_number)
         ->assertSee('Community Sports Day');
+});
+
+test('public requestor types store standardized values and display proper admin labels', function ($type, $label) {
+    Storage::fake('local');
+    Mail::fake();
+    $facility = Facility::create(['facility_name' => 'Type Gym', 'capacity' => 2000, 'status' => 'available']);
+    $data = validPublicReservationData($facility);
+    $data['reservation_type'] = $type;
+    $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
+    $this->post(route('reservation.store'), $data)->assertSessionHasNoErrors();
+    $reservation = Reservation::sole();
+    expect($reservation->reservation_type)->toBe($type);
+    $this->actingAs(\App\Models\User::factory()->create(['role' => 'admin']))
+        ->get(route('admin.reservations.show', $reservation))->assertOk()->assertSee($label);
+})->with([['internal', 'Internal'], ['external', 'External']]);
+
+test('public requestor type rejects missing and unapproved values at verification and submission', function ($type) {
+    Storage::fake('local');
+    Mail::fake();
+    $facility = Facility::create(['facility_name' => 'Invalid Type Gym', 'capacity' => 2000, 'status' => 'available']);
+    $data = validPublicReservationData($facility);
+    $data['reservation_type'] = $type;
+    $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
+    $response = $this->post(route('reservation.store'), $data)->assertSessionHasErrors('reservation_type');
+    if ($type === '') $response->assertSessionHasErrors(['reservation_type' => 'Please select a requestor type.']);
+    $this->postJson(route('reservation.send_code'), [
+        'email' => 'juan@example.com', 'contact_person' => 'Juan Dela Cruz',
+        'contact_number' => '09123456789', 'reservation_type' => $type,
+    ])->assertUnprocessable()->assertJsonValidationErrors('reservation_type');
+    $this->assertDatabaseCount('reservations', 0);
+    Mail::assertNothingSent();
+})->with(['', 'student', 'community', 'organization', 'Internal', 'External Requestor']);
+
+test('public capacity validation rejects invalid attendees without storing or notifying', function ($attendees) {
+    Storage::fake('local');
+    Mail::fake();
+    $facility = Facility::create(['facility_name' => 'Capacity Gym', 'capacity' => 2000, 'status' => 'available']);
+    $data = validPublicReservationData($facility);
+    $data['expected_attendees'] = $attendees;
+    $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
+    $response = $this->from(route('reservation.create'))->post(route('reservation.store'), $data);
+    $response->assertRedirect(route('reservation.create'))->assertSessionHasErrors('expected_attendees')
+        ->assertSessionHasInput('event_name', $data['event_name']);
+    if (is_numeric($attendees) && $attendees > 2000) {
+        $response->assertSessionHasErrors(['expected_attendees' => \App\Support\GymCapacity::ERROR]);
+    }
+    $this->assertDatabaseCount('reservations', 0);
+    $this->assertDatabaseCount('reservation_documents', 0);
+    expect(Storage::disk('local')->allFiles())->toBeEmpty();
+    Mail::assertNothingSent();
+})->with([2001, 2500, 3000, 0, -1, '1.5', '2000.5', 'not-a-number', null]);
+
+test('public capacity validation accepts whole numbers up to the boundary', function ($attendees) {
+    Storage::fake('local');
+    Mail::fake();
+    $facility = Facility::create(['facility_name' => 'Boundary Capacity Gym', 'capacity' => 2000, 'status' => 'available']);
+    $data = validPublicReservationData($facility);
+    $data['expected_attendees'] = $attendees;
+    $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
+    $this->post(route('reservation.store'), $data)->assertSessionHasNoErrors();
+    expect(Reservation::sole()->expected_attendees)->toBe($attendees);
+})->with([1, 1500, 1999, 2000]);
+
+test('public reservations reject missing or declined gymnasium agreements even with forged timestamps', function ($acceptance) {
+    Storage::fake('local');
+    $facility = Facility::create(['facility_name' => 'Agreement Gym', 'capacity' => 100, 'status' => 'available']);
+    $data = validPublicReservationData($facility);
+    $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
+    unset($data['agreement_accepted']);
+    if ($acceptance !== null) {
+        $data['agreement_accepted'] = $acceptance;
+    }
+    $data['agreement_accepted_at'] = now()->toDateTimeString();
+
+    $this->post(route('reservation.store'), $data)->assertSessionHasErrors([
+        'agreement_accepted' => 'Please read and accept the MCST Gymnasium Use Agreement before submitting your reservation request.',
+    ]);
+    $this->assertDatabaseCount('reservations', 0);
+    $this->assertDatabaseCount('reservation_documents', 0);
+})->with([null, '0', 'false']);
+
+test('admin reservation details show recorded acceptance and do not claim legacy acceptance', function () {
+    Storage::fake('local');
+    Mail::fake();
+    $facility = Facility::create(['facility_name' => 'Admin Agreement Gym', 'capacity' => 100, 'status' => 'available']);
+    $data = validPublicReservationData($facility);
+    $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
+    $this->post(route('reservation.store'), $data)->assertSessionHasNoErrors();
+    $reservation = Reservation::sole();
+    $admin = \App\Models\User::factory()->create(['role' => 'admin']);
+    $this->actingAs($admin)->get(route('admin.reservations.show', $reservation))->assertOk()
+        ->assertSee('Gymnasium Use Agreement')->assertSee('Accepted')
+        ->assertSee($reservation->agreement_accepted_at->format('F d, Y g:i A'))
+        ->assertSee('Juan Dela Cruz')->assertSee($reservation->reference_number);
+    $reservation->update(['agreement_accepted' => false, 'agreement_accepted_at' => null]);
+    $this->get(route('admin.reservations.show', $reservation))->assertOk()->assertSee('Not recorded');
 });
 
 test('public reservations require at least three days notice', function () {
@@ -183,7 +284,7 @@ test('public submission ignores forged browser verification and consumes real pr
         ->assertSessionHasErrors('contact_email');
     $this->assertDatabaseCount('reservations', 0);
 
-    $this->postJson('/reserve/send-code', ['email' => 'juan@example.com', 'contact_person' => 'Juan Dela Cruz', 'contact_number' => '09123456789', 'reservation_type' => 'community'])->assertOk();
+    $this->postJson('/reserve/send-code', ['email' => 'juan@example.com', 'contact_person' => 'Juan Dela Cruz', 'contact_number' => '09123456789', 'reservation_type' => 'internal'])->assertOk();
     $code = Mail::sent(\App\Mail\PublicRegistrationCode::class)->sole()->code;
     $this->postJson('/reserve/verify-code', ['email' => 'juan@example.com', 'code' => $code])->assertOk();
     unset($data['email_verified']);

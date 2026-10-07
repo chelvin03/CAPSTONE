@@ -125,7 +125,7 @@ test('admin can open and update a reservation from the management actions', func
         'reference_number' => 'QA-EDIT-RESERVATION',
         'user_id' => $this->admin->id,
         'facility_id' => $facility->id,
-        'reservation_type' => 'sports',
+        'reservation_type' => 'internal',
         'event_name' => 'Original Event',
         'purpose' => 'Original purpose',
         'contact_person' => 'QA Tester',
@@ -147,7 +147,7 @@ test('admin can open and update a reservation from the management actions', func
 
     $this->put(route('admin.reservations.update', $reservation), [
         'facility_id' => $facility->id,
-        'reservation_type' => 'sports',
+        'reservation_type' => 'internal',
         'event_name' => 'Updated Event',
         'event_type' => 'Tournament',
         'purpose' => 'Updated purpose',

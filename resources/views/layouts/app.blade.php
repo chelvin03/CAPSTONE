@@ -23,6 +23,7 @@
             <header class="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-8">
                 <button type="button" @click="navigationOpen = true" class="btn-secondary !min-h-10 !px-3 lg:hidden" aria-label="Open navigation" aria-controls="mobile-navigation"><i class="bi bi-list text-xl" aria-hidden="true"></i></button>
                 <div class="ml-auto flex items-center gap-3">
+                    @if(auth()->user()->role === 'admin')@include('components.equipment-notifications')@endif
                     <div class="hidden text-right sm:block"><p class="text-sm font-semibold text-slate-800">{{ auth()->user()->full_name }}</p><p class="text-xs capitalize text-slate-500">{{ auth()->user()->role }}</p></div>
                     @if (auth()->user()->role === 'staff')
                         <span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700" aria-label="{{ auth()->user()->full_name }}">{{ strtoupper(substr(auth()->user()->first_name, 0, 1)) }}</span>

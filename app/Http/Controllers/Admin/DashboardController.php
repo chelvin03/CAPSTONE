@@ -53,6 +53,8 @@ class DashboardController extends Controller
                 'Available operating hours' => $data['availableHours'], 'Average processing time (hours)' => $data['processingHours'],
                 'Records with decision timestamps' => $data['processingCount'], 'Previous period requests' => $data['previousTotal'],
                 'Previous period change (%)' => $data['change'], 'Expected attendees (approved + completed)' => $data['expectedAttendees'],
+                'Gym capacity (persons per event)' => $data['gymCapacity'],
+                'Average attendance capacity usage (%)' => $data['averageAttendanceCapacityUsage'],
                 'Feedback responses' => $data['feedbackCount'], 'Average recorded satisfaction rating' => $data['feedbackAverage'],
                 'Currently waiting' => $data['waitingCount'], 'Ever waitlisted (history)' => $data['waitingEver'],
                 'Promoted to approved (history)' => $data['waitingPromoted'], 'Waiting-list conversion (%)' => $data['waitingConversion'],

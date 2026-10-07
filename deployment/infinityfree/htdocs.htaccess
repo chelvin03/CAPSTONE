@@ -1,0 +1,13 @@
+# Deployment-only file. Upload as htdocs/.htaccess; leave public/.htaccess intact.
+DirectoryIndex index.php
+Options -Indexes
+RewriteEngine On
+
+# Hide dotfiles and all private Laravel directories, including direct requests.
+RewriteRule (^|/)\.(?!well-known(?:/|$)) - [F,L]
+RewriteRule ^(?:app|bootstrap|config|database|resources|routes|storage|vendor|scripts|tests)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:artisan|composer\.(?:json|lock)|package(?:-lock)?\.json|phpunit\.xml|vite\.config\.js|tailwind\.config\.js|README\.md)$ - [F,L,NC]
+
+# Preserve the public directory layout so index.php's relative paths stay valid.
+RewriteRule ^public(?:/|$) - [L]
+RewriteRule ^(.*)$ public/$1 [L]

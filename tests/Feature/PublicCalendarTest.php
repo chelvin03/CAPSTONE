@@ -81,10 +81,10 @@ test('flexible reservations enforce hours and refresh remaining time after submi
     \Illuminate\Support\Facades\Mail::fake();
     \Illuminate\Support\Facades\Storage::fake('local');
     $this->withSession(['public_email_verified' => ['email' => 'requestor@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp]]);
-    $payload = ['facility_id' => $this->gym->id, 'reservation_type' => 'student', 'event_name' => 'Practice',
+    $payload = ['facility_id' => $this->gym->id, 'reservation_type' => 'internal', 'event_name' => 'Practice',
         'purpose' => 'Sports', 'contact_person' => 'Requestor', 'contact_email' => 'requestor@example.com',
         'contact_number' => '09123456789', 'expected_attendees' => 20, 'reservation_date' => '2026-03-10',
-        'start_time' => '08:00', 'end_time' => '17:00', 'agreement' => '1',
+        'start_time' => '08:00', 'end_time' => '17:00', 'agreement' => '1', 'agreement_accepted' => '1',
         'permit' => \Illuminate\Http\UploadedFile::fake()->create('letter.pdf', 20, 'application/pdf')];
     $this->post(route('reservation.store'), [...$payload, 'start_time' => '07:59'])->assertSessionHasErrors('start_time');
     $this->post(route('reservation.store'), [...$payload, 'end_time' => '21:01'])->assertSessionHasErrors('start_time');

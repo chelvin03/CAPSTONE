@@ -1,0 +1,2 @@
+# Defense in depth: private files must never be served directly over HTTP.
+Require all denied

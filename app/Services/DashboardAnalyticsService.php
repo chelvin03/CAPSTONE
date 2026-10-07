@@ -81,6 +81,8 @@ class DashboardAnalyticsService
         $processing = $this->processing($query);
         $timeSlots = $this->timeSlots($query);
         $extras = $this->supplementary($query);
+        $attendance = (clone $query)->whereIn('status', ['approved', 'completed']);
+        $averageAttendance = (clone $attendance)->avg('expected_attendees');
         $filterLabels = [
             'Event type' => isset($filters['category']) ? self::label($filters['category']) : 'All',
             'Requestor type' => isset($filters['requestor_type']) ? self::label($filters['requestor_type']) : 'All',
@@ -104,6 +106,8 @@ class DashboardAnalyticsService
             'cancelledReservations' => (int) $counts->get('cancelled', 0), 'oldPending' => $oldPending,
             'cancellationRate' => $total ? round($counts->get('cancelled', 0) / $total * 100, 1) : null,
             'expectedAttendees' => (int) (clone $query)->whereIn('status', ['approved', 'completed'])->sum('expected_attendees'),
+            'gymCapacity' => \App\Support\GymCapacity::MAX_ATTENDEES,
+            'averageAttendanceCapacityUsage' => $averageAttendance === null ? null : round((float) $averageAttendance / \App\Support\GymCapacity::MAX_ATTENDEES * 100, 1),
             'processingHours' => $processing->hours === null ? null : round((float) $processing->hours, 1),
             'processingCount' => (int) $processing->total,
             'monthlyActivity' => $monthlyActivity, 'trendActivity' => $trendActivity,

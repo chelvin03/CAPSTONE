@@ -69,15 +69,16 @@ class PublicReservationController extends Controller
             ->get();
 
         $minimumNoticeDays = max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3)));
+        $equipment = \App\Models\Equipment::where('status', 'available')->orderBy('equipment_name')->get();
 
-        return view('public.reservations.create', compact('facilities', 'minimumNoticeDays', 'emailVerified', 'requestorDetails', 'initialStep'));
+        return view('public.reservations.create', compact('facilities', 'equipment', 'minimumNoticeDays', 'emailVerified', 'requestorDetails', 'initialStep'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
-            'reservation_type' => ['required', 'in:student,faculty,staff,organization,community'],
+            'reservation_type' => ['required', 'in:internal,external'],
             'event_name' => ['required', 'string', 'max:255'],
             'event_type' => ['nullable', 'string', 'max:100'],
             'purpose' => ['required', 'string'],
@@ -86,7 +87,7 @@ class PublicReservationController extends Controller
             'contact_person' => ['required', 'string', 'max:255'],
             'contact_email' => ['required', 'email:rfc', 'max:255'],
             'contact_number' => ['required', 'digits:11'],
-            'expected_attendees' => ['required', 'integer', 'min:1'],
+            'expected_attendees' => \App\Support\GymCapacity::rules(),
             'reservation_date' => ['required', 'date', 'after_or_equal:'.now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString(), 'before_or_equal:'.now()->addDays((int) SystemSetting::getValue('maximum_advance_days', 365))->toDateString()],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
@@ -99,9 +100,17 @@ class PublicReservationController extends Controller
                 'max:'.config('gym.documents.max_size_kb'),
             ],
             'agreement' => ['accepted'],
+            'agreement_accepted' => ['accepted'],
+            'equipment' => ['nullable', 'array'],
+            'equipment.*' => ['array:quantity_requested'],
+            'equipment.*.quantity_requested' => ['nullable', 'integer', 'min:1', 'max:100000'],
             'requested_equipment' => ['nullable', 'string', 'max:255', 'required_with:requested_equipment_quantity'],
             'requested_equipment_quantity' => ['nullable', 'integer', 'min:1', 'required_with:requested_equipment'],
 
+        ], [
+            'agreement_accepted.accepted' => 'Please read and accept the MCST Gymnasium Use Agreement before submitting your reservation request.',
+            'expected_attendees.max' => \App\Support\GymCapacity::ERROR,
+            'reservation_type.required' => 'Please select a requestor type.',
         ]);
 
         if (! $this->emailIsVerified($request, $validated['contact_email'])) {
@@ -110,6 +119,11 @@ class PublicReservationController extends Controller
                 'contact_email' => 'Please verify this email address before submitting the reservation.',
             ]);
         }
+
+        if ($request->session()->has('public_reservation_details.reservation_type') && $request->session()->get('public_reservation_details.reservation_type') !== $validated['reservation_type']) {
+            return back()->withInput()->withErrors(['reservation_type' => 'Please verify your requestor details again after changing Requestor Type.']);
+        }
+        app(\App\Services\EquipmentRequestService::class)->validateRequests($validated['reservation_type'], $validated['equipment'] ?? [], $validated['requested_equipment'] ?? null);
 
         if (Facility::findOrFail($validated['facility_id'])->status !== 'available') {
             return back()->withInput()->withErrors(['facility_id' => 'The gymnasium is currently unavailable.']);
@@ -147,6 +161,9 @@ class PublicReservationController extends Controller
 
         try {
             $reservation = DB::transaction(function () use ($validated, &$storedPermitPath): Reservation {
+                $equipmentService = app(\App\Services\EquipmentRequestService::class);
+                $equipmentService->lockInventory();
+                $equipmentService->validateRequests($validated['reservation_type'], $validated['equipment'] ?? [], $validated['requested_equipment'] ?? null);
                 // Serialize submissions for this facility before the final overlap check.
                 $facility = Facility::whereKey($validated['facility_id'])->lockForUpdate()->firstOrFail();
                 $unavailable = $facility->status !== 'available'
@@ -181,9 +198,12 @@ class PublicReservationController extends Controller
                     'requested_equipment' => $validated['requested_equipment'] ?? null,
                     'requested_equipment_quantity' => $validated['requested_equipment_quantity'] ?? null,
                     'status' => 'new',
+                    'agreement_accepted' => true,
+                    'agreement_accepted_at' => now(),
                 ]);
 
                 $permit = $validated['permit'];
+                app(\App\Services\EquipmentRequestService::class)->attach($reservation, $validated['equipment'] ?? []);
                 $storedFilename = Str::uuid().'.'.$permit->extension();
                 $directory = trim(config('gym.documents.directory'), '/').
                     '/'.$reservation->reference_number;
@@ -256,10 +276,10 @@ class PublicReservationController extends Controller
             'email' => ['required', 'email:rfc', 'max:255'],
             'contact_person' => ['required', 'string', 'max:255'],
             'contact_number' => ['required', 'digits:11'],
-            'reservation_type' => ['required', 'in:student,faculty,staff,organization,community'],
+            'reservation_type' => ['required', 'in:internal,external'],
             'organization_department' => ['nullable', 'string', 'max:255'],
             'purpose' => ['nullable', 'string'],
-        ]);
+        ], ['reservation_type.required' => 'Please select a requestor type.']);
         $email = Str::lower(trim($validated['email']));
         $previous = $request->session()->get('public_email_challenge');
         $details = [...$validated, 'contact_email' => $email];
@@ -387,7 +407,7 @@ class PublicReservationController extends Controller
 
         if ($reference !== '') {
             $request->validate(['reference' => ['string', 'max:50']]);
-            $reservation = Reservation::with(['facility', 'statusHistories'])
+            $reservation = Reservation::with(['facility', 'statusHistories', 'equipment', 'notifications'])
                 ->where('reference_number', $reference)
                 ->first();
         }

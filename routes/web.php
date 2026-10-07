@@ -50,6 +50,11 @@ Route::get('/reserve/availability', [PublicReservationController::class, 'availa
 Route::get('/track', [PublicReservationController::class, 'track'])
     ->name('reservation.track');
 
+Route::get('/reservation/{reservation}/equipment-access', [\App\Http\Controllers\EquipmentRequestController::class, 'access'])
+    ->middleware(['signed', 'throttle:30,1'])->name('reservation.equipment.access');
+Route::post('/reservation/{reservation}/equipment/{equipment}/response', [\App\Http\Controllers\EquipmentRequestController::class, 'respond'])
+    ->middleware('throttle:30,1')->name('reservation.equipment.respond');
+
 Route::get(
     '/reservation/success/{referenceNumber}',
     [PublicReservationController::class, 'success']
@@ -143,6 +148,9 @@ Route::middleware([
                     'edit',
                     'update',
                 ]);
+
+            Route::post('/reservations/{reservation}/equipment/{equipment}/review', [\App\Http\Controllers\EquipmentRequestController::class, 'review'])
+                ->name('reservations.equipment.review');
 
             Route::patch(
                 '/reservations/{reservation}/approve',

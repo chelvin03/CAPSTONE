@@ -96,7 +96,7 @@ test('guest admin and unapproved staff follow staff access rules', function () {
 test('operational notices use maintenance capacity cancellations and schedule history without revealing notes', function () {
     $this->gym->update(['status' => 'maintenance']);
     Equipment::create(['equipment_name' => 'Chairs', 'total_quantity' => 100, 'unit' => 'pcs', 'status' => 'maintenance']);
-    $event = staffMonitoringReservation($this->gym, ['expected_attendees' => 200]);
+    $event = staffMonitoringReservation($this->gym, ['expected_attendees' => 2000]);
     $cancelled = staffMonitoringReservation($this->gym, ['status' => 'cancelled', 'cancelled_at' => now()->subDay(), 'cancellation_reason' => 'PRIVATE REASON']);
     DB::table('reservation_status_histories')->insert(['reservation_id' => $event->id, 'new_status' => 'approved', 'previous_status' => 'approved', 'remarks' => 'Reservation rescheduled: PRIVATE CHANGE', 'created_at' => now()->subDay()]);
     ScheduleBlock::create(['facility_id' => $this->gym->id, 'starts_on' => now()->toDateString(), 'ends_on' => now()->toDateString(), 'title' => 'PRIVATE BLOCK', 'reason' => 'PRIVATE BLOCK REASON', 'created_by' => $this->staff->id]);

@@ -12,7 +12,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Reservation extends Model
 {
-    use HasFactory;
+    use HasFactory, \Illuminate\Notifications\Notifiable;
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $reservation): void {
+            if (! $reservation->exists || $reservation->isDirty(['expected_attendees', 'reservation_date', 'start_time', 'end_time', 'facility_id'])
+                || ($reservation->isDirty('status') && in_array($reservation->status, ['approved', 'completed'], true))) {
+                // Validate the raw value before the integer cast could truncate decimals.
+                \Illuminate\Support\Facades\Validator::make(
+                    ['expected_attendees' => $reservation->getAttributes()['expected_attendees'] ?? null],
+                    ['expected_attendees' => \App\Support\GymCapacity::rules()],
+                    ['expected_attendees.max' => \App\Support\GymCapacity::ERROR],
+                )->validate();
+            }
+        });
+    }
 
     protected $fillable = [
         'reference_number',
@@ -47,9 +62,13 @@ class Reservation extends Model
         'cancelled_by',
         'cancelled_at',
         'completed_at',
+        'agreement_accepted',
+        'agreement_accepted_at',
     ];
 
     protected $casts = [
+        'agreement_accepted' => 'boolean',
+        'agreement_accepted_at' => 'datetime',
         'reservation_date' => 'date',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
@@ -80,6 +99,8 @@ class Reservation extends Model
                 'quantity_requested',
                 'quantity_approved',
                 'remarks',
+                'status', 'quantity_offered', 'reply_sent_at', 'requires_response',
+                'latest_offer_id', 'requestor_response', 'requestor_responded_at',
             ])
             ->withTimestamps();
     }

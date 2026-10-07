@@ -37,6 +37,6 @@ class ReservationController extends Controller
 
     public function show(string $reservation, StaffMonitoringService $monitoring): View
     {
-        return view('staff.reservation.show', ['reservation' => $monitoring->records()->findOrFail($reservation)]);
+        return view('staff.reservation.show', ['reservation' => $monitoring->records()->with('equipment')->findOrFail($reservation)]);
     }
 }

@@ -33,7 +33,7 @@
                         @selected(old('facility_id') == $facility->id)
                     >
                         {{ $facility->facility_name }}
-                        — Capacity: {{ $facility->capacity }}
+                        — Capacity: {{ number_format(\App\Support\GymCapacity::MAX_ATTENDEES) }}
                     </option>
                 @endforeach
             </select>
@@ -47,25 +47,13 @@
             <select
                 id="reservation_type"
                 name="reservation_type"
+                x-model="requestorType"
                 required
                 class="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
                 <option value="">Select type</option>
-                <option value="school" @selected(old('reservation_type') === 'school')>
-                    School Activity
-                </option>
-                <option value="community" @selected(old('reservation_type') === 'community')>
-                    Community Activity
-                </option>
-                <option value="sports" @selected(old('reservation_type') === 'sports')>
-                    Sports Activity
-                </option>
-                <option value="government" @selected(old('reservation_type') === 'government')>
-                    Government Activity
-                </option>
-                <option value="other" @selected(old('reservation_type') === 'other')>
-                    Other
-                </option>
+                <option value="internal" @selected(old('reservation_type') === 'internal')>Internal – MCST</option>
+                <option value="external" @selected(old('reservation_type') === 'external')>External</option>
             </select>
         </div>
 
@@ -167,7 +155,7 @@
                 type="number"
                 name="expected_attendees"
                 value="{{ old('expected_attendees') }}"
-                min="1"
+                min="1" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1"
                 required
                 class="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
@@ -179,7 +167,7 @@
                         <div><label class="mb-2 block text-sm font-semibold">Event Title *</label><input name="event_name" value="{{ old('event_name') }}" required class="w-full rounded-lg border-slate-300"></div>
                         <div><label class="mb-2 block text-sm font-semibold">Event Type</label><input name="event_type" value="{{ old('event_type') }}" class="w-full rounded-lg border-slate-300" placeholder="Sports Event"></div>
                         <div><label class="mb-2 block text-sm font-semibold">Facility *</label><select name="facility_id" x-model="facility" @change="loadAvailability" required class="w-full rounded-lg border-slate-300"><option value="">Select facility</option>@foreach($facilities as $facility)<option value="{{ $facility->id }}">{{ $facility->facility_name }}</option>@endforeach</select></div>
-                        <div><label class="mb-2 block text-sm font-semibold">Estimated Participants *</label><input name="expected_attendees" type="number" min="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300"></div>
+                        <div><label class="mb-2 block text-sm font-semibold">Estimated Participants *</label><input name="expected_attendees" type="number" min="1" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300"></div>
                         <div class="md:col-span-2"><label class="mb-2 block text-sm font-semibold">Purpose *</label><textarea name="purpose" rows="3" required class="w-full rounded-lg border-slate-300">{{ old('purpose') }}</textarea></div>
                     </div>
                 </div>
@@ -293,7 +281,7 @@
     </div>
 </div>
 
-<div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+<fieldset x-show="requestorType === 'internal'" :disabled="requestorType !== 'internal'"><div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
 
     <div class="border-b border-slate-200 px-6 py-5">
         <h2 class="text-lg font-bold text-slate-900">
@@ -301,7 +289,7 @@
         </h2>
 
         <p class="mt-1 text-sm text-slate-500">
-            Leave the quantity blank when the equipment is not needed.
+            Equipment requests are subject to availability and approval by the Gym Administrator. Only Internal MCST requestors may request equipment.
         </p>
     </div>
 
@@ -358,6 +346,7 @@
     </div>
 </div>
 
+</fieldset>
 <script>
     (function () {
         const equipment = [
@@ -436,3 +425,5 @@
         })();
     })();
 </script>
+
+@include('admin.reservations.partials.capacity-validation')

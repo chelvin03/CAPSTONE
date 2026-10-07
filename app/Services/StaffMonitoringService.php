@@ -82,9 +82,9 @@ class StaffMonitoringService
             $notices->push(['text' => 'No equipment records are marked available.', 'url' => route('staff.equipment.index')]);
         }
         $highAttendance = $this->ordered($this->records()->where('status', 'approved')->where('reservation_date', '>=', $today)
-            ->where('reservation_date', '<', $afterSevenDays)->whereHas('facility', fn ($q) => $q->where('capacity', '>', 0)->whereColumn('reservations.expected_attendees', '>=', 'facilities.capacity')))->limit(5)->get();
+            ->where('reservation_date', '<', $afterSevenDays)->where('expected_attendees', '>=', \App\Support\GymCapacity::MAX_ATTENDEES))->limit(5)->get();
         foreach ($highAttendance as $row) {
-            $notices->push(['text' => $row->reference_number.': expected attendance ('.$row->expected_attendees.') meets or exceeds facility capacity ('.$row->facility->capacity.').', 'url' => route('staff.reservations.show', $row)]);
+            $notices->push(['text' => $row->reference_number.': expected attendance ('.$row->expected_attendees.') meets or exceeds facility capacity ('.\App\Support\GymCapacity::MAX_ATTENDEES.').', 'url' => route('staff.reservations.show', $row)]);
         }
         $cancelled = $this->records()->where('status', 'cancelled')->where(function ($q) use ($now) {
             $q->whereBetween('cancelled_at', [$now->subDays(7), $now])->orWhereHas('statusHistories', fn ($q) => $q->where('new_status', 'cancelled')->whereBetween('created_at', [$now->subDays(7), $now]));

@@ -78,7 +78,7 @@
 function reservationFlow() {
     return {
         step: {{ $errors->any() ? 2 : 1 }}, availabilityLoading: false, availabilityError: '', message: '', occupied: [],
-        contactPerson: @js(old('contact_person', '')), email: @js(old('contact_email', '')), contactNumber: @js(old('contact_number', '')), requestorType: @js(old('reservation_type', 'student')),
+        contactPerson: @js(old('contact_person', '')), email: @js(old('contact_email', '')), contactNumber: @js(old('contact_number', '')), requestorType: @js(old('reservation_type', '')),
         facility: @js(old('facility_id', '')), date: @js(old('reservation_date', '')), startTime: @js(old('start_time', '')), endTime: @js(old('end_time', '')),
         minimumDate: @js(now()->addDays($minimumNoticeDays)->format('Y-m-d')), calendarMonth: @js(old('reservation_date') ? substr(old('reservation_date'), 0, 7) : now()->addDays($minimumNoticeDays)->format('Y-m')),
         get calendarMonthLabel() { const [year, month] = this.calendarMonth.split('-').map(Number); return new Date(year, month - 1, 1).toLocaleDateString([], {month: 'long', year: 'numeric'}); },

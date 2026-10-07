@@ -65,9 +65,10 @@
                     <p id="contact_number-error" class="wizard-field-error" x-show="fieldErrors.contact_number" x-text="fieldErrors.contact_number"></p>
                 </div>
                 <div>
-                    <label for="reservation_type" class="mb-2 block font-semibold">User Type <span class="required-marker" aria-hidden="true">*</span></label>
+                    <label for="reservation_type" class="mb-2 block font-semibold">Requestor Type <span class="required-marker" aria-hidden="true">*</span></label>
                     <select id="reservation_type" name="reservation_type" x-model="requestorType" aria-describedby="reservation_type-error" :aria-invalid="Boolean(fieldErrors.reservation_type)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                        @foreach (['student' => 'Student', 'faculty' => 'Faculty', 'staff' => 'Staff', 'organization' => 'Recognized Organization'] as $value => $label)
+                        <option value="">Select Requestor Type</option>
+                        @foreach (['internal' => 'Internal', 'external' => 'External'] as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
@@ -146,9 +147,10 @@
                         </div>
 <input type="hidden" name="facility_id" x-model="facility">
                         <div>
-                            <label for="expected_attendees" class="mb-2 block text-sm font-semibold">Number of Participants *</label>
-                            <input placeholder="Enter expected number of attendees" name="expected_attendees" id="expected_attendees" aria-describedby="expected_attendees-error" aria-invalid="{{ $errors->has('expected_attendees') ? 'true' : 'false' }}" type="number" min="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                            @error('expected_attendees')<p id="expected_attendees-error" class="wizard-field-error">{{ $message }}</p>@enderror
+                            <label for="expected_attendees" class="mb-2 block text-sm font-semibold">Expected Number of Attendees *</label>
+                            <input placeholder="Enter expected number of attendees" name="expected_attendees" id="expected_attendees" aria-describedby="expected_attendees-help expected_attendees-error" :aria-invalid="Boolean(fieldErrors.expected_attendees)" type="number" min="1" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees') }}" @input="validateAttendance($event.target)" @invalid="step = 2; validateAttendance($event.target)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            <p id="expected_attendees-help" class="wizard-field-help">Maximum Gymnasium Capacity: 2,000 persons</p>
+                            <p id="expected_attendees-error" class="wizard-field-error" role="alert" x-show="fieldErrors.expected_attendees" x-text="fieldErrors.expected_attendees">@error('expected_attendees'){{ $message }}@enderror</p>
                         </div>
                     </div>
                 </div>
@@ -194,6 +196,22 @@
                     <p class="mt-1 text-xs text-slate-500">Supported Formats: PDF, PNG, JPG (Max: 5MB)</p>
                 </div>
 
+<section x-show="requestorType === 'internal'" aria-labelledby="equipment-request-heading">
+    <h2 id="equipment-request-heading" class="mb-3 text-lg font-bold text-blue-900">Equipment Request</h2>
+    <p class="wizard-field-help">Equipment requests are subject to availability and approval by the Gym Administrator.</p>
+    <div class="mt-4 grid gap-5 sm:grid-cols-2">
+        @forelse ($equipment as $item)
+        <div>
+            <label for="equipment-{{ $item->id }}" class="mb-2 block font-semibold">{{ $item->equipment_name }} — Quantity Requested</label>
+            <input id="equipment-{{ $item->id }}" name="equipment[{{ $item->id }}][quantity_requested]" type="number" min="1" max="100000" step="1" placeholder="Leave blank if not needed" value="{{ old('equipment.'.$item->id.'.quantity_requested') }}" :disabled="requestorType !== 'internal'" class="w-full rounded-lg border-slate-300 px-3 py-2">
+            @error('equipment.'.$item->id.'.quantity_requested')<p class="wizard-field-error">{{ $message }}</p>@enderror
+        </div>
+        @empty
+        <p class="wizard-field-help">No equipment is currently listed as available for requests.</p>
+        @endforelse
+    </div>
+    @error('equipment')<p class="wizard-field-error" role="alert">{{ $message }}</p>@enderror
+</section>
 <div><label for="additional_notes" class="mb-2 block font-semibold">Additional Notes</label><textarea name="additional_notes" id="additional_notes" rows="3" class="w-full rounded-lg border-slate-300">{{ old('additional_notes') }}</textarea></div>
                 <p x-show="hasSelectedConflict" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The selected time overlaps a pending or reserved slot. Choose another time.</p>
 <p class="wizard-info">Please make sure all reservation details are correct before proceeding.</p>
@@ -202,9 +220,41 @@
 <section x-show="step === 3" class="wizard-card bg-white p-6" aria-labelledby="confirmation-heading"><p class="wizard-step-caption">STEP 3 OF 3</p><h2 id="confirmation-heading">Facility &amp; Confirmation</h2><p class="wizard-heading-description">Please review your reservation details carefully before submitting your request.</p>
 
 
-<h3 class="confirmation-subheading">Facility Information</h3><dl class="facility-information"><div><dt>Facility</dt><dd>MCST Gymnasium</dd></div><div><dt>Location</dt><dd>MCST Gymnasium</dd></div><div><dt>Capacity</dt><dd>{{ $gym?->capacity ? number_format($gym->capacity).' participants' : 'Not specified' }}</dd></div><div><dt>Facility Status</dt><dd x-text="facilityStatus"></dd></div></dl>
+<h3 class="confirmation-subheading">Facility Information</h3><dl class="facility-information"><div><dt>Facility</dt><dd>MCST Gymnasium</dd></div><div><dt>Location</dt><dd>MCST Gymnasium</dd></div><div><dt>Capacity</dt><dd>{{ number_format(\App\Support\GymCapacity::MAX_ATTENDEES) }} persons</dd></div><div><dt>Facility Status</dt><dd x-text="facilityStatus"></dd></div></dl>
 <h3 class="confirmation-subheading">Reservation Summary</h3><dl class="reservation-summary"><template x-for="item in summary" :key="item.label"><div><dt x-text="item.label"></dt><dd x-text="item.value || '?'"></dd></div></template></dl>
 <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-blue-900"><input name="agreement" value="1" type="checkbox" required class="mt-1 rounded border-blue-300"><span>I confirm that the information is correct and understand that this request still requires administrator approval.</span></label>
+<section class="gym-use-agreement" aria-labelledby="gym-use-agreement-heading">
+    <h3 id="gym-use-agreement-heading">MCST Gymnasium Use Agreement</h3>
+    <p>By submitting this reservation request, I understand and agree to follow the rules for the proper use of the MCST Gymnasium:</p>
+    <ol class="gym-use-rules">
+        <li><strong>No Food Inside the Gymnasium</strong><ul>
+            <li>Food and meals are not allowed inside the gymnasium unless specifically permitted by the Gym Administrator.</li>
+            <li>The requestor is responsible for informing all participants and guests about this rule.</li>
+        </ul></li>
+        <li><strong>Maintain Cleanliness</strong><ul>
+            <li>The requestor and participants must keep the gymnasium clean during and after the event.</li>
+            <li>Trash, decorations, bottles, papers, and other materials used during the event must be properly collected and disposed of.</li>
+            <li>The area must be left clean and orderly after use.</li>
+        </ul></li>
+        <li><strong>Responsibility for Damages</strong><ul>
+            <li>The requestor must take proper care of MCST property, including chairs, tables, equipment, facilities, and other items inside the gymnasium.</li>
+            <li>If any chair, equipment, facility, or other MCST property is damaged due to the event or its participants, the incident must be reported to the Gym Administrator.</li>
+            <li>The requestor may be held responsible for damages caused during their reserved event, subject to MCST policies and assessment by the authorized personnel.</li>
+        </ul></li>
+        <li><strong>Proper Use of the Gymnasium</strong><ul>
+            <li>The gymnasium must only be used for the approved purpose, date, and time stated in the reservation.</li>
+            <li>The requestor must follow instructions given by the Gym Administrator and authorized MCST personnel.</li>
+        </ul></li>
+    </ol>
+    <label for="agreement_accepted" class="gym-use-consent">
+        <input id="agreement_accepted" name="agreement_accepted" value="1" type="checkbox" required @checked(old('agreement_accepted'))
+            aria-describedby="agreement_accepted-error" :aria-invalid="Boolean(fieldErrors.agreement_accepted)"
+            @invalid="step = 3; fieldErrors.agreement_accepted = 'Please read and accept the MCST Gymnasium Use Agreement before submitting your reservation request.'; $event.target.setCustomValidity(fieldErrors.agreement_accepted)"
+            @change="$event.target.setCustomValidity(''); delete fieldErrors.agreement_accepted">
+        <span>I have read, understood, and agree to follow the MCST Gymnasium Use Agreement and accept responsibility for the proper use of the facility during my reservation. <span class="required-marker" aria-hidden="true">*</span></span>
+    </label>
+    <p id="agreement_accepted-error" class="wizard-field-error" role="alert" x-show="fieldErrors.agreement_accepted" x-text="fieldErrors.agreement_accepted">@error('agreement_accepted'){{ $message }}@enderror</p>
+</section>
 <div class="wizard-actions"><button type="button" @click="step = 2" class="wizard-secondary">&larr; Back</button><button type="submit" :disabled="!bookingCanSubmit || hasSelectedConflict || availabilityLoading || !!availabilityError || !emailVerification.verified || facilityStatus !== 'Available'" class="wizard-primary">Submit Reservation</button></div></section>
         @endif
     </form>
@@ -234,6 +284,7 @@ summary: [],
 get facilityStatus() { return @js($gym?->status ?? 'unavailable') === 'maintenance' ? 'Maintenance' : (this.hasSelectedConflict ? (this.occupied.some(slot => slot.status === 'blackout' && this.startTime < slot.end_time.slice(0,5) && this.endTime > slot.start_time.slice(0,5)) ? 'Maintenance' : 'Reserved') : (@js($gym?->status ?? 'unavailable') === 'available' ? 'Available' : 'Reserved')); },
 reviewReservation() {
 this.message = '';
+if (!this.validateAttendance(this.$refs.reservationForm.elements.namedItem('expected_attendees'))) { this.$refs.reservationForm.elements.namedItem('expected_attendees').reportValidity(); return; }
 if (!this.bookingCanSubmit) { this.message = 'Select an available date and time slot before continuing.'; return; }
 for (const field of this.$refs.reservationForm.querySelector('[aria-labelledby="event-heading"]').querySelectorAll('input,select,textarea')) { if (!field.reportValidity()) return; }
 if (this.endTime <= this.startTime) { this.message = 'End time must be after start time.'; return; }
@@ -241,7 +292,7 @@ const fields = this.$refs.reservationForm.elements;
 const value = name => fields.namedItem(name)?.value || '';
 const time = t => new Date('2000-01-01T' + t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
 if (!this.date) { this.message = "Select a reservation date."; return; }
-this.summary = [ ['Requestor Name',this.contactPerson], ['User Type',fields.namedItem('reservation_type').selectedOptions[0].text], ['Event Name',value('event_name')], ['Event Type',value('event_type')], ['Reservation Date',this.selectedDateLabel], ['Start Time',time(this.startTime)], ['End Time',time(this.endTime)], ['Number of Participants',value('expected_attendees')], ['Facility','MCST Gymnasium'], ['Uploaded Supporting Document',fields.namedItem('permit').files[0]?.name], ['Purpose',this.purpose], ['Organization / Department',this.organization], ['Additional Notes',value('additional_notes')] ].map(([label,value])=>({label,value}));
+this.summary = [ ['Requestor Name',this.contactPerson], ['Requestor Type',fields.namedItem('reservation_type').selectedOptions[0].text], ['Event Name',value('event_name')], ['Event Type',value('event_type')], ['Reservation Date',this.selectedDateLabel], ['Start Time',time(this.startTime)], ['End Time',time(this.endTime)], ['Number of Participants',value('expected_attendees')], ['Facility','MCST Gymnasium'], ['Uploaded Supporting Document',fields.namedItem('permit').files[0]?.name], ['Purpose',this.purpose], ['Organization / Department',this.organization], ['Additional Notes',value('additional_notes')] ].map(([label,value])=>({label,value}));
 this.step = 3;
 },
         init() {
@@ -259,6 +310,20 @@ this.step = 3;
                 this.emailVerification.code = '';
             });
         },
+        validateAttendance(field) {
+            field.setCustomValidity('');
+            const value = Number(field.value);
+            let error = '';
+            if (value > @js(\App\Support\GymCapacity::MAX_ATTENDEES)) {
+                error = 'The expected number of attendees exceeds the MCST Gymnasium maximum capacity of 2,000 persons. Please reduce the number of attendees to continue.';
+            } else if (!field.value || !/^[0-9]+$/.test(field.value) || !Number.isInteger(value) || value < 1 || field.validity.badInput || field.validity.stepMismatch) {
+                error = 'Enter a whole number of attendees between 1 and 2,000.';
+            }
+            field.setCustomValidity(error);
+            if (error) this.fieldErrors.expected_attendees = error;
+            else delete this.fieldErrors.expected_attendees;
+            return !error;
+        },
         get conflictWarningKey() {
             return this.step === 3 && !this.availabilityLoading && this.hasSelectedConflict
                 ? [this.facility, this.date, this.startTime, this.endTime].join('|') : '';
@@ -275,7 +340,7 @@ this.step = 3;
         contactPerson: @js(old('contact_person', $requestorDetails['contact_person'] ?? '')),
         email: @js(old('contact_email', $requestorDetails['contact_email'] ?? '')),
         contactNumber: @js(old('contact_number', $requestorDetails['contact_number'] ?? '')),
-        requestorType: @js(old('reservation_type', $requestorDetails['reservation_type'] ?? 'student')),
+        requestorType: @js(old('reservation_type', $requestorDetails['reservation_type'] ?? '')),
         emailVerification: { sent: @js(session()->has('public_email_challenge')), sentTo: '', showNotice: false, verified: @js($emailVerified), sending: false, verifying: false, code: '', cooldown: 0, cooldownTimer: null },
         facility: @js((string) ($gym?->id ?? '')),
         date: @js(old('reservation_date', '')),
@@ -305,7 +370,7 @@ this.step = 3;
                 if (!this.contactPerson) this.fieldErrors.contact_person = 'Enter your full name.';
                 if (!this.email) this.fieldErrors.contact_email = 'Enter your email address.';
                 if (!this.contactNumber) this.fieldErrors.contact_number = 'Enter your contact number.';
-                if (!this.requestorType) this.fieldErrors.reservation_type = 'Select your requestor type.';
+                if (!this.requestorType) this.fieldErrors.reservation_type = 'Please select a requestor type.';
                 this.message = 'Complete all required contact fields before continuing.';
                 return;
             }

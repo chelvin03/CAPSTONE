@@ -44,6 +44,7 @@
         <div><dt>{{ $label }}</dt><dd>{{ $value }}</dd></div>
         @endforeach
     </dl>
+    @include('public.reservations.partials.equipment-updates')
     @if($reservation->statusHistories->isNotEmpty())
     <h3>Status History</h3><ol class="tracking-history">
         @foreach($reservation->statusHistories->sortByDesc('created_at') as $history)

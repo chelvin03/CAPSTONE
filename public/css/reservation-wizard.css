@@ -146,4 +146,13 @@
 @media (max-width: 640px) { .booking-custom-times { grid-template-columns: 1fr; padding: 18px; } }
 
 .legend-partial { background: #facc15; }
+.gym-use-agreement { margin: 24px 0; padding: clamp(16px, 3vw, 28px); border: 1px solid #bfdbfe; border-top: 4px solid #2563eb; border-radius: 12px; background: #f8fafc; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
+.gym-use-agreement h3 { color: #1e3a8a; font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+.gym-use-rules { list-style: decimal; padding-left: 24px; margin: 18px 0; }
+.gym-use-rules > li { margin-bottom: 16px; }
+.gym-use-rules strong { color: #1e3a8a; }
+.gym-use-rules ul { list-style: disc; padding-left: 20px; margin-top: 6px; }
+.gym-use-rules ul li { margin-top: 4px; }
+.wizard-card .gym-use-consent { display: flex; align-items: flex-start; gap: 12px; border-top: 1px solid #bfdbfe; padding-top: 18px; font-size: 14px; font-weight: 600; }
+.gym-use-consent input { flex-shrink: 0; width: 20px; height: 20px; margin-top: 3px; accent-color: #2563eb; }
 .booking-day.day-partial { background: #facc15; border-color: #facc15; color: #172b3c; }
