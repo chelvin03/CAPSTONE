@@ -36,6 +36,8 @@ class Equipment extends Model
                 'quantity_requested',
                 'quantity_approved',
                 'remarks',
+                'status', 'quantity_offered', 'reply_sent_at', 'requires_response',
+                'latest_offer_id', 'requestor_response', 'requestor_responded_at',
             ])
             ->withTimestamps();
     }

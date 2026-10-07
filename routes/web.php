@@ -35,16 +35,22 @@ Route::post('/reserve', [PublicReservationController::class, 'store'])
     ->name('reservation.store');
 
 Route::post('/reserve/send-code', [PublicReservationController::class, 'sendVerificationCode'])
-    ->name('reservation.send_code');
+    ->middleware('throttle:5,1')->name('reservation.send_code');
 
 Route::post('/reserve/verify-code', [PublicReservationController::class, 'verifyVerificationCode'])
-    ->name('reservation.verify_code');
+    ->middleware('throttle:30,1')->name('reservation.verify_code');
+
+Route::post('/reserve/edit-details', [PublicReservationController::class, 'editDetails'])
+    ->name('reservation.edit_details');
 
 Route::get('/reserve/availability', [PublicReservationController::class, 'availability'])
     ->name('reservation.availability');
 
 Route::get('/track', [PublicReservationController::class, 'track'])
     ->name('reservation.track');
+
+Route::get('/reservation/{reservation}/equipment-access', [\App\Http\Controllers\EquipmentRequestController::class, 'access'])->middleware(['signed', 'throttle:30,1'])->name('reservation.equipment.access');
+Route::post('/reservation/{reservation}/equipment/{equipment}/response', [\App\Http\Controllers\EquipmentRequestController::class, 'respond'])->middleware('throttle:30,1')->name('reservation.equipment.respond');
 
 Route::get(
     '/reservation/success/{referenceNumber}',
@@ -128,6 +134,8 @@ Route::middleware([
 
             Route::resource('equipment', EquipmentController::class)
                 ->except(['show']);
+
+            Route::post('/reservations/{reservation}/equipment/{equipment}/review', [\App\Http\Controllers\EquipmentRequestController::class, 'review'])->name('reservations.equipment.review');
 
             Route::resource('reservations', ReservationController::class)
                 ->only([

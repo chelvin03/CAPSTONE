@@ -46,6 +46,17 @@ The original Laravel framework information follows.
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Local database startup
+
+Open the app normally using `php artisan serve` and http://127.0.0.1:8000.
+On Windows with `APP_ENV=local`, requests automatically start XAMPP MySQL
+from `C:\xampp` when the configured local MySQL port 3306 is unavailable.
+The app waits up to 15 seconds before reading database sessions. Existing
+MySQL processes are reused, and the database remains running after requests.
+This does not run in testing or production, or for remote database connections.
+If startup fails, the page shows a short service-unavailable message; check
+the Laravel and XAMPP MySQL logs for details, then refresh.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

@@ -86,16 +86,19 @@ class ReservationController extends Controller
             'contact_person' => ['required', 'string', 'max:255'],
             'contact_number' => ['required', 'string', 'max:30'],
             'contact_email' => ['nullable', 'email:rfc', 'max:255'],
-            'expected_attendees' => ['required', 'integer', 'min:1'],
+            'expected_attendees' => ['required', 'integer', 'min:1', 'max:2000'],
             'reservation_date' => ['required', 'date', 'after_or_equal:today'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
             'setup_time' => ['nullable', 'date_format:H:i'],
             'cleanup_time' => ['nullable', 'date_format:H:i'],
             'equipment' => ['nullable', 'array'],
+            'equipment.*' => ['array:quantity_requested'],
             'equipment.*.quantity_requested' => ['nullable', 'integer', 'min:1'],
             'priority_override' => ['nullable', 'boolean'],
-        ]);
+        ], ['expected_attendees.max' => 'The expected number of attendees cannot exceed the MCST Gymnasium maximum capacity of 2,000 persons.']);
+
+        app(\App\Services\EquipmentRequestService::class)->validateRequests($validated['reservation_type'], $validated['equipment'] ?? []);
 
         $conflictingReservations = Reservation::query()
             ->where('facility_id', $validated['facility_id'])
@@ -117,6 +120,7 @@ class ReservationController extends Controller
         }
 
         DB::transaction(function () use ($request, $validated, $conflictingReservations): void {
+            app(\App\Services\EquipmentRequestService::class)->lockInventory();
             if ($validated['priority_override'] ?? false) {
                 foreach ($conflictingReservations as $conflict) {
                     $previousStatus = $conflict->status;
@@ -154,23 +158,7 @@ class ReservationController extends Controller
                 'approved_at' => ($validated['priority_override'] ?? false) ? now() : null,
             ]);
 
-            $equipmentData = [];
-
-            foreach ($validated['equipment'] ?? [] as $equipmentId => $item) {
-                $quantity = $item['quantity_requested'] ?? null;
-
-                if ($quantity) {
-                    $equipmentData[$equipmentId] = [
-                        'quantity_requested' => $quantity,
-                        'quantity_approved' => null,
-                        'remarks' => null,
-                    ];
-                }
-            }
-
-            if ($equipmentData !== []) {
-                $reservation->equipment()->sync($equipmentData);
-            }
+            app(\App\Services\EquipmentRequestService::class)->attach($reservation, $validated['equipment'] ?? []);
 
             ReservationStatusHistory::create([
                 'reservation_id' => $reservation->id,
@@ -214,6 +202,7 @@ class ReservationController extends Controller
             'approvedBy',
             'rejectedBy',
             'cancelledBy',
+            'notifications',
         ]);
 
         return view('admin.reservations.show', compact('reservation'));
@@ -242,7 +231,7 @@ class ReservationController extends Controller
             'contact_person' => ['required', 'string', 'max:255'],
             'contact_number' => ['required', 'digits:11'],
             'contact_email' => ['nullable', 'email:rfc', 'max:255'],
-            'expected_attendees' => ['required', 'integer', 'min:1'],
+            'expected_attendees' => ['required', 'integer', 'min:1', 'max:2000'],
             'reservation_date' => ['required', 'date'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
@@ -250,7 +239,7 @@ class ReservationController extends Controller
             'cleanup_time' => ['nullable', 'date_format:H:i'],
             'requested_equipment' => ['nullable', 'string', 'max:255', 'required_with:requested_equipment_quantity'],
             'requested_equipment_quantity' => ['nullable', 'integer', 'min:1', 'required_with:requested_equipment'],
-        ]);
+        ], ['expected_attendees.max' => 'The expected number of attendees cannot exceed the MCST Gymnasium maximum capacity of 2,000 persons.']);
 
         $hasConflict = Reservation::query()
             ->whereKeyNot($reservation->id)
@@ -267,7 +256,15 @@ class ReservationController extends Controller
             ]);
         }
 
-        $reservation->update($validated);
+        app(\App\Services\EquipmentRequestService::class)->validateRequests($validated['reservation_type'],
+            $reservation->equipment()->get()->mapWithKeys(fn ($item) => [$item->id => ['quantity_requested' => $item->pivot->quantity_requested]])->all(), $validated['requested_equipment'] ?? null, false);
+        DB::transaction(function () use ($reservation, $validated): void {
+            $service = app(\App\Services\EquipmentRequestService::class);
+            $service->lockInventory();
+            $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            $reservation->update($validated);
+            $service->assertAllocations($reservation);
+        });
 
         AuditLog::record('reservation.updated', $reservation, [
             'reference_number' => $reservation->reference_number,
@@ -293,6 +290,12 @@ class ReservationController extends Controller
         }
 
         DB::transaction(function () use ($request, $reservation, $validated): void {
+            $service = app(\App\Services\EquipmentRequestService::class);
+            $service->lockInventory();
+            $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            if (!in_array($reservation->status, ['new', 'validated', 'waiting_list'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['status' => 'This reservation can no longer be approved.']);
+            }
             $previousStatus = $reservation->status;
 
             $reservation->update([
@@ -307,14 +310,22 @@ class ReservationController extends Controller
 
             foreach ($validated['equipment'] ?? [] as $equipmentId => $item) {
                 if ($reservation->equipment->contains('id', (int) $equipmentId)) {
-                    $reservation->equipment()->updateExistingPivot(
-                        $equipmentId,
-                        [
-                            'quantity_approved' => $item['quantity_approved'] ?? 0,
-                        ]
-                    );
+                    $equipment = Equipment::findOrFail($equipmentId);
+                    $requestedItem = $reservation->equipment->firstWhere('id', (int) $equipmentId);
+                    $quantity = (int) ($item['quantity_approved'] ?? 0);
+                    if ($quantity > 0) {
+                        $service->approveQuantity($reservation, $equipment, $quantity);
+                    } else {
+                        $reservation->equipment()->updateExistingPivot($equipmentId, ['quantity_approved' => 0, 'status' => 'rejected', 'requires_response' => false, 'latest_offer_id' => null]);
+                    }
+                    $service->publish($reservation, ['equipment_id' => $equipment->id, 'equipment_name' => $equipment->equipment_name,
+                        'requested' => (int) $requestedItem->pivot->quantity_requested, 'available' => $service->available($equipment, $reservation),
+                        'quantity' => $quantity, 'message' => $quantity > 0 ? 'Your equipment request has been approved.' : 'Your equipment request was rejected.',
+                        'action' => $quantity > 0 ? 'approve' : 'reject']);
                 }
             }
+
+            $service->assertAllocations($reservation);
 
             ReservationStatusHistory::create([
                 'reservation_id' => $reservation->id,
@@ -417,12 +428,16 @@ class ReservationController extends Controller
 
         $old = $reservation->only(['facility_id','reservation_date','start_time','end_time']);
         DB::transaction(function () use ($request,$reservation,$validated,$conflicts,$old): void {
+            $service = app(\App\Services\EquipmentRequestService::class);
+            $service->lockInventory();
+            $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
             foreach ($conflicts as $conflict) {
                 $previous=$conflict->status; $new=$validated['conflict_resolution'];
                 $conflict->update(['status'=>$new,'cancellation_reason'=>$new==='cancelled'?$validated['reason']:$conflict->cancellation_reason,'cancelled_by'=>$new==='cancelled'?$request->user()->id:$conflict->cancelled_by,'cancelled_at'=>$new==='cancelled'?now():$conflict->cancelled_at]);
                 ReservationStatusHistory::create(['reservation_id'=>$conflict->id,'changed_by'=>$request->user()->id,'previous_status'=>$previous,'new_status'=>$new,'remarks'=>$validated['reason']]);
             }
             $reservation->update(['facility_id'=>$validated['facility_id'],'reservation_date'=>$validated['reservation_date'],'start_time'=>$validated['start_time'],'end_time'=>$validated['end_time']]);
+            $service->assertAllocations($reservation);
             ReservationStatusHistory::create(['reservation_id'=>$reservation->id,'changed_by'=>$request->user()->id,'previous_status'=>$reservation->status,'new_status'=>$reservation->status,'remarks'=>'Reservation rescheduled: '.$validated['reason']]);
             AuditLog::record('reservation.rescheduled',$reservation,['old'=>$old,'new'=>$reservation->only(['facility_id','reservation_date','start_time','end_time']),'affected'=>$conflicts->pluck('reference_number')->all()]);
         });

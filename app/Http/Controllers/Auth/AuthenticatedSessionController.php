@@ -37,8 +37,7 @@ class AuthenticatedSessionController extends Controller
                 && config('gym.auth.local_test_admin_password_only'))
             || ($user->role === 'staff' && $user->email === 'staff@mcst.edu.ph'
                 && config('gym.auth.local_test_staff_password_only'));
-        if (app()->environment('local')
-            && $localTestAccount) {
+        if ($user->role === 'admin' || (app()->environment('local') && $localTestAccount)) {
             Auth::guard('web')->login($user, $request->boolean('remember'));
             $request->session()->regenerate();
 

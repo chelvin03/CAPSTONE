@@ -13,7 +13,10 @@ use App\Models\EmailTemplate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Hash;
+use App\Mail\PublicRegistrationCode;
+use App\Mail\ReservationSubmitted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -42,8 +45,18 @@ class PublicReservationController extends Controller
         return response()->json($occupied->concat($blocks)->values());
     }
 
-    public function create(): View
+    public function create(Request $request): View|RedirectResponse
     {
+        if ((int) $request->query('step') === 1) {
+            $request->session()->forget(['public_email_verified', 'public_email_challenge', 'public_reservation_details', '_old_input']);
+        }
+
+        $emailVerified = $this->emailIsVerified($request);
+        if ((int) $request->query('step') === 3 && ! $emailVerified) {
+            return redirect()->route('reservation.create')->withErrors(['contact_email' => 'Please verify your email before continuing to Event Information.']);
+        }
+        $requestorDetails = $request->session()->get('public_reservation_details', []);
+        $initialStep = $emailVerified ? 3 : ($request->session()->has('public_email_challenge') ? 2 : 1);
         $facilities = Facility::query()
             ->where('status', 'available')
             ->orderBy('facility_name')
@@ -51,21 +64,22 @@ class PublicReservationController extends Controller
 
         $minimumNoticeDays = max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3)));
 
-        return view('public.reservations.create', compact('facilities', 'minimumNoticeDays'));
+        $equipment = \App\Models\Equipment::where('status', 'available')->orderBy('equipment_name')->get();
+        return view('public.reservations.create', compact('facilities', 'equipment', 'minimumNoticeDays', 'emailVerified', 'requestorDetails', 'initialStep'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
-            'reservation_type' => ['required', 'in:student,faculty,organization,community'],
+            'reservation_type' => ['required', 'in:internal,external'],
             'event_name' => ['required', 'string', 'max:255'],
             'event_type' => ['nullable', 'string', 'max:100'],
             'purpose' => ['required', 'string'],
             'contact_person' => ['required', 'string', 'max:255'],
             'contact_email' => ['required', 'email:rfc', 'max:255'],
             'contact_number' => ['required', 'digits:11'],
-            'expected_attendees' => ['required', 'integer', 'min:1'],
+            'expected_attendees' => ['required', 'integer', 'min:1', 'max:2000'],
             'reservation_date' => ['required', 'date', 'after_or_equal:'.now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString(), 'before_or_equal:'.now()->addDays((int) SystemSetting::getValue('maximum_advance_days', 365))->toDateString()],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
@@ -78,11 +92,29 @@ class PublicReservationController extends Controller
                 'max:'.config('gym.documents.max_size_kb'),
             ],
             'agreement' => ['accepted'],
+            'agreement_accepted' => ['accepted'],
+            'equipment' => ['nullable', 'array'],
+            'equipment.*' => ['array:quantity_requested'],
+            'equipment.*.quantity_requested' => ['nullable', 'integer', 'min:1', 'max:100000'],
+            'equipment_qty' => ['prohibited'],
             'requested_equipment' => ['nullable', 'string', 'max:255', 'required_with:requested_equipment_quantity'],
             'requested_equipment_quantity' => ['nullable', 'integer', 'min:1', 'required_with:requested_equipment'],
 
+        ], ['expected_attendees.max' => 'The expected number of attendees cannot exceed the MCST Gymnasium maximum capacity of 2,000 persons.', 'reservation_type.required' => 'Please select a requestor type.',
+            'agreement_accepted.accepted' => 'Please read and accept the MCST Gymnasium Use Agreement before submitting your reservation request.',
         ]);
 
+        if (! $this->emailIsVerified($request, $validated['contact_email'])) {
+            $request->session()->forget(['public_email_verified', 'public_email_challenge']);
+            return back()->withInput()->withErrors([
+                'contact_email' => 'Please verify this email address before submitting the reservation.',
+            ]);
+        }
+
+        if ($request->session()->has('public_reservation_details.reservation_type') && $request->session()->get('public_reservation_details.reservation_type') !== $validated['reservation_type']) {
+            return back()->withInput()->withErrors(['reservation_type' => 'Please verify your details again after changing Requestor Type.']);
+        }
+        app(\App\Services\EquipmentRequestService::class)->validateRequests($validated['reservation_type'], $validated['equipment'] ?? [], $validated['requested_equipment'] ?? null);
         $durationMinutes = (strtotime($validated['end_time']) - strtotime($validated['start_time'])) / 60;
         if ($durationMinutes > ((int) SystemSetting::getValue('maximum_booking_hours', 8) * 60)) {
             return back()->withInput()->withErrors(['end_time' => 'The booking exceeds the maximum allowed duration.']);
@@ -116,6 +148,9 @@ class PublicReservationController extends Controller
 
         try {
             $reservation = DB::transaction(function () use ($validated, &$storedPermitPath): Reservation {
+                $service = app(\App\Services\EquipmentRequestService::class);
+                $service->lockInventory();
+                $service->validateRequests($validated['reservation_type'], $validated['equipment'] ?? [], $validated['requested_equipment'] ?? null);
                 $reservation = Reservation::create([
                     'reference_number' => $this->generateReferenceNumber(),
                     'user_id' => null,
@@ -136,8 +171,11 @@ class PublicReservationController extends Controller
                     'requested_equipment' => $validated['requested_equipment'] ?? null,
                     'requested_equipment_quantity' => $validated['requested_equipment_quantity'] ?? null,
                     'status' => 'new',
+                    'agreement_accepted' => true,
+                    'agreement_accepted_at' => now(),
                 ]);
 
+                $service->attach($reservation, $validated['equipment'] ?? []);
                 $permit = $validated['permit'];
                 $storedFilename = Str::uuid().'.'.$permit->extension();
                 $directory = trim(config('gym.documents.directory'), '/').
@@ -180,71 +218,145 @@ class PublicReservationController extends Controller
             $trackingUrl = route('reservation.track', ['reference' => $reservation->reference_number]);
             $template = EmailTemplate::where('key', 'booking_confirmation')->first();
             $body = str_replace(['{reference}', '{tracking_link}'], [$reservation->reference_number, $trackingUrl], $template?->body ?? "Your MCST Gym reservation was submitted successfully.\n\nReference code: {reference}\nTrack your reservation: {tracking_link}");
-            Mail::raw(
+            Mail::mailer('smtp')->to($reservation->contact_email)->send(new ReservationSubmitted(
+                $reservation->load('facility'),
+                $trackingUrl,
                 $body,
-                fn ($message) => $message
-                    ->to($reservation->contact_email)
-                    ->subject($template?->subject ?? 'MCST Gym Reservation Confirmation')
-            );
+                $template?->subject ?? 'MCST Gymnasium Reservation Request Confirmation',
+            ));
+            $request->session()->flash('reservation_email_sent', true);
         } catch (\Throwable $exception) {
+            $request->session()->flash('reservation_email_sent', false);
             Log::error('Reservation confirmation email delivery failed.', [
                 'reservation_id' => $reservation->id,
-                'exception' => $exception,
+                'exception_class' => $exception::class,
+                'exception_code' => $exception->getCode(),
             ]);
         }
 
+        $references = $request->session()->get('public_reservation_references', []);
+        $request->session()->put('public_reservation_references', array_values(array_unique([...$references, $reservation->reference_number])));
+        $request->session()->forget(['public_email_verified', 'public_email_challenge', 'public_reservation_details']);
+
         return redirect()
-            ->route('reservation.success', $reservation->reference_number);
+            ->route('reservation.track', ['reference' => $reservation->reference_number])
+            ->with('reservation_submitted', $reservation->reference_number);
     }
 
     public function sendVerificationCode(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'email:rfc'],
-        ]);
-
-        $email = (string) $validated['email'];
-        $code = random_int(100000, 999999);
-        $key = 'reservation:email_code:'.sha1($email);
-        $verifiedKey = 'reservation:email_verified:'.sha1($email);
-
-        Cache::forget($verifiedKey);
-        Cache::put($key, (string) $code, now()->addMinutes(10));
-
-        try {
-            Mail::raw(
-                "Your MCST Gym reservation verification code is: {$code}",
-                fn ($message) => $message->to($email)->subject('MCST Reservation Verification Code')
-            );
-        } catch (\Throwable $e) {
-            Log::error('Failed to send reservation verification code', ['email' => $email, 'exception' => $e]);
-            return response()->json(['message' => 'Failed to send verification code. Please try again later.'], 500);
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'contact_person' => ['required', 'string', 'max:255'],
+            'contact_number' => ['required', 'digits:11'],
+            'reservation_type' => ['required', 'in:internal,external'],
+        ], ['reservation_type.required' => 'Please select a requestor type.']);
+        $email = Str::lower(trim($validated['email']));
+        $previous = $request->session()->get('public_email_challenge');
+        $details = [...$validated, 'contact_email' => $email];
+        unset($details['email']);
+        $request->session()->put('public_reservation_details', $details);
+        // A changed address immediately invalidates any previous proof, even during cooldown.
+        $request->session()->forget('public_email_verified');
+        if (($previous['email'] ?? null) !== $email) {
+            $request->session()->forget('public_email_challenge');
         }
-
-        return response()->json(['message' => 'Verification code sent.']);
+        $key = hash('sha256', $email);
+        $cooldown = 'public-code:send:'.$key;
+        $sends = 'public-code:sends:'.$key;
+        foreach ([[$cooldown, 1], [$sends, 5]] as [$limit, $maximum]) {
+            if (RateLimiter::tooManyAttempts($limit, $maximum)) {
+                return response()->json([
+                    'message' => 'Please wait before requesting another verification code.',
+                    'retry_after' => RateLimiter::availableIn($limit),
+                ], 429);
+            }
+        }
+        RateLimiter::hit($cooldown, 60);
+        RateLimiter::hit($sends, 600);
+        $request->session()->forget('public_email_challenge');
+        do {
+            $code = (string) random_int(100000, 999999);
+        } while (isset($previous['hash']) && Hash::check($code, $previous['hash']));
+        try {
+            Mail::mailer('smtp')->to($email)->send(new PublicRegistrationCode($code));
+        } catch (\Throwable $exception) {
+            // SMTP exception messages/debug transcripts may contain credentials or the OTP.
+            // Log the exception type, numeric code, source and a safe diagnostic category only.
+            $message = strtolower($exception->getMessage());
+            $reason = match (true) {
+                str_contains($message, '535'), str_contains($message, 'authenticate') => 'smtp_authentication_failed',
+                str_contains($message, 'certificate') => 'smtp_tls_certificate_failed',
+                str_contains($message, 'timed out'), str_contains($message, 'connection') => 'smtp_connection_failed',
+                default => 'mail_delivery_failed',
+            };
+            Log::error('Public reservation verification email failed.', [
+                'exception_class' => $exception::class,
+                'exception_code' => $exception->getCode(),
+                'source' => basename($exception->getFile()).':'.$exception->getLine(),
+                'reason' => $reason,
+            ]);
+            return response()->json(['message' => "We couldn't send the verification code. Please try again.", 'retry_after' => 60], 503);
+        }
+        $request->session()->put('public_email_challenge', [
+            'email' => $email,
+            'hash' => Hash::make($code),
+            'expires_at' => now()->addMinutes(10)->timestamp,
+            'verified' => false,
+        ]);
+        return response()->json(['message' => 'A new verification code has been sent to your email.', 'retry_after' => 60]);
     }
 
     public function verifyVerificationCode(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'email:rfc'],
-            'code' => ['required', 'string'],
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'code' => ['required', 'string', 'regex:/\A[0-9]{6}\z/'],
         ]);
-
-        $email = (string) $validated['email'];
-        $code = (string) $validated['code'];
-        $key = 'reservation:email_code:'.sha1($email);
-        $cached = Cache::get($key);
-
-        if ($cached && hash_equals((string) $cached, $code)) {
-            Cache::forget($key);
-            $verifiedKey = 'reservation:email_verified:'.sha1($email);
-            Cache::put($verifiedKey, true, now()->addMinutes(30));
-            return response()->json(['verified' => true]);
+        $email = Str::lower(trim($validated['email']));
+        $limit = 'public-code:attempt:'.hash('sha256', $email.'|'.$request->ip());
+        if (RateLimiter::tooManyAttempts($limit, 5)) {
+            $request->session()->forget('public_email_challenge');
+            return response()->json(['message' => 'Too many incorrect codes. Wait ten minutes, then request a new code.'], 429);
         }
-
-        return response()->json(['verified' => false], 422);
+        $challenge = $request->session()->get('public_email_challenge');
+        if (! $challenge || $challenge['email'] !== $email
+            || $request->session()->get('public_reservation_details.contact_email') !== $email) {
+            return response()->json(['verified' => false, 'message' => 'Your verification session has expired. Please start again.'], 422);
+        }
+        if ($challenge['expires_at'] <= now()->timestamp) {
+            $request->session()->forget('public_email_challenge');
+            return response()->json(['verified' => false, 'message' => 'Your verification code has expired. Please request a new code.'], 422);
+        }
+        if (! Hash::check($validated['code'], $challenge['hash'])) {
+            RateLimiter::hit($limit, 600);
+            if (RateLimiter::tooManyAttempts($limit, 5)) {
+                $request->session()->forget('public_email_challenge');
+            }
+            return response()->json(['verified' => false, 'message' => 'Invalid verification code.'], 422);
+        }
+        $request->session()->forget('public_email_challenge');
+        $request->session()->put('public_email_verified', [
+            'email' => $email, 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp,
+        ]);
+        return response()->json(['verified' => true, 'redirect' => route('reservation.create', ['step' => 3])]);
     }
+
+    public function editDetails(Request $request): JsonResponse
+    {
+        $request->session()->forget(['public_email_verified', 'public_email_challenge']);
+        return response()->json(['verified' => false]);
+    }
+
+    private function emailIsVerified(Request $request, ?string $email = null): bool
+    {
+        $proof = $request->session()->get('public_email_verified');
+        $email ??= $request->session()->get('public_reservation_details.contact_email');
+        return $proof && ($proof['verified'] ?? false) === true
+            && $proof['expires_at'] > now()->timestamp
+            && $proof['email'] === Str::lower(trim((string) $email));
+    }
+
 
     public function success(string $referenceNumber): View
     {
@@ -261,17 +373,19 @@ class PublicReservationController extends Controller
 
     public function track(Request $request): View
     {
-        $reference = Str::upper(trim((string) $request->query('reference', '')));
+        $recentReservations = Reservation::whereIn('reference_number', $request->session()->get('public_reservation_references', []))->latest()->get();
+        $reference = Str::upper(trim((string) $request->query('reference', $recentReservations->first()?->reference_number ?? '')));
         $reservation = null;
 
         if ($reference !== '') {
             $request->validate(['reference' => ['string', 'max:50']]);
-            $reservation = Reservation::with(['facility', 'statusHistories'])
+            $reservation = Reservation::with(['facility', 'statusHistories', 'equipment', 'notifications'])
                 ->where('reference_number', $reference)
                 ->first();
         }
 
-        return view('public.reservations.track', compact('reference', 'reservation'));
+        return view('public.reservations.track', compact('reference', 'reservation', 'recentReservations'));
+
     }
 
     private function generateReferenceNumber(): string

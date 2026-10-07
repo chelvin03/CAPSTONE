@@ -7,8 +7,9 @@
 
     <!-- Steps nav -->
     <nav class="mb-6 flex items-center gap-4">
-        <div class="flex-1 text-left"><span :class="step === 1 ? 'text-blue-600 font-bold' : 'text-slate-400'">Step 1: Contact Details</span></div>
-        <div class="flex-1 text-right"><span :class="step === 2 ? 'text-blue-600 font-bold' : 'text-slate-400'">Step 2: Event Info</span></div>
+        <div class="flex-1 text-left"><span :class="step === 1 ? 'text-blue-600 font-bold' : 'text-emerald-600'"><span x-show="step > 1" aria-hidden="true">&#10003; </span>Contact Info</span></div>
+        <div class="flex-1 text-center"><span :class="step === 2 ? 'text-blue-600 font-bold' : 'text-slate-400'">Step 2: Verification</span></div>
+        <div class="flex-1 text-right"><span :class="step === 3 ? 'text-blue-600 font-bold' : 'text-slate-400'">Step 3: Event Info</span></div>
     </nav>
 
     @if ($errors->any())
@@ -20,7 +21,9 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('reservation.store') }}" enctype="multipart/form-data">
+    <div x-show="message" x-text="message" role="alert" class="mb-5 rounded-lg border border-red-200 bg-red-50 px-5 py-4 text-red-700"></div>
+
+    <form x-ref="reservationForm" method="POST" action="{{ route('reservation.store') }}" enctype="multipart/form-data">
         @csrf
 
         <!-- Step 1 -->
@@ -45,22 +48,56 @@
                 <div>
                     <label class="mb-2 block font-semibold">Requestor Type *</label>
                     <select id="reservation_type" name="reservation_type" x-model="requestorType" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                        @foreach (['student' => 'Student', 'faculty' => 'Faculty', 'organization' => 'Organization', 'community' => 'Community'] as $value => $label)
+                        <option value="">Select Requestor Type</option>
+                        @foreach (['internal' => 'Internal', 'external' => 'External'] as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
-                <p x-show="message" x-text="message" role="alert" class="sm:col-span-2 text-sm text-red-700"></p>
                 <div class="sm:col-span-2 text-right">
-                    <button type="button" @click="continueToEvent" class="rounded-lg bg-blue-600 px-6 py-3 font-bold text-white">Continue to Event Info →</button>
+                    <button type="button" @click="goToVerification" class="rounded-lg bg-blue-600 px-6 py-3 font-bold text-white">Continue to Verification &rarr;</button>
                 </div>
             </div>
         </section>
 
-        <!-- Step 2: Event Info -->
-        <section x-show="step === 2" class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <!-- Step 2: Verification -->
+        <section x-show="step === 2" class="space-y-5" aria-labelledby="verification-heading">
+            <div x-show="emailVerification.sent && emailVerification.showNotice" role="status" class="flex items-start justify-between gap-4 rounded-lg border border-cyan-200 bg-cyan-100 px-6 py-5 text-lg text-cyan-900">
+                <p>A 6-digit verification code has been sent to your email:<br><span class="break-all" x-text="emailVerification.sentTo"></span></p>
+                <button type="button" aria-label="Dismiss notification" @click="emailVerification.showNotice = false" class="text-3xl leading-none text-slate-500">&times;</button>
+            </div>
+            <div class="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-md">
+                <div class="border-b border-slate-200 px-6 py-10 text-center">
+                    <svg class="mx-auto mb-5 h-16 w-16 text-blue-600" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                        <rect x="5" y="10" width="52" height="38" rx="5" stroke="currentColor" stroke-width="3"/>
+                        <path d="m7 17 24 16 24-16M7 43l16-12" stroke="currentColor" stroke-width="3"/>
+                        <circle cx="47" cy="45" r="14" fill="currentColor" stroke="white" stroke-width="4"/>
+                        <path d="m41 45 4 4 7-10" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <h2 id="verification-heading" class="text-3xl font-bold text-slate-900">Verify Your Email</h2>
+                    <p class="mt-2 text-slate-500">Enter the 6-digit verification code sent to <strong class="break-all" x-text="email"></strong>.</p>
+                </div>
+                <div class="px-5 py-8 sm:px-8">
+                    <label for="public-verification-code" class="mb-3 block text-center font-semibold text-slate-900">Enter Verification Code</label>
+                    <input id="public-verification-code" x-ref="verificationCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" x-model="emailVerification.code" @input="emailVerification.code = $event.target.value.replace(/[^0-9]/g, '').slice(0, 6)" @keydown.enter.prevent="verifyCodeAndContinue" placeholder="000000" class="block w-full rounded-xl border-slate-300 py-4 text-center text-2xl font-bold focus:border-blue-500 focus:ring-4 focus:ring-blue-200">
+                    <div class="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-5">
+                        <button type="button" @click="editDetails" :disabled="emailVerification.sending || emailVerification.verifying" class="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 disabled:opacity-50">&larr; Edit Details</button>
+                        <button type="button" @click="verifyCodeAndContinue" :disabled="emailVerification.sending || emailVerification.verifying || !/^[0-9]{6}$/.test(emailVerification.code)" class="rounded-lg bg-blue-600 px-8 py-3 text-lg font-semibold text-white hover:bg-blue-700 disabled:opacity-50" x-text="emailVerification.verifying ? 'Verifying...' : 'Verify & Continue'"></button>
+                    </div>
+                    <div class="mt-5 text-center text-sm">
+                        <button type="button" @click="sendCode" :disabled="emailVerification.sending || emailVerification.verifying || emailVerification.cooldown > 0" class="font-medium text-blue-600 disabled:text-slate-400" x-text="emailVerification.sending ? 'Sending code...' : (emailVerification.cooldown > 0 ? 'Resend code in ' + emailVerification.cooldown + 's' : 'Resend verification code')"></button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        @if ($emailVerified)
+        <!-- Step 3: Event Info -->
+        <input type="hidden" name="reservation_date" x-model="date" value="{{ old('reservation_date') }}">
+        <section x-show="step === 3" class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-200 p-6">
                 <h1 class="text-xl font-bold">Event Details & Requests</h1>
+                <button type="button" @click="editDetails" class="mt-3 text-sm font-semibold text-blue-600">Edit Contact Details</button>
                 <p class="mt-1 text-sm text-slate-500">Booking as: <strong x-text="contactPerson"></strong></p>
             </div>
             <div class="space-y-7 p-6">
@@ -86,7 +123,10 @@
                         </div>
                         <div>
                             <label class="mb-2 block text-sm font-semibold">Estimated Participants *</label>
-                            <input name="expected_attendees" type="number" min="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            <input id="expected_attendees" name="expected_attendees" type="number" min="1" max="2000" step="1" x-model="expectedAttendees" :aria-invalid="attendeesInvalid" aria-describedby="capacity-note capacity-error" :style="attendeesInvalid ? 'border-color: #dc2626' : ''" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            <p id="capacity-note" class="mt-2 text-sm text-slate-500">Maximum Gymnasium Capacity: 2,000 persons</p>
+                            <p id="capacity-error" x-show="attendeesInvalid" x-text="attendeesError" class="mt-2 text-sm text-red-700" role="alert"></p>
+                            @error('expected_attendees')<p class="mt-2 text-sm text-red-700" role="alert">{{ $message }}</p>@enderror
                         </div>
                         <div class="md:col-span-2">
                             <label class="mb-2 block text-sm font-semibold">Purpose *</label>
@@ -154,45 +194,84 @@
                     <p class="mt-1 text-xs text-slate-500">Supported Formats: PDF, PNG, JPG (Max: 5MB)</p>
                 </div>
 
-                <!-- Equipment -->
-                <div>
-                    <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">3. Equipment Request (Optional)</h2>
-                    <div class="rounded-lg border border-slate-200 p-4">
-                        <table class="w-full text-sm">
-                            <thead class="bg-slate-100"><tr><th class="p-2 text-left">Select</th><th class="p-2 text-left">Item Description</th><th class="p-2 text-left">Quantity</th></tr></thead>
-                            <tbody>
-                                <tr class="border-t"><td class="p-2"><input type="checkbox" name="equipment[sound]" value="1"></td><td class="p-2">Sound System & Microphones</td><td class="p-2"><input name="equipment_qty[sound]" type="number" min="1" value="1" class="w-24 rounded border-slate-300 px-2 py-1"></td></tr>
-                                <tr class="border-t"><td class="p-2"><input type="checkbox" name="equipment[chairs]" value="1"></td><td class="p-2">Monobloc Chairs</td><td class="p-2"><input name="equipment_qty[chairs]" type="number" min="1" value="50" class="w-24 rounded border-slate-300 px-2 py-1"></td></tr>
-                            </tbody>
-                        </table>
+                @if (($requestorDetails['reservation_type'] ?? old('reservation_type')) === 'internal')
+                <fieldset x-show="requestorType === 'internal'" :disabled="requestorType !== 'internal'" class="rounded-lg border border-slate-200 p-4">
+                    <h2 class="mb-3 text-sm font-bold text-blue-900">Equipment Request (Optional — Internal Only)</h2>
+                    <p class="mb-4 text-sm text-slate-500">Equipment requests are subject to availability and approval by the Gym Administrator.</p>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                    @forelse ($equipment as $item)
+                        <div><label for="equipment-{{ $item->id }}" class="mb-2 block text-sm font-semibold">{{ $item->equipment_name }} — Quantity Requested</label>
+                        <input id="equipment-{{ $item->id }}" name="equipment[{{ $item->id }}][quantity_requested]" type="number" min="1" max="100000" step="1" value="{{ old('equipment.'.$item->id.'.quantity_requested') }}" placeholder="Leave blank if not needed" class="w-full rounded-lg border-slate-300 px-3 py-2">
+                        @error('equipment.'.$item->id.'.quantity_requested')<p class="mt-2 text-sm text-red-700">{{ $message }}</p>@enderror</div>
+                    @empty
+                        <p class="text-sm text-slate-500">No equipment is currently available for requests.</p>
+                    @endforelse
                     </div>
-                </div>
-
+                    @error('equipment')<p class="mt-2 text-sm text-red-700" role="alert">{{ $message }}</p>@enderror
+                </fieldset>
+                @endif
                 <p x-show="hasSelectedConflict" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The selected time overlaps a pending or reserved slot. Choose another time.</p>
-                <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-sm text-blue-900"><input name="agreement" value="1" type="checkbox" required class="mt-1 rounded border-blue-300"><span>I confirm that the information is correct and understand that this request still requires administrator approval.</span></label>
-                <div class="flex justify-between">
-                    <button type="button" @click="step = 1" class="rounded-lg border border-slate-300 px-6 py-3 font-semibold">Back to Contact Details</button>
-                    <input type="hidden" name="reservation_date" :value="date">
-                    <button :disabled="hasSelectedConflict || availabilityLoading" class="rounded-lg bg-emerald-600 px-6 py-3 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">✓ Submit Final Reservation</button>
+                @include('public.reservations.partials.gym-use-agreement')
+                <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-sm text-blue-900"><input name="agreement" value="1" type="checkbox" x-model="confirmationAccepted" required class="mt-1 rounded border-blue-300"><span>I confirm that the information is correct and understand that this request still requires administrator approval.</span></label>
+                <div class="flex justify-end">
+                    <button disabled :disabled="!policyAccepted || !confirmationAccepted || attendeesInvalid || !date || hasSelectedConflict || availabilityLoading || !emailVerification.verified" class="rounded-lg bg-emerald-600 px-6 py-3 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Submit Final Reservation</button>
                 </div>
             </div>
         </section>
 
+        @endif
     </form>
+
+    <dialog x-ref="conflictDialog" aria-labelledby="conflict-title" aria-describedby="conflict-description"
+        @cancel.prevent="closeConflictWarning" class="w-full max-w-md rounded-2xl border-0 bg-white p-6 shadow-xl"
+        style="max-width: min(28rem, calc(100vw - 2rem));">
+        <h2 id="conflict-title" class="text-xl font-bold text-red-700">This time is unavailable</h2>
+        <p id="conflict-description" class="mt-3 text-slate-700">The selected time overlaps a pending reservation, confirmed booking, or blocked schedule. Please choose another time.</p>
+        <button type="button" autofocus @click="closeConflictWarning" class="mt-6 w-full rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700">Choose another time</button>
+    </dialog>
+    <style>dialog::backdrop { background: rgb(15 23 42 / 60%); }</style>
 </div>
 
 <script>
 function reservationFlow() {
     return {
-        step: {{ $errors->any() ? 2 : 1 }},
+        step: {{ $initialStep }},
+        init() {
+            this.$watch('conflictWarningKey', key => {
+                if (key) this.$nextTick(() => {
+                    if (this.conflictWarningKey && !this.$refs.conflictDialog.open) this.$refs.conflictDialog.showModal();
+                });
+                else if (this.$refs.conflictDialog.open) this.$refs.conflictDialog.close();
+            });
+            if (this.step === 3) this.loadAvailability();
+            this.$watch('email', () => {
+                this.emailVerification.verified = false;
+                this.emailVerification.sent = false;
+                this.emailVerification.code = '';
+            });
+        },
+        get conflictWarningKey() {
+            return this.step === 3 && !this.availabilityLoading && this.hasSelectedConflict
+                ? [this.facility, this.date, this.startTime, this.endTime].join('|') : '';
+        },
+        closeConflictWarning() {
+            this.$refs.conflictDialog.close();
+            this.$nextTick(() => this.$refs.reservationForm.elements.namedItem('start_time').focus());
+        },
+        expectedAttendees: @js(old('expected_attendees', '')),
+        get attendeesInvalid() { const value = Number(this.expectedAttendees); return String(this.expectedAttendees).trim() === '' || !Number.isInteger(value) || value < 1 || value > 2000; },
+        get attendeesError() { return Number(this.expectedAttendees) > 2000 ? 'The expected number of attendees exceeds the MCST Gymnasium maximum capacity of 2,000 persons. Please reduce the number of attendees to continue.' : 'Please enter a whole number from 1 to 2,000.'; },
+        policyAccepted: @js(in_array(old('agreement_accepted'), ['1', 1, true, 'true', 'yes', 'on'], true)),
+        confirmationAccepted: @js(in_array(old('agreement'), ['1', 1, true, 'true', 'yes', 'on'], true)),
         availabilityLoading: false,
         availabilityError: '',
         message: '',
         occupied: [],
-        contactPerson: @js(old('contact_person', '')),
-        email: @js(old('contact_email', '')),
-        contactNumber: @js(old('contact_number', '')),
-        requestorType: @js(old('reservation_type', 'student')),
+        contactPerson: @js(old('contact_person', $requestorDetails['contact_person'] ?? '')),
+        email: @js(old('contact_email', $requestorDetails['contact_email'] ?? '')),
+        contactNumber: @js(old('contact_number', $requestorDetails['contact_number'] ?? '')),
+        requestorType: @js(old('reservation_type', $requestorDetails['reservation_type'] ?? '')),
+        emailVerification: { sent: @js(session()->has('public_email_challenge')), sentTo: '', showNotice: false, verified: @js($emailVerified), sending: false, verifying: false, code: '', cooldown: 0, cooldownTimer: null },
         facility: @js(old('facility_id', '')),
         date: @js(old('reservation_date', '')),
         startTime: @js(old('start_time', '')),
@@ -207,12 +286,135 @@ function reservationFlow() {
         changeMonth(offset) { if (!this.canMoveMonth(offset)) return; const [year, month] = this.calendarMonth.split('-').map(Number); const target = new Date(year, month - 1 + offset, 1); this.calendarMonth = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}`; },
         selectDate(value) { if (value < this.minimumDate) return; this.date = value; this.loadAvailability(); },
         get totalHours() { if (!this.startTime || !this.endTime) return ''; const [sh, sm] = this.startTime.split(':').map(Number); const [eh, em] = this.endTime.split(':').map(Number); return Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60); },
-        get hasSelectedConflict() { if (!this.startTime || !this.endTime) return false; return this.occupied.some(slot => this.startTime < slot.end_time.slice(0, 5) && this.endTime > slot.start_time.slice(0, 5)); },
+        get hasSelectedConflict() { if (!this.startTime || !this.endTime || this.endTime <= this.startTime) return false; return this.occupied.some(slot => this.startTime < slot.end_time.slice(0, 5) && this.endTime > slot.start_time.slice(0, 5)); },
 
-        continueToEvent() { this.message = ''; if (!this.contactPerson.trim() || !this.email.trim() || !this.contactNumber.trim() || !this.requestorType) { this.message = 'Complete all required contact fields before continuing.'; return; } if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email)) { this.message = 'Enter a valid email address.'; return; } if (!/^\d{11}$/.test(this.contactNumber)) { this.message = 'Contact number must contain exactly 11 digits.'; return; } this.step = 2; this.loadAvailability(); },
+        async goToVerification() {
+            this.message = '';
+            const fields = this.$refs.reservationForm.elements;
+            this.contactPerson = fields.namedItem('contact_person').value.trim();
+            this.email = fields.namedItem('contact_email').value.trim();
+            this.contactNumber = fields.namedItem('contact_number').value.trim();
+            this.requestorType = fields.namedItem('reservation_type').value;
+            if (!this.requestorType) { this.message = 'Please select a requestor type.'; return; }
+            if (!this.contactPerson || !this.email || !this.contactNumber || !this.requestorType) {
+                this.message = 'Complete all required contact fields before continuing.';
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email)) {
+                this.message = 'Enter a valid email address.';
+                return;
+            }
+            if (!/^[0-9]{11}$/.test(this.contactNumber)) {
+                this.message = 'Contact number must contain exactly 11 digits.';
+                return;
+            }
+            await this.$nextTick();
+            this.step = 2;
+            if (!this.emailVerification.sent || this.emailVerification.sentTo !== this.email) this.sendCode();
+        },
+
+        continueToEvent() { this.message = ''; if (!this.emailVerification.verified) { this.message = 'Please verify your email before continuing.'; return; } this.step = 3; this.loadAvailability(); },
+
+        startCooldown(seconds) {
+            if (this.emailVerification.cooldownTimer) clearInterval(this.emailVerification.cooldownTimer);
+            this.emailVerification.cooldown = seconds;
+            if (!seconds) return;
+            this.emailVerification.cooldownTimer = setInterval(() => {
+                if (--this.emailVerification.cooldown <= 0) {
+                    clearInterval(this.emailVerification.cooldownTimer);
+                    this.emailVerification.cooldownTimer = null;
+                }
+            }, 1000);
+        },
+
+        async editDetails() {
+            this.message = '';
+            try {
+                const response = await fetch(@js(route('reservation.edit_details')), {
+                    method: 'POST',
+                    headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': this.$refs.reservationForm.elements.namedItem('_token').value}
+                });
+                if (!response.ok) throw new Error('Unable to edit details. Please refresh and try again.');
+                this.emailVerification.verified = false;
+                this.emailVerification.sent = false;
+                this.emailVerification.code = '';
+                this.step = 1;
+            } catch (error) { this.message = error.message; }
+        },
+
+        async sendCode() {
+            if (this.emailVerification.sending || this.emailVerification.cooldown > 0) return;
+            this.message = '';
+            this.emailVerification.verified = false;
+            this.emailVerification.sending = true;
+            try {
+                const url = new URL(@js(route('reservation.send_code')), window.location.origin);
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('input[name="_token"]')?.value || ''
+                    },
+                    body: JSON.stringify({ email: this.email, contact_person: this.contactPerson, contact_number: this.contactNumber, reservation_type: this.requestorType })
+                });
+                const data = await res.json();
+                this.startCooldown(data.retry_after || (res.status === 429 ? 60 : 0));
+                if (!res.ok) throw new Error(data.message || 'Unable to send code');
+                this.emailVerification.sent = true;
+                this.emailVerification.sentTo = this.email;
+                this.emailVerification.showNotice = true;
+                this.$nextTick(() => this.$refs.verificationCode.focus());
+                this.emailVerification.code = '';
+
+            } catch (e) {
+                this.message = e.message || 'Failed to send verification code.';
+            } finally {
+                this.emailVerification.sending = false;
+            }
+        },
+
+        async verifyCode() {
+            if (this.emailVerification.verifying || this.emailVerification.sending || !/^[0-9]{6}$/.test(this.emailVerification.code)) return false;
+            this.emailVerification.verifying = true;
+            try {
+                const url = new URL(@js(route('reservation.verify_code')), window.location.origin);
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('input[name="_token"]')?.value || ''
+                    },
+                    body: JSON.stringify({ email: this.email, code: this.emailVerification.code })
+                });
+                const data = await res.json();
+                if (!res.ok) { this.message = data.message || 'Invalid verification code.'; return false; }
+                if (data.verified) {
+                    this.emailVerification.verified = true;
+                    window.location.assign(data.redirect);
+                    this.message = '';
+                    return true;
+                }
+                this.message = 'Invalid verification code.';
+                return false;
+            } catch (e) {
+                this.message = 'Invalid verification code.';
+                return false;
+            } finally {
+                this.emailVerification.verifying = false;
+            }
+        },
+
+        async verifyCodeAndContinue() {
+            const ok = await this.verifyCode();
+            if (ok) {
+                this.message = 'Email verified. Opening Event Information...';
+            }
+        },
 
         async loadAvailability() { this.availabilityError = ''; if (!this.facility || !this.date) { this.occupied = []; return; } this.availabilityLoading = true; try { const url = new URL(@js(route('reservation.availability')), window.location.origin); url.searchParams.set('facility_id', this.facility); url.searchParams.set('date', this.date); const response = await fetch(url, {headers: {'Accept': 'application/json'}}); if (!response.ok) throw new Error('Availability could not be loaded. Please try again.'); this.occupied = await response.json(); } catch (error) { this.occupied = []; this.availabilityError = error.message; } finally { this.availabilityLoading = false; } },
-        formatSlot(slot) { const format = time => new Date(`2000-01-01T${time}`).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); return `${format(slot.start_time)} – ${format(slot.end_time)}`; }
+        formatSlot(slot) { const format = time => new Date(`2000-01-01T${time}`).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); return `${format(slot.start_time)} - ${format(slot.end_time)}`; }
     }
 }
 </script>

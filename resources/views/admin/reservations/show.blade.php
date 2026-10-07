@@ -93,10 +93,12 @@
 
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Reservation Type
+                            Requestor Type
                         </p>
                         <p class="mt-1 text-sm text-slate-700">
-                            {{ ucwords(str_replace('_', ' ', $reservation->reservation_type)) }}
+                            <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold" style="{{ $reservation->reservation_type === 'internal' ? 'background: #DBEAFE; color: #1E3A8A;' : ($reservation->reservation_type === 'external' ? 'background: #F1F5F9; color: #334155;' : 'background: #FEF3C7; color: #92400E;') }}">
+                            {{ match($reservation->reservation_type) { 'internal' => 'Internal', 'external' => 'External', default => 'Not classified' } }}
+                        </span>
                         </p>
                     </div>
 
@@ -189,46 +191,22 @@
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 class="mb-5 text-lg font-bold text-slate-900">
-                    Requested Equipment
-                </h2>
-
-                @if ($reservation->requested_equipment)
-                    <div class="flex items-center justify-between rounded-lg bg-slate-50 p-4">
-                        <p class="text-sm font-semibold text-slate-900">
-                            {{ $reservation->requested_equipment }}
-                        </p>
-                        <p class="text-sm text-slate-700">
-                            Quantity: {{ $reservation->requested_equipment_quantity }}
-                        </p>
-                    </div>
-                @endif
-
-                @forelse ($reservation->equipment as $item)
-                    <div class="flex items-center justify-between border-b border-slate-100 py-3 last:border-0">
-                        <div>
-                            <p class="text-sm font-semibold text-slate-900">
-                                {{ $item->equipment_name }}
-                            </p>
-                            <p class="text-xs text-slate-500">
-                                Requested: {{ $item->pivot->quantity_requested }}
-                            </p>
-                        </div>
-
-                        <p class="text-sm font-semibold text-slate-700">
-                            Approved:
-                            {{ $item->pivot->quantity_approved ?? 0 }}
-                        </p>
-                    </div>
-                @empty
-                    @unless ($reservation->requested_equipment)
-                        <p class="text-sm text-slate-500">
-                            No equipment requested.
-                        </p>
-                    @endunless
-                @endforelse
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="gym-agreement-heading">
+                <h2 id="gym-agreement-heading" class="mb-5 text-lg font-bold" style="color: #1E3A8A">Gymnasium Use Agreement</h2>
+                <dl class="grid gap-5 text-sm sm:grid-cols-2">
+                    <div><dt class="font-semibold text-slate-500">Agreement Status</dt><dd class="mt-2">
+                        @if ($reservation->agreement_accepted)
+                            <span class="inline-flex rounded-full px-3 py-1 font-semibold text-white" style="background-color: #10B981">Accepted</span>
+                        @else
+                            <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">Not recorded</span>
+                        @endif
+                    </dd></div>
+                    <div><dt class="font-semibold text-slate-500">Date Accepted</dt><dd class="mt-2 text-slate-700">{{ $reservation->agreement_accepted_at?->format('F d, Y g:i A') ?? 'Not recorded' }}</dd></div>
+                    <div><dt class="font-semibold text-slate-500">Requestor Name</dt><dd class="mt-2 break-words text-slate-700">{{ $reservation->contact_person }}</dd></div>
+                    <div><dt class="font-semibold text-slate-500">Reservation Reference Number</dt><dd class="mt-2 break-words text-slate-700">{{ $reservation->reference_number }}</dd></div>
+                </dl>
             </section>
+            @include('admin.reservations.partials.equipment-review')
 
         </div>
 

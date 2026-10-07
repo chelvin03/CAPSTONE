@@ -67,6 +67,7 @@
                     <th class="px-4 py-3 text-left">Reference</th>
                     <th class="px-4 py-3 text-left">Facility</th>
                     <th class="px-4 py-3 text-left">Event</th>
+                    <th class="px-4 py-3 text-left">Requestor Type</th>
                     <th class="px-4 py-3 text-left">Date</th>
                     <th class="px-4 py-3 text-left">Status</th>
                     <th class="px-4 py-3 text-center">Action</th>
@@ -90,6 +91,10 @@
                     <td class="px-4 py-3">
                         {{ $reservation->event_name }}
                     </td>
+
+                    <td class="px-4 py-3"><span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold" style="{{ $reservation->reservation_type === 'internal' ? 'background: #DBEAFE; color: #1E3A8A;' : ($reservation->reservation_type === 'external' ? 'background: #F1F5F9; color: #334155;' : 'background: #FEF3C7; color: #92400E;') }}">
+                            {{ match($reservation->reservation_type) { 'internal' => 'Internal', 'external' => 'External', default => 'Not classified' } }}
+                        </span></td>
 
                     <td class="px-4 py-3">
                         {{ $reservation->reservation_date->format('M d, Y') }}
@@ -131,7 +136,7 @@
 
                 <tr>
 
-                    <td colspan="6"
+                    <td colspan="7"
                         class="py-8 text-center text-gray-500">
 
                         No reservations found.

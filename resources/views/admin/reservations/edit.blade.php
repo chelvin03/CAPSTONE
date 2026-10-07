@@ -43,7 +43,7 @@
                 <div>
                     <label for="reservation_type" class="field-label">Reservation Type *</label>
                     <select id="reservation_type" name="reservation_type" required class="field">
-                        @foreach (['school' => 'School Activity', 'community' => 'Community Activity', 'sports' => 'Sports Activity', 'government' => 'Government Activity', 'other' => 'Other'] as $value => $label)
+                        @foreach (['internal' => 'Internal', 'external' => 'External'] as $value => $label)
                             <option value="{{ $value }}" @selected(old('reservation_type', $reservation->reservation_type) === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
@@ -54,7 +54,7 @@
                 <div><label for="contact_person" class="field-label">Contact Person *</label><input id="contact_person" name="contact_person" value="{{ old('contact_person', $reservation->contact_person) }}" required class="field"></div>
                 <div><label for="contact_number" class="field-label">Contact Number *</label><input id="contact_number" name="contact_number" type="tel" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" value="{{ old('contact_number', $reservation->contact_number) }}" required class="field"></div>
                 <div><label for="contact_email" class="field-label">Contact Email</label><input id="contact_email" name="contact_email" type="email" value="{{ old('contact_email', $reservation->contact_email) }}" class="field"></div>
-                <div><label for="expected_attendees" class="field-label">Estimated Participants *</label><input id="expected_attendees" name="expected_attendees" type="number" min="1" value="{{ old('expected_attendees', $reservation->expected_attendees) }}" required class="field"></div>
+                <div><label for="expected_attendees" class="field-label">Estimated Participants *</label><input id="expected_attendees" name="expected_attendees" type="number" min="1" max="2000" step="1" value="{{ old('expected_attendees', $reservation->expected_attendees) }}" required class="field"></div>
             </div>
         </section>
 

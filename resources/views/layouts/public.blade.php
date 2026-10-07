@@ -37,6 +37,7 @@
         Staff Login
     </a>
 
+    <a href="{{ route('reservation.track') }}" class="mr-4 inline-block font-semibold text-white">Track Reservation</a>
     <a
         href="{{ route('reservation.create') }}"
         style="

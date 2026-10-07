@@ -20,6 +20,7 @@
 
         <div class="min-w-0 flex-1">
 
+            @if(auth()->user()->role === 'admin')<div class="flex justify-end px-4 pt-3">@include('components.equipment-notifications')</div>@endif
             <header class="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-8">
                 <button type="button" @click="navigationOpen = true" class="btn-secondary !min-h-10 !px-3 lg:hidden" aria-label="Open navigation" aria-controls="mobile-navigation"><i class="bi bi-list text-xl" aria-hidden="true"></i></button>
                 <div class="ml-auto flex items-center gap-3">
