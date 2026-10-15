@@ -21,12 +21,17 @@
             </p>
         </div>
 
+        <div class="flex flex-wrap items-center gap-3">
+        @if(auth()->user()->role === 'admin')
+            @include('components.equipment-notifications')
+        @endif
         <a
             href="{{ route('admin.equipment.create') }}"
             class="inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
         >
             + Add Equipment
         </a>
+        </div>
 
     </div>
 

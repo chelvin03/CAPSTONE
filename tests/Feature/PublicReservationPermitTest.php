@@ -32,12 +32,12 @@ function validPublicReservationData(Facility $facility): array
     ];
 }
 
-test('a public reservation stores its required permit', function () {
+test('a public reservation without event type stores its required permit', function () {
     Storage::fake('local');
     Mail::fake();
 
     $facility = Facility::create([
-        'facility_name' => 'Main Gym',
+        'facility_name' => 'MCST Gymnasium',
         'capacity' => 100,
         'status' => 'available',
     ]);
@@ -48,6 +48,7 @@ test('a public reservation stores its required permit', function () {
         250,
         'application/pdf'
     );
+    unset($data['event_type']);
     $data['requested_equipment'] = 'Volleyball net';
     $data['requested_equipment_quantity'] = 2;
     $data['agreement_accepted_at'] = '2000-01-01 00:00:00';
@@ -95,7 +96,7 @@ test('a public reservation stores its required permit', function () {
 test('public requestor types store standardized values and display proper admin labels', function ($type, $label) {
     Storage::fake('local');
     Mail::fake();
-    $facility = Facility::create(['facility_name' => 'Type Gym', 'capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['reservation_type'] = $type;
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
@@ -109,7 +110,7 @@ test('public requestor types store standardized values and display proper admin 
 test('public requestor type rejects missing and unapproved values at verification and submission', function ($type) {
     Storage::fake('local');
     Mail::fake();
-    $facility = Facility::create(['facility_name' => 'Invalid Type Gym', 'capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['reservation_type'] = $type;
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
@@ -126,7 +127,7 @@ test('public requestor type rejects missing and unapproved values at verificatio
 test('public capacity validation rejects invalid attendees without storing or notifying', function ($attendees) {
     Storage::fake('local');
     Mail::fake();
-    $facility = Facility::create(['facility_name' => 'Capacity Gym', 'capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['expected_attendees'] = $attendees;
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
@@ -145,7 +146,7 @@ test('public capacity validation rejects invalid attendees without storing or no
 test('public capacity validation accepts whole numbers up to the boundary', function ($attendees) {
     Storage::fake('local');
     Mail::fake();
-    $facility = Facility::create(['facility_name' => 'Boundary Capacity Gym', 'capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['expected_attendees'] = $attendees;
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
@@ -155,7 +156,7 @@ test('public capacity validation accepts whole numbers up to the boundary', func
 
 test('public reservations reject missing or declined gymnasium agreements even with forged timestamps', function ($acceptance) {
     Storage::fake('local');
-    $facility = Facility::create(['facility_name' => 'Agreement Gym', 'capacity' => 100, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 100, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
     unset($data['agreement_accepted']);
@@ -174,7 +175,7 @@ test('public reservations reject missing or declined gymnasium agreements even w
 test('admin reservation details show recorded acceptance and do not claim legacy acceptance', function () {
     Storage::fake('local');
     Mail::fake();
-    $facility = Facility::create(['facility_name' => 'Admin Agreement Gym', 'capacity' => 100, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 100, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
     $this->post(route('reservation.store'), $data)->assertSessionHasNoErrors();
@@ -193,7 +194,7 @@ test('public reservations require at least three days notice', function () {
     config(['gym.reservation.minimum_notice_days' => 3]);
 
     $facility = Facility::create([
-        'facility_name' => 'Advance Window Gym',
+        'facility_name' => 'MCST Gymnasium',
         'capacity' => 100,
         'status' => 'available',
     ]);
@@ -208,7 +209,7 @@ test('public reservations require at least three days notice', function () {
 
 test('a public reservation requires an exact eleven digit contact number', function () {
     Storage::fake('local');
-    $facility = Facility::create(['facility_name' => 'Contact Gym', 'capacity' => 100, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 100, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['contact_number'] = '0912345678';
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
@@ -219,7 +220,7 @@ test('a public reservation requires a valid permit', function () {
     Storage::fake('local');
 
     $facility = Facility::create([
-        'facility_name' => 'Main Gym',
+        'facility_name' => 'MCST Gymnasium',
         'capacity' => 100,
         'status' => 'available',
     ]);
@@ -241,7 +242,7 @@ test('a public reservation requires a valid permit', function () {
 test('a public reservation requires a valid email format without otp verification', function () {
     Storage::fake('local');
     $facility = Facility::create([
-        'facility_name' => 'Verification Gym',
+        'facility_name' => 'MCST Gymnasium',
         'capacity' => 100,
         'status' => 'available',
     ]);
@@ -258,7 +259,7 @@ test('a public reservation requires a valid email format without otp verificatio
 test('public reservations require the contact email to be verified before submission', function () {
     Storage::fake('local');
     $facility = Facility::create([
-        'facility_name' => 'Verified Email Gym',
+        'facility_name' => 'MCST Gymnasium',
         'capacity' => 100,
         'status' => 'available',
     ]);
@@ -277,7 +278,7 @@ test('public reservations require the contact email to be verified before submis
 test('public submission ignores forged browser verification and consumes real proof', function () {
     Storage::fake('local');
     Mail::fake();
-    $facility = Facility::create(['facility_name' => 'OTP Gym', 'capacity' => 100, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 100, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
     $this->withSession(['public_email_verified' => null])->post(route('reservation.store'), $data)
@@ -300,7 +301,7 @@ test('public submission ignores forged browser verification and consumes real pr
 test('confirmation mail failure preserves the reservation and tracking page', function () {
     Storage::fake('local');
     Mail::shouldReceive('mailer')->with('smtp')->once()->andThrow(new RuntimeException('SMTP unavailable'));
-    $facility = Facility::create(['facility_name' => 'Mail Failure Gym', 'capacity' => 100, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 100, 'status' => 'available']);
     $data = validPublicReservationData($facility);
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
     $this->post(route('reservation.store'), $data)->assertSessionHas('reservation_email_sent', false);

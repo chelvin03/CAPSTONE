@@ -11,6 +11,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class StaffController extends Controller
@@ -38,6 +40,38 @@ class StaffController extends Controller
     public function create(): View
     {
         return view('admin.staff.create');
+    }
+
+    public function edit(User $staff): View
+    {
+        abort_unless($staff->role === 'staff', 404);
+
+        return view('admin.staff.edit', compact('staff'));
+    }
+
+    public function update(Request $request, User $staff): RedirectResponse
+    {
+        abort_unless($staff->role === 'staff', 404);
+
+        $validated = $request->validate([
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users', 'email')->ignore($staff->id)],
+            'current_password' => ['required', 'current_password'],
+            'password' => ['nullable', 'confirmed', Rules\Password::min(12)->mixedCase()->numbers()->symbols()],
+        ]);
+
+        $staff->email = $validated['email'];
+        if ($staff->isDirty('email')) {
+            $staff->email_verified_at = null;
+        }
+        if (! empty($validated['password'])) {
+            $staff->password = Hash::make($validated['password']);
+        }
+        if ($staff->isDirty(['email', 'password'])) {
+            $staff->setRememberToken(Str::random(60));
+        }
+        $staff->save();
+
+        return redirect()->route('admin.staff.index')->with('success', 'Staff login details updated successfully.');
     }
 
     public function store(Request $request): RedirectResponse

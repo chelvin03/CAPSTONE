@@ -2,10 +2,22 @@ function gymBookingCalendar() {
     return {
         bookingMonth: '', bookingDays: {}, bookingLoading: false, bookingError: '', bookingRequest: 0,
         bookingOpening: '', bookingClosing: '', bookingPeriod: '',
+        bookingClockMonth: '', bookingClockTimer: null,
+        get bookingYears() {
+            const first = Number(this.minimumDate.slice(0, 4));
+            const last = Number(this.maximumDate.slice(0, 4));
+            return Array.from({length: last - first + 1}, (_, index) => first + index);
+        },
+        async bookingChooseMonth(year, month) {
+            const key = `${year}-${String(month).padStart(2, '0')}`;
+            this.bookingMonth = key < this.minimumDate.slice(0, 7) ? this.minimumDate.slice(0, 7)
+                : key > this.maximumDate.slice(0, 7) ? this.maximumDate.slice(0, 7) : key;
+            await this.loadBookingMonth();
+        },
         get bookingAvailablePeriods() { return (this.bookingSelectedDay?.slots || []).filter(slot => slot.available); },
         get bookingTimeError() {
             if (!this.startTime || !this.endTime) return '';
-            if (this.startTime < '08:00' || this.endTime > '21:00') return 'Reservations must be within 8:00 AM - 9:00 PM.';
+            if (this.startTime < (this.bookingOpening || '07:00') || this.endTime > (this.bookingClosing || '24:00')) return 'Reservations must be within 7:00 AM to 12 midnight.';
             if (this.endTime <= this.startTime) return 'End Time must be after Start Time.';
             if (this.hasSelectedConflict) return 'Selected time overlaps with an existing reservation. Please choose from the remaining available time.';
             return '';
@@ -38,7 +50,7 @@ function gymBookingCalendar() {
                 && this.startTime && this.endTime > this.startTime && this.startTime >= this.bookingOpening
                 && this.endTime <= this.bookingClosing && !this.hasSelectedConflict);
         },
-        bookingTime(time) { return time ? new Date(`2000-01-01T${time}`).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : ''; },
+        bookingTime(time) { return time?.startsWith('24:00') ? '12:00 midnight' : (time ? new Date(`2000-01-01T${time}`).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : ''); },
         bookingCanMove(offset) {
             if (!this.bookingMonth) return false;
             const [year, month] = this.bookingMonth.split('-').map(Number);
@@ -55,6 +67,14 @@ function gymBookingCalendar() {
         },
         async openBookingCalendar() {
             this.bookingMonth = (this.date || this.minimumDate).slice(0, 7);
+            if (!this.bookingClockTimer) {
+                this.bookingClockMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+                this.bookingClockTimer = setInterval(() => {
+                    const today = new Date();
+                    const month = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+                    if (month !== this.bookingClockMonth) window.location.reload();
+                }, 60000);
+            }
             await this.loadBookingMonth();
         },
         async loadBookingMonth() {
@@ -65,8 +85,13 @@ function gymBookingCalendar() {
                 const url = new URL(this.bookingAvailabilityUrl, window.location.origin);
                 url.searchParams.set('facility_id', this.facility); url.searchParams.set('month', this.bookingMonth);
                 const response = await fetch(url, {headers: {'Accept': 'application/json'}, cache: 'no-store'});
-                if (!response.ok) throw new Error('Calendar availability could not be loaded. Please try again.');
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(response.status === 422 ? (error.errors?.facility_id?.[0] || error.message || 'Invalid calendar request.')
+                        : 'Calendar availability could not be loaded. Please try again.');
+                }
                 const data = await response.json();
+                if (!data.days || !data.opening_time || !data.closing_time) throw new Error('The online calendar files need updating. Please contact the administrator.');
                 if (request !== this.bookingRequest) return;
                 this.bookingDays = data.days; this.bookingOpening = data.opening_time; this.bookingClosing = data.closing_time;
                 if (this.bookingSelectedDay) this.occupied = this.bookingSelectedDay.occupied;

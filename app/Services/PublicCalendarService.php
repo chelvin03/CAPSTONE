@@ -12,6 +12,23 @@ use Carbon\CarbonImmutable;
 
 class PublicCalendarService
 {
+    public const CLEANING_MINUTES = 60;
+
+    public function bufferedTime(string $time, int $offset): string
+    {
+        $minutes = max(0, min(1440, (int) substr($time, 0, 2) * 60 + (int) substr($time, 3, 2) + $offset));
+        return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+    }
+
+    public function hasReservationConflict(int $facilityId, string $date, string $start, string $end): bool
+    {
+        return Reservation::where('facility_id', $facilityId)->whereDate('reservation_date', $date)
+            ->whereNotIn('status', ['rejected', 'cancelled'])
+            ->where('start_time', '<', $this->bufferedTime($end, self::CLEANING_MINUTES))
+            ->where('end_time', '>', $this->bufferedTime($start, -self::CLEANING_MINUTES))
+            ->exists();
+    }
+
     public function month(Facility $facility, string $month): array
     {
         $first = CarbonImmutable::createFromFormat('!Y-m', $month);
@@ -22,16 +39,18 @@ class PublicCalendarService
             ->groupBy(fn ($row) => $row->reservation_date->toDateString());
         $blocks = ScheduleBlock::whereDate('starts_on', '<=', $last)->whereDate('ends_on', '>=', $first)
             ->where(fn ($q) => $q->whereNull('facility_id')->orWhere('facility_id', $facility->id))->get();
-        $opening = config('gym.reservation.opening_time', '08:00');
-        $closing = config('gym.reservation.closing_time', '21:00');
+        $opening = config('gym.reservation.opening_time', '07:00');
+        $closing = config('gym.reservation.closing_time', '24:00');
         $minimum = now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString();
-        $maximum = now()->addDays((int) SystemSetting::getValue('maximum_advance_days', 365))->toDateString();
+        $maximum = now()->addYearsNoOverflow(15)->toDateString();
         $days = [];
         for ($day = $first; $day <= $last; $day = $day->addDay()) {
             $date = $day->toDateString();
             $busy = [];
             foreach ($bookings->get($date, collect()) as $booking) {
-                $busy[] = ['start_time' => $booking->start_time, 'end_time' => $booking->end_time, 'status' => 'reserved'];
+                // Leave room for cleaning after either the existing or the new booking.
+                $busy[] = ['start_time' => $this->bufferedTime($booking->start_time, -self::CLEANING_MINUTES),
+                    'end_time' => $this->bufferedTime($booking->end_time, self::CLEANING_MINUTES), 'status' => 'reserved'];
             }
             foreach ($blocks as $block) {
                 if ($block->starts_on->toDateString() <= $date && $block->ends_on->toDateString() >= $date) {
@@ -45,8 +64,9 @@ class PublicCalendarService
             $available = count(array_filter($slots, fn ($slot) => $slot['available']));
             $status = $available === 0 ? 'full' : ($available < count($slots) ? 'partial' : 'available');
             $days[$date] = ['date' => $date, 'status' => $status, 'label' => match ($status) {
-                'full' => 'Fully Booked', 'partial' => 'Available Time', default => 'Available',
-            }, 'selectable' => $date >= $minimum && $date <= $maximum, 'slots' => $slots, 'occupied' => $busy];
+                'full' => 'Unavailable', 'partial' => 'Reserved / available times', default => 'Available',
+            }, 'selectable' => $date >= $minimum && $date <= $maximum,
+                'slots' => array_values(array_filter($slots, fn ($slot) => $slot['available'])), 'occupied' => $busy];
         }
         return ['days' => $days, 'opening_time' => $opening, 'closing_time' => $closing];
     }

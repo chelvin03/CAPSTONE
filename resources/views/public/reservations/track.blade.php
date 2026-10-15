@@ -15,14 +15,22 @@
     <form method="GET" action="{{ route('reservation.track') }}" class="tracking-search"><label class="sr-only" for="tracking-reference">Reservation Reference Number</label><input id="tracking-reference" name="reference" value="{{ $reference }}" required maxlength="50" placeholder="MCST-GYM-YYYYMMDD-XXXXXX"><button class="tracking-button tracking-primary">Track Reservation</button></form>
     @if($reference !== '' && !$reservation)<p class="tracking-message" role="alert">No reservation was found for that reference code.</p>@endif
     @if($reservation)@include('public.reservations.partials.live-tracking')@endif
-    @if($recentReservations->isNotEmpty())
-    <section class="tracking-recent"><h2>My Reservation History</h2><p>Requests submitted in this browser. You can also enter a saved reference number above.</p><ul>
-        @foreach($recentReservations as $recent)
-        <li><a href="{{ route('reservation.track', ['reference' => $recent->reference_number]) }}"><strong>{{ $recent->reference_number }}</strong><span>{{ $recent->event_name }}</span><span>{{ $recent->reservation_date->format('F d, Y') }} · {{ ucwords(str_replace('_', ' ', $recent->status)) }}</span></a></li>
-        @endforeach
-    </ul></section>
+    @if($reservation && $ownsReservation && $reservation->requestorCancellationAllowed())
+    <section class="tracking-cancellation" aria-labelledby="cancellation-heading">
+        <h3 id="cancellation-heading">Cancel Reservation</h3>
+        <p>You may cancel within 48 hours after submission, before your event starts. A reason is required.</p>
+        <p class="tracking-cancellation-deadline"><strong>Cancellation deadline:</strong> {{ $reservation->created_at->copy()->addHours(48)->format('F d, Y g:i A') }} ({{ config('app.timezone') }}).</p>
+        <form method="POST" action="{{ route('reservation.cancel', $reservation) }}" onsubmit="return confirm('Cancel this reservation? Your schedule will be released.');">
+            @csrf
+            <p id="cancellation-help">Cancelling releases your reserved schedule. To reserve again, you will need to submit a new request.</p>
+            <label for="cancellation-reason">Cancellation reason <span aria-hidden="true">*</span></label>
+            <textarea id="cancellation-reason" name="cancellation_reason" required maxlength="2000" rows="4" placeholder="Tell us why you need to cancel your reservation." aria-describedby="cancellation-help" class="w-full rounded-lg border-slate-300">{{ old('cancellation_reason') }}</textarea>
+            <button type="submit" class="tracking-button tracking-danger">Cancel Reservation</button>
+        </form>
+    </section>
+    @elseif($reservation && $ownsReservation && !in_array($reservation->status, ['cancelled', 'rejected', 'completed'], true))
+        <p class="tracking-message">Online cancellation is closed. Cancellation is allowed within 48 hours after submission and before the event starts. Please contact the administrator for assistance.</p>
     @endif
-    <div class="tracking-actions"><a href="{{ route('home') }}" class="tracking-button">Back to Home</a><a href="{{ route('reservation.create', ['step' => 1]) }}" class="tracking-button">Make Another Reservation</a></div>
 </div></div>
 <script src="{{ asset('js-reservation-tracking.js') }}?v={{ filemtime(public_path('js-reservation-tracking.js')) }}"></script>
 @endsection

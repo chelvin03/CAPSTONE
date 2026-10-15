@@ -6,9 +6,9 @@ use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 
 test('admin priority reservation overrides a conflicting slot and notifies the affected requestor', function () {
-    Mail::shouldReceive('raw')->once();
+    Mail::fake();
     $admin = User::factory()->create(['role' => 'admin']);
-    $facility = Facility::create(['facility_name' => 'Priority Gym', 'capacity' => 200, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 200, 'status' => 'available']);
     $affected = Reservation::create([
         'reference_number' => 'MCST-AFFECTED',
         'facility_id' => $facility->id,
@@ -38,20 +38,23 @@ test('admin priority reservation overrides a conflicting slot and notifies the a
         'start_time' => '10:00',
         'end_time' => '12:00',
         'priority_override' => '1',
-    ])->assertRedirect(route('admin.reservations.index'));
+    ])->assertSessionHasNoErrors()->assertRedirect(route('admin.reservations.index'));
 
-    expect($affected->refresh()->status)->toBe('waiting_list');
+    expect($affected->refresh()->status)->toBe('cancelled');
+    expect($affected->cancellation_reason)->toContain('priority reservation');
+    Mail::assertSent(\App\Mail\ReservationCancelled::class, fn ($mail) => $mail->hasTo('affected@example.com') && $mail->reservation->id === $affected->id);
     $priority = Reservation::where('event_name', 'Priority Government Event')->firstOrFail();
-    expect($priority->status)->toBe('approved')->and($priority->priority_number)->toBe(1);
+    expect($priority->status)->toBe('approved')->and($priority->priority_number)->toBe(1)
+        ->and($priority->reference_number)->toBe('R1-A');
     $this->assertDatabaseHas('reservation_status_histories', [
         'reservation_id' => $affected->id,
-        'new_status' => 'waiting_list',
+        'new_status' => 'cancelled',
     ]);
 });
 
 test('ordinary admin booking cannot use an occupied slot without priority override', function () {
     $admin = User::factory()->create(['role' => 'admin']);
-    $facility = Facility::create(['facility_name' => 'Locked Gym', 'capacity' => 100, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 100, 'status' => 'available']);
     Reservation::create([
         'reference_number' => 'MCST-LOCKED', 'facility_id' => $facility->id,
         'reservation_type' => 'school', 'event_name' => 'Existing Event', 'purpose' => 'Test',

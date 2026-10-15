@@ -46,6 +46,9 @@
 
     </div>
 
+    @if(in_array($reservation->status, ['approved', 'completed'], true))
+        <div class="mb-5 rounded-xl border border-green-200 bg-green-50 p-4"><p class="font-semibold text-green-800">Approved / For AR — staff preparation required</p><a class="mt-2 inline-block font-semibold text-blue-700 underline" href="{{ route('admin.reservations.receipt', $reservation) }}" target="_blank" rel="noopener"><i class="bi bi-printer" aria-hidden="true"></i> View AR Progress</a></div>
+    @endif
     @if (session('success'))
         <div class="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
             {{ session('success') }}
@@ -95,15 +98,6 @@
                         </p>
                         <p class="mt-1 text-sm font-semibold text-slate-900">
                             {{ $reservation->event_name }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Event Type
-                        </p>
-                        <p class="mt-1 text-sm text-slate-700">
-                            {{ $reservation->event_type ?? 'Not specified' }}
                         </p>
                     </div>
 
@@ -182,31 +176,12 @@
                         </p>
                     </div>
 
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Setup Time
-                        </p>
-                        <p class="mt-1 text-sm text-slate-700">
-                            {{ $reservation->setup_time
-                                ? \Carbon\Carbon::parse($reservation->setup_time)->format('g:i A')
-                                : 'Not specified' }}
-                        </p>
-                    </div>
 
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Cleanup Time
-                        </p>
-                        <p class="mt-1 text-sm text-slate-700">
-                            {{ $reservation->cleanup_time
-                                ? \Carbon\Carbon::parse($reservation->cleanup_time)->format('g:i A')
-                                : 'Not specified' }}
-                        </p>
-                    </div>
 
                 </div>
             </section>
 
+            @include('admin.reservations.partials.attachments')
             @include('admin.reservations.partials.equipment-review')
 
         </div>
@@ -238,22 +213,13 @@
                         </p>
                     </div>
 
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Account
-                        </p>
-                        <p class="mt-1 text-sm text-slate-700">
-                            {{ $reservation->user->email ?? 'Not available' }}
-                        </p>
-                    </div>
-
                 </div>
             </section>
 
             <section class="rounded-2xl border border-blue-200 bg-blue-50 p-6">
                 <h2 class="mb-2 text-lg font-bold text-blue-900">Reassign or Reschedule</h2><p class="mb-4 text-sm text-blue-700">Administrators may force-assign any slot and resolve affected reservations.</p>
                 <form method="POST" action="{{route('admin.reservations.reschedule',$reservation)}}" class="grid gap-3 sm:grid-cols-2">@csrf @method('PATCH')
-                    <select name="facility_id" required class="rounded-lg border-slate-300">@foreach(\App\Models\Facility::where('status','available')->orderBy('facility_name')->get() as $facility)<option value="{{$facility->id}}" @selected($reservation->facility_id===$facility->id)>{{$facility->facility_name}}</option>@endforeach</select>
+                    <p class="font-semibold">MCST Gymnasium</p>
                     <input type="date" name="reservation_date" value="{{$reservation->reservation_date->format('Y-m-d')}}" required class="rounded-lg border-slate-300"><input type="time" name="start_time" value="{{substr($reservation->start_time,0,5)}}" required class="rounded-lg border-slate-300"><input type="time" name="end_time" value="{{substr($reservation->end_time,0,5)}}" required class="rounded-lg border-slate-300">
                     <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="force_assign" value="1"> Force assign occupied slot</label><select name="conflict_resolution" class="rounded-lg border-slate-300"><option value="waiting_list">Move conflicts to waiting list</option><option value="cancelled">Cancel conflicts</option></select>
                     <textarea name="reason" required rows="2" placeholder="Reason for schedule adjustment" class="sm:col-span-2 rounded-lg border-slate-300"></textarea><button class="sm:col-span-2 rounded-lg bg-blue-700 p-3 font-semibold text-white">Update Schedule & Notify</button>
@@ -269,7 +235,7 @@
         </h2>
 
         <p class="mb-4 font-bold text-red-600">
-            Current Status: {{ $reservation->status }}
+            Current Status: {{ $reservation->status === 'pencil' ? 'Pencil booking — tentative hold' : $reservation->status }}
         </p>
 
         </h2>
@@ -286,7 +252,7 @@
 
     <input
         type="submit"
-        value="Approve Reservation"
+        value="{{ $reservation->status === 'pencil' ? 'Confirm Pencil Booking / For AR' : 'Approve / For AR' }}"
         style="
             display: block;
             width: 100%;
@@ -347,7 +313,7 @@
 
 @endif
 
-            @if ($reservation->status === 'approved')
+            @if (in_array($reservation->status, ['approved', 'pencil'], true))
                 <section class="rounded-2xl border border-red-200 bg-red-50 p-6">
                     <h2 class="mb-3 text-lg font-bold text-red-800">
                         Cancel Reservation

@@ -1,0 +1,9 @@
+Upload htdocs/app/Models/AuditLog.php over the same file on the hosting account.
+
+This patch hashes persisted database values and verifies against APP_KEY plus APP_PREVIOUS_KEYS. It does not rewrite, delete, or re-sign existing audit history.
+
+If the online APP_KEY differs from the key used to create the exported audit records, privately add that original key to APP_PREVIOUS_KEYS in the online .env. Preserve the current APP_KEY and any existing previous keys. APP_PREVIOUS_KEYS is a comma-separated list. Never post keys in chat or screenshots. Reload cached configuration using your existing deployment process if applicable.
+
+Refresh Admin > Audit Logs. A valid chain will show Audit integrity verified. If the warning remains, retain the database backup and investigate the failed record, migration history, original key, and database import. Do not rehash unverified history to hide a warning.
+
+Local validation: five audit tests passed, covering database normalization, retained keys, tampering, filters/export, and immutability. The hosted database and its application key have not been inspected, so the cause of its record #1 failure is not confirmed.

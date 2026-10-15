@@ -3,6 +3,9 @@
 @section('content')
 <div class="page-shell">
     <header class="page-header"><div><a class="text-sm font-semibold text-blue-700 underline" href="{{ route('staff.reservations.index') }}">Back to Reservations</a><h1 class="page-title mt-3">Reservation Details</h1><p class="page-description">Read-only operational information.</p></div></header>
+    @if(in_array($reservation->status, ['approved', 'completed'], true))
+        <div class="card mb-5 p-5"><h2 class="font-bold">Acknowledgement Receipt (AR)</h2><p class="mt-2 text-sm text-slate-600">Admin approved this booking. Prepare the AR, review it, then send the print-ready link to the requestor.</p><a class="btn-primary mt-3" href="{{ route('staff.reservations.receipt', $reservation) }}" target="_blank" rel="noopener"><i class="bi bi-printer" aria-hidden="true"></i> Prepare / Send AR</a></div>
+    @endif
     <section class="card p-6"><h2 class="text-lg font-bold">{{ $reservation->event_name }}</h2><dl class="mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         @foreach (['Reference Number' => $reservation->reference_number, 'Event Type' => $reservation->event_type ?: 'Not specified', 'Facility' => $reservation->facility?->facility_name ?? 'Not assigned', 'Scheduled Date' => $reservation->reservation_date->format('F d, Y'), 'Start–End Time' => substr($reservation->start_time, 0, 5).'–'.substr($reservation->end_time, 0, 5), 'Expected Attendees' => number_format($reservation->expected_attendees)] as $heading => $value)
             <div><dt class="text-sm font-semibold text-slate-500">{{ $heading }}</dt><dd class="mt-2 text-sm">{{ $value }}</dd></div>

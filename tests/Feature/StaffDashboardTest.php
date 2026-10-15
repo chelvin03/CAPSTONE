@@ -61,7 +61,7 @@ test('staff cannot enter admin routes or mutate operational records', function (
     $reservation = staffMonitoringReservation($this->gym);
     $equipment = Equipment::create(['equipment_name' => 'Chairs', 'total_quantity' => 20, 'unit' => 'pcs', 'status' => 'available']);
     $this->actingAs($this->staff);
-    foreach (['admin.dashboard', 'admin.reports.index', 'admin.reports.export', 'admin.reports.excel', 'admin.reports.word', 'admin.reservations.create', 'admin.facilities.create', 'admin.equipment.create'] as $route) {
+    foreach (['admin.dashboard', 'admin.reports.index', 'admin.reports.export', 'admin.reports.excel', 'admin.reports.word', 'admin.reservations.create', 'admin.equipment.create'] as $route) {
         $this->get(route($route))->assertForbidden();
     }
     $this->get(route('admin.dashboard', ['export' => 'csv']))->assertForbidden();
@@ -71,11 +71,14 @@ test('staff cannot enter admin routes or mutate operational records', function (
     $this->post(route('admin.reservations.store'), [])->assertForbidden();
     $this->get(route('admin.reservations.edit', $reservation))->assertForbidden();
     $this->patch(route('admin.reservations.update', $reservation), ['status' => 'completed'])->assertForbidden();
-    foreach (['facilities' => $this->gym, 'equipment' => $equipment] as $resource => $record) {
+    foreach (['equipment' => $equipment] as $resource => $record) {
         $this->post(route('admin.'.$resource.'.store'), [])->assertForbidden();
         $this->get(route('admin.'.$resource.'.edit', $record))->assertForbidden();
         $this->put(route('admin.'.$resource.'.update', $record), [])->assertForbidden();
         $this->delete(route('admin.'.$resource.'.destroy', $record))->assertForbidden();
+    }
+    foreach (['get', 'post', 'put', 'delete'] as $method) {
+        $this->{$method}('/admin/facilities')->assertNotFound();
     }
     expect($reservation->fresh()->status)->toBe('approved');
     expect($this->gym->fresh())->not->toBeNull();
@@ -101,7 +104,7 @@ test('operational notices use maintenance capacity cancellations and schedule hi
     DB::table('reservation_status_histories')->insert(['reservation_id' => $event->id, 'new_status' => 'approved', 'previous_status' => 'approved', 'remarks' => 'Reservation rescheduled: PRIVATE CHANGE', 'created_at' => now()->subDay()]);
     ScheduleBlock::create(['facility_id' => $this->gym->id, 'starts_on' => now()->toDateString(), 'ends_on' => now()->toDateString(), 'title' => 'PRIVATE BLOCK', 'reason' => 'PRIVATE BLOCK REASON', 'created_by' => $this->staff->id]);
     $this->actingAs($this->staff)->get(route('staff.dashboard'))->assertOk()->assertSee('under maintenance')
-        ->assertSee('meets or exceeds facility capacity')->assertSee('recently cancelled')->assertSee('schedule changed')
+        ->assertSee('meets or exceeds gym capacity')->assertSee('recently cancelled')->assertSee('schedule changed')
         ->assertSee('No equipment records are marked available')->assertSee('schedule block(s) affect today')
         ->assertDontSee('PRIVATE REASON')->assertDontSee('PRIVATE CHANGE')->assertDontSee('PRIVATE BLOCK');
     $this->get(route('staff.schedules.index'))->assertOk()->assertSee('Unavailable')->assertDontSee('PRIVATE BLOCK');
@@ -130,7 +133,7 @@ test('schedule date filter only shows confirmed events and dashboard handles an 
         ->assertViewHas('upcomingCount', 0)->assertSee('No gymnasium events are scheduled for today.')
         ->assertSee('No operational notices at this time.');
     $this->gym->delete();
-    $this->get(route('staff.dashboard'))->assertOk()->assertSee('No facility records available.');
+    $this->get(route('staff.dashboard'))->assertOk()->assertSee('Gym information is unavailable.');
     $gym = Facility::create(['facility_name' => 'New Gym', 'capacity' => 200, 'status' => 'available']);
     foreach (['approved', 'completed', 'new', 'rejected', 'cancelled'] as $status) {
         staffMonitoringReservation($gym, ['status' => $status, 'reservation_date' => '2026-10-01']);

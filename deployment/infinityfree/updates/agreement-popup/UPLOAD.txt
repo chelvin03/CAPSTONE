@@ -1,0 +1,4 @@
+Upload each file into the matching existing hosting folder and replace the existing file.
+resources/views/public/reservations/create.blade.php -> /htdocs/resources/views/public/reservations/
+public/css/reservation-wizard.css -> /htdocs/public/css/
+Do not upload this README. Refresh with Ctrl+F5. This update contains no environment, database, or uploaded-document files.

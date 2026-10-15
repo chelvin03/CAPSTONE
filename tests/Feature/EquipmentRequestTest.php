@@ -36,7 +36,7 @@ test('only internal public requestors can store inventory requests and external 
         'purpose' => 'School activity', 'contact_person' => 'Equipment Requestor', 'contact_email' => 'requestor@example.com',
         'contact_number' => '09123456789', 'expected_attendees' => 100, 'reservation_date' => now()->addDays(5)->toDateString(),
         'start_time' => '08:00', 'end_time' => '12:00', 'agreement' => '1', 'agreement_accepted' => '1',
-        'equipment' => [$this->chairs->id => ['quantity_requested' => 200]],
+        'equipment' => [$this->chairs->id => ['quantity_requested' => 150]],
         'permit' => UploadedFile::fake()->create('permit.pdf', 20, 'application/pdf')];
     $this->withSession(['public_email_verified' => ['email' => 'requestor@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp]])
         ->post(route('reservation.store'), $data)->assertSessionHasErrors('equipment');
@@ -45,7 +45,17 @@ test('only internal public requestors can store inventory requests and external 
     Mail::assertNothingSent();
     $this->post(route('reservation.store'), array_replace($data, ['reservation_type' => 'internal']))->assertSessionHasNoErrors();
     $item = Reservation::sole()->equipment()->firstOrFail();
-    expect($item->pivot->quantity_requested)->toBe(200)->and($item->pivot->quantity_approved)->toBeNull()->and($item->pivot->status)->toBe('pending');
+    expect($item->pivot->quantity_requested)->toBe(150)->and($item->pivot->quantity_approved)->toBeNull()->and($item->pivot->status)->toBe('pending');
+});
+
+test('equipment requests cannot exceed inventory and exact stock is allowed', function () {
+    $service = app(EquipmentRequestService::class);
+    $service->validateRequests('internal', [$this->chairs->id => ['quantity_requested' => 150]]);
+    expect(fn () => $service->validateRequests('internal', [$this->chairs->id => ['quantity_requested' => 151]]))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
+    $this->chairs->update(['total_quantity' => 0]);
+    expect(fn () => $service->validateRequests('internal', [$this->chairs->id => ['quantity_requested' => 1]]))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
 });
 
 test('public inventory input rejects invalid quantities unavailable stock ids and injected approvals', function ($row) {
@@ -214,4 +224,20 @@ test('unavailable equipment and unknown inventory IDs cannot be requested', func
         ->toThrow(\Illuminate\Validation\ValidationException::class);
     expect(fn () => app(EquipmentRequestService::class)->validateRequests('internal', [999999 => ['quantity_requested' => 10]]))
         ->toThrow(\Illuminate\Validation\ValidationException::class);
+});
+
+
+test('equipment dropdown is restricted to internal requestors', function () {
+    foreach (['external', 'internal'] as $type) {
+        $response = $this->withSession([
+            'public_email_verified' => ['email' => 'requestor@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp],
+            'public_reservation_details' => ['contact_email' => 'requestor@example.com', 'reservation_type' => $type],
+        ])->get(route('reservation.create', ['step' => 3]))->assertOk();
+        if ($type === 'internal') {
+            $response->assertSee('id="equipment-request-heading"', false)
+                ->assertSee('Select equipment')->assertSee('Add equipment')->assertSee('equipmentStock(row.id)', false);
+        } else {
+            $response->assertSee('x-if="requestorType === \'internal\'"', false);
+        }
+    }
 });

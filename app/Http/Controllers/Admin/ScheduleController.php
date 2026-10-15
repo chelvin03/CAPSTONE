@@ -23,10 +23,11 @@ class ScheduleController extends Controller
         $filters = $request->validate([
             'month' => ['nullable', 'date_format:Y-m'],
             'date' => ['nullable', 'date_format:Y-m-d'],
-            'status' => ['nullable', Rule::in([...config('gym.statuses'), 'pending'])],
+            'status' => ['nullable', Rule::in([...config('gym.statuses'), 'pending', 'pencil'])],
             'event_type' => ['nullable', 'string', 'max:100'],
             'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
         ]);
+        $filters['facility_id'] = Facility::gym()->value('id');
         $month = $filters['month'] ?? now()->format('Y-m');
         $start = CarbonImmutable::createFromFormat('!Y-m', $month);
         $end = $start->endOfMonth();
@@ -34,7 +35,7 @@ class ScheduleController extends Controller
         if (substr($selectedDate, 0, 7) !== $month) {
             $selectedDate = $start->toDateString();
         }
-        $facilities = Facility::orderBy('facility_name')->get(['id', 'facility_name', 'status']);
+        $facilities = Facility::gym()->orderBy('facility_name')->get(['id', 'facility_name', 'status']);
         $reservableFacilities = $facilities->where('status', 'available')->values();
         $scope = isset($filters['facility_id']) ? $facilities->where('id', $filters['facility_id'])->values() : $facilities;
         $reservations = Reservation::with('facility:id,facility_name')->whereBetween('reservation_date', [$start->toDateString(), $end->toDateString()])
@@ -62,6 +63,7 @@ class ScheduleController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge(['facility_id' => Facility::gymId()]);
         $validated = $request->validate([
             'facility_id' => ['nullable', 'exists:facilities,id'],
             'title' => ['required', 'string', 'max:255'],
@@ -71,10 +73,25 @@ class ScheduleController extends Controller
             'start_time' => ['nullable', 'required_with:end_time', 'date_format:H:i'],
             'end_time' => ['nullable', 'required_with:start_time', 'date_format:H:i', 'after:start_time'],
         ]);
-        $block = ScheduleBlock::create([...$validated, 'created_by' => $request->user()->id]);
-        AuditLog::record('schedule_block.created', $block, $validated);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $request): void {
+            Facility::whereKey($validated['facility_id'])->lockForUpdate()->firstOrFail();
+            $block = ScheduleBlock::create([...$validated, 'created_by' => $request->user()->id]);
+            AuditLog::record('schedule_block.created', $block, $validated);
+            $affected = Reservation::where('facility_id', $block->facility_id)->where('status', 'approved')
+                ->whereDate('reservation_date', '>=', $block->starts_on->toDateString())
+                ->whereDate('reservation_date', '<=', $block->ends_on->toDateString())
+                ->when($block->start_time, fn ($query) => $query->where('start_time', '<', $block->end_time)
+                    ->where('end_time', '>', $block->start_time))->lockForUpdate()->get();
+            $reason = 'Administrator schedule block: '.$block->title;
+            if (filled($block->reason)) {
+                $reason .= '. '.$block->reason;
+            }
+            foreach ($affected as $reservation) {
+                app(\App\Services\ReservationCancellationService::class)->cancel($reservation, $request->user()->id, $reason);
+            }
+        });
 
-        return back()->with('success', 'Blackout period created.');
+        return back()->with('success', 'Blackout period created. Conflicting approved reservations were cancelled and requestors notified by email.');
     }
 
     public function destroy(ScheduleBlock $block): RedirectResponse

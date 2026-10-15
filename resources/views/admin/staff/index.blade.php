@@ -26,7 +26,7 @@
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200">
                 <thead class="bg-slate-50"><tr>
-                    @foreach (['Name', 'Email', 'Contact Number', 'Status', 'Priority Permission', 'Created'] as $heading)
+                    @foreach (['Name', 'Email', 'Contact Number', 'Status', 'Priority Permission', 'Created', 'Action'] as $heading)
                         <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $heading }}</th>
                     @endforeach
                 </tr></thead>
@@ -39,9 +39,9 @@
                             <td class="px-6 py-4"><span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">{{ ucfirst($member->status) }}</span></td>
                             <td class="px-6 py-4"><form method="POST" action="{{route('admin.staff.permissions',$member)}}">@csrf @method('PATCH')<label class="flex items-center gap-2 text-xs"><input type="checkbox" name="can_priority_override" value="1" @checked($member->can_priority_override) onchange="this.form.submit()"> Authorized</label></form></td>
                             <td class="px-6 py-4 text-sm text-slate-600">{{ $member->created_at->format('M d, Y') }}</td>
-                        </tr>
+                        <td class="px-6 py-4"><a class="font-semibold text-blue-700" href="{{ route('admin.staff.edit', $member) }}">Edit Login</a></td></tr>
                     @empty
-                        <tr><td colspan="6" class="px-6 py-10 text-center text-sm text-slate-500">No staff accounts found.</td></tr>
+                        <tr><td colspan="7" class="px-6 py-10 text-center text-sm text-slate-500">No staff accounts found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

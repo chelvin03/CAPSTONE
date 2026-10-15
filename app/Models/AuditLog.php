@@ -97,6 +97,9 @@ class AuditLog extends Model
             $log = new static($attributes);
             $log->previous_hash = $previousHash;
             $log->save();
+            // Hash the stored representation: JSON columns and database drivers
+            // can normalize values when inserting them.
+            $log->refresh();
             $log->entry_hash = static::hashFor($log, $previousHash);
             DB::table('audit_logs')->where('id', $log->id)->update(['entry_hash' => $log->entry_hash]);
         }, 3);
@@ -106,10 +109,20 @@ class AuditLog extends Model
     {
         $previousHash = str_repeat('0', 64);
         $checked = 0;
+        $keys = array_unique([(string) config('app.key'), ...config('app.previous_keys', [])]);
         foreach (static::query()->orderBy('id')->cursor() as $log) {
             $checked++;
-            $expected = static::hashFor($log, $previousHash);
-            if (! hash_equals($previousHash, (string) $log->previous_hash) || ! hash_equals($expected, (string) $log->entry_hash)) {
+            if (! hash_equals($previousHash, (string) $log->previous_hash)) {
+                return ['valid' => false, 'checked' => $checked, 'failed_id' => $log->id];
+            }
+            $matches = false;
+            foreach ($keys as $key) {
+                if (hash_equals(static::hashFor($log, $previousHash, $key), (string) $log->entry_hash)) {
+                    $matches = true;
+                    break;
+                }
+            }
+            if (! $matches) {
                 return ['valid' => false, 'checked' => $checked, 'failed_id' => $log->id];
             }
             $previousHash = (string) $log->entry_hash;
@@ -118,7 +131,24 @@ class AuditLog extends Model
         return ['valid' => true, 'checked' => $checked, 'failed_id' => null];
     }
 
-    private static function hashFor(self $log, string $previousHash): string
+    public function timestampMatchingHash(): ?string
+    {
+        $keys = array_unique([(string) config('app.key'), ...config('app.previous_keys', [])]);
+        $candidate = clone $this;
+        // Diagnostic only: verification continues to reject altered timestamps.
+        foreach ([0, ...range(-24, -1), ...range(1, 24)] as $hours) {
+            $candidate->created_at = $this->created_at?->copy()->addHours($hours);
+            foreach ($keys as $key) {
+                if (hash_equals(static::hashFor($candidate, (string) $this->previous_hash, $key), (string) $this->entry_hash)) {
+                    return $candidate->created_at?->format('Y-m-d H:i:s');
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function hashFor(self $log, string $previousHash, ?string $key = null): string
     {
         $payload = [
             'id' => $log->id,
@@ -142,7 +172,7 @@ class AuditLog extends Model
             'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
         ];
 
-        return hash_hmac('sha256', $previousHash.'|'.json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), (string) config('app.key'));
+        return hash_hmac('sha256', $previousHash.'|'.json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), $key ?? (string) config('app.key'));
     }
 
     private static function redact(?array $values): ?array

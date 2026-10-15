@@ -79,7 +79,7 @@ function reservationFlow() {
     return {
         step: {{ $errors->any() ? 2 : 1 }}, availabilityLoading: false, availabilityError: '', message: '', occupied: [],
         contactPerson: @js(old('contact_person', '')), email: @js(old('contact_email', '')), contactNumber: @js(old('contact_number', '')), requestorType: @js(old('reservation_type', '')),
-        facility: @js(old('facility_id', '')), date: @js(old('reservation_date', '')), startTime: @js(old('start_time', '')), endTime: @js(old('end_time', '')),
+        facility: @js($facilities->first()?->id ?? ''), date: @js(old('reservation_date', '')), startTime: @js(old('start_time', '')), endTime: @js(old('end_time', '')),
         minimumDate: @js(now()->addDays($minimumNoticeDays)->format('Y-m-d')), calendarMonth: @js(old('reservation_date') ? substr(old('reservation_date'), 0, 7) : now()->addDays($minimumNoticeDays)->format('Y-m')),
         get calendarMonthLabel() { const [year, month] = this.calendarMonth.split('-').map(Number); return new Date(year, month - 1, 1).toLocaleDateString([], {month: 'long', year: 'numeric'}); },
         get calendarDays() { const [year, month] = this.calendarMonth.split('-').map(Number); const firstDay = new Date(year, month - 1, 1).getDay(); const daysInMonth = new Date(year, month, 0).getDate(); const days = Array(firstDay).fill(null); for (let number = 1; number <= daysInMonth; number++) { const date = `${year}-${String(month).padStart(2, '0')}-${String(number).padStart(2, '0')}`; days.push({number, date, selectable: date >= this.minimumDate, label: new Date(year, month - 1, number).toLocaleDateString([], {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'})}); } return days; },

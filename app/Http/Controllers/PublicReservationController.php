@@ -28,6 +28,7 @@ class PublicReservationController extends Controller
 {
     public function availability(Request $request): JsonResponse
     {
+        $request->merge(['facility_id' => Facility::gymId()]);
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
             'date' => ['required_without:month', 'date'],
@@ -45,7 +46,11 @@ class PublicReservationController extends Controller
             ->whereDate('reservation_date', $validated['date'])
             ->whereNotIn('status', ['rejected', 'cancelled'])
             ->orderBy('start_time')
-            ->get(['start_time', 'end_time', 'status']);
+            ->get(['start_time', 'end_time', 'status'])->map(function ($booking) {
+                $calendar = app(\App\Services\PublicCalendarService::class);
+                return ['start_time' => $calendar->bufferedTime($booking->start_time, -$calendar::CLEANING_MINUTES),
+                    'end_time' => $calendar->bufferedTime($booking->end_time, $calendar::CLEANING_MINUTES), 'status' => $booking->status];
+            });
         $blocks = ScheduleBlock::query()->whereDate('starts_on', '<=', $validated['date'])->whereDate('ends_on', '>=', $validated['date'])
             ->where(fn ($query) => $query->whereNull('facility_id')->orWhere('facility_id', $validated['facility_id']))
             ->get()->map(fn ($block) => ['start_time' => $block->start_time ?? '00:00:00', 'end_time' => $block->end_time ?? '23:59:59', 'status' => 'blackout']);
@@ -64,7 +69,7 @@ class PublicReservationController extends Controller
         }
         $requestorDetails = $request->session()->get('public_reservation_details', []);
         $initialStep = $emailVerified ? 3 : ($request->session()->has('public_email_challenge') ? 2 : 1);
-        $facilities = Facility::query()
+        $facilities = Facility::gym()
             ->orderBy('facility_name')
             ->get();
 
@@ -76,6 +81,7 @@ class PublicReservationController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge(['facility_id' => Facility::gymId()]);
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
             'reservation_type' => ['required', 'in:internal,external'],
@@ -88,9 +94,11 @@ class PublicReservationController extends Controller
             'contact_email' => ['required', 'email:rfc', 'max:255'],
             'contact_number' => ['required', 'digits:11'],
             'expected_attendees' => \App\Support\GymCapacity::rules(),
-            'reservation_date' => ['required', 'date', 'after_or_equal:'.now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString(), 'before_or_equal:'.now()->addDays((int) SystemSetting::getValue('maximum_advance_days', 365))->toDateString()],
+            'reservation_date' => ['required', 'date', 'after_or_equal:'.now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString(), 'before_or_equal:'.now()->addYearsNoOverflow(15)->toDateString()],
             'start_time' => ['required', 'date_format:H:i'],
-            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+            'end_time' => ['required', 'string', 'regex:/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$|^24:00$/', function ($attribute, $value, $fail) use ($request) {
+                if ($value <= (string)$request->input('start_time')) $fail('End time must be after start time. Use 24:00 for the midnight end of the selected date.');
+            }],
             'setup_time' => ['nullable', 'date_format:H:i'],
             'cleanup_time' => ['nullable', 'date_format:H:i'],
             'permit' => [
@@ -129,26 +137,20 @@ class PublicReservationController extends Controller
             return back()->withInput()->withErrors(['facility_id' => 'The gymnasium is currently unavailable.']);
         }
 
-        if ($validated['start_time'] < '08:00' || $validated['end_time'] > '21:00') {
-            return back()->withInput()->withErrors(['start_time' => 'Reservations must be within 8:00 AM - 9:00 PM.']);
+        if ($validated['start_time'] < config('gym.reservation.opening_time', '07:00')
+            || $validated['end_time'] > config('gym.reservation.closing_time', '24:00')) {
+            return back()->withInput()->withErrors(['start_time' => 'Reservations must be within the gym operating hours (7:00 AM to 12 midnight).']);
         }
 
-        $hasConflict = Reservation::query()
-            ->where('facility_id', $validated['facility_id'])
-            ->whereDate('reservation_date', $validated['reservation_date'])
-            ->whereNotIn('status', ['rejected', 'cancelled'])
-            ->where(function ($query) use ($validated): void {
-                $query
-                    ->where('start_time', '<', $validated['end_time'])
-                    ->where('end_time', '>', $validated['start_time']);
-            })
-            ->exists();
-
+        $calendar = app(\App\Services\PublicCalendarService::class);
+        $hasConflict = $calendar->hasReservationConflict(
+            (int) $validated['facility_id'], $validated['reservation_date'], $validated['start_time'], $validated['end_time']
+        );
         if ($hasConflict) {
             return back()
                 ->withInput()
                 ->withErrors([
-                    'reservation_date' => 'Selected time overlaps with an existing reservation. Please choose from the remaining available time.',
+                    'reservation_date' => 'Selected time overlaps with a reservation or its one-hour cleaning buffer. Please choose from the remaining available time.',
                 ]);
         }
 
@@ -160,21 +162,19 @@ class PublicReservationController extends Controller
         $storedPermitPath = null;
 
         try {
-            $reservation = DB::transaction(function () use ($validated, &$storedPermitPath): Reservation {
+            $reservation = DB::transaction(function () use ($validated, $calendar, &$storedPermitPath): Reservation {
                 $equipmentService = app(\App\Services\EquipmentRequestService::class);
                 $equipmentService->lockInventory();
                 $equipmentService->validateRequests($validated['reservation_type'], $validated['equipment'] ?? [], $validated['requested_equipment'] ?? null);
                 // Serialize submissions for this facility before the final overlap check.
                 $facility = Facility::whereKey($validated['facility_id'])->lockForUpdate()->firstOrFail();
                 $unavailable = $facility->status !== 'available'
-                    || Reservation::where('facility_id', $facility->id)->whereDate('reservation_date', $validated['reservation_date'])
-                        ->whereNotIn('status', ['rejected', 'cancelled'])->where('start_time', '<', $validated['end_time'])
-                        ->where('end_time', '>', $validated['start_time'])->exists()
+                    || $calendar->hasReservationConflict((int) $facility->id, $validated['reservation_date'], $validated['start_time'], $validated['end_time'])
                     || ScheduleBlock::whereDate('starts_on', '<=', $validated['reservation_date'])->whereDate('ends_on', '>=', $validated['reservation_date'])
                         ->where(fn ($q) => $q->whereNull('facility_id')->orWhere('facility_id', $facility->id))
                         ->where(fn ($q) => $q->whereNull('start_time')->orWhere(fn ($times) => $times->where('start_time', '<', $validated['end_time'])->where('end_time', '>', $validated['start_time'])))->exists();
                 if ($unavailable) {
-                    throw \Illuminate\Validation\ValidationException::withMessages(['reservation_date' => 'Selected time overlaps with an existing reservation. Please choose from the remaining available time.']);
+                    throw \Illuminate\Validation\ValidationException::withMessages(['reservation_date' => 'Selected time overlaps with a reservation or its one-hour cleaning buffer. Please choose from the remaining available time.']);
                 }
                 $reservation = Reservation::create([
                     'reference_number' => $this->generateReferenceNumber(),
@@ -418,24 +418,42 @@ class PublicReservationController extends Controller
             return response()->json(['status' => $reservation->status, 'html' => $html, 'version' => hash('sha256', $html)])
                 ->header('Cache-Control', 'no-store, private');
         }
-        $recentReservations = Reservation::whereIn('reference_number', $request->session()->get('public_reservation_references', []))
-            ->latest()->get();
-        return view('public.reservations.track', compact('reference', 'reservation', 'recentReservations'));
+        $ownsReservation = $reservation && $this->requestorOwnsReservation($request, $reservation);
+        return view('public.reservations.track', compact('reference', 'reservation', 'ownsReservation'));
+    }
+
+    private function requestorOwnsReservation(Request $request, Reservation $reservation): bool
+    {
+        return in_array($reservation->reference_number, $request->session()->get('public_reservation_references', []), true)
+            || ($reservation->contact_email && $this->emailIsVerified($request, $reservation->contact_email));
+    }
+
+    public function cancel(Request $request, Reservation $reservation): RedirectResponse
+    {
+        abort_unless($this->requestorOwnsReservation($request, $reservation), 403);
+        $validated = $request->validate(['cancellation_reason' => ['required', 'string', 'max:2000']]);
+        DB::transaction(function () use ($reservation, $validated): void {
+            $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            if (! $reservation->requestorCancellationAllowed()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'cancellation_reason' => 'Cancellation is allowed only within 48 hours after submission, before the event starts, for an active reservation.',
+                ]);
+            }
+            $previous = $reservation->status;
+            $reservation->update(['status' => 'cancelled', 'cancellation_reason' => $validated['cancellation_reason'],
+                'cancelled_by' => null, 'cancelled_at' => now()]);
+            ReservationStatusHistory::create(['reservation_id' => $reservation->id, 'changed_by' => null,
+                'previous_status' => $previous, 'new_status' => 'cancelled',
+                'remarks' => 'Cancelled by requestor: '.$validated['cancellation_reason']]);
+            \App\Models\AuditLog::record('reservation.requestor_cancelled', $reservation,
+                ['previous_status' => $previous, 'reason' => $validated['cancellation_reason']]);
+        });
+        return redirect()->route('reservation.track', ['reference' => $reservation->reference_number])
+            ->with('success', 'Your reservation has been cancelled. Your reason has been recorded.');
     }
 
     private function generateReferenceNumber(): string
     {
-        do {
-            $reference = 'MCST-GYM-'.
-                now()->format('Ymd').
-                '-'.
-                Str::upper(Str::random(6));
-        } while (
-            Reservation::query()
-                ->where('reference_number', $reference)
-                ->exists()
-        );
-
-        return $reference;
+        return app(\App\Services\ReservationReferenceService::class)->next();
     }
 }

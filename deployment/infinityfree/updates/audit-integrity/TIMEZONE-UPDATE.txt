@@ -1,0 +1,4 @@
+TIME ZONE FOLLOW-UP
+Upload htdocs/config/database.php from this folder to the online htdocs/config/database.php. Back up the online file first. This sets MySQL/MariaDB session time zone to +08:00 by default (DB_TIMEZONE can override it). Keep APP_KEY and APP_PREVIOUS_KEYS unchanged. No database rows or hashes are rewritten.
+
+Evidence: the SQL export stores record #1 at 2026-09-05 10:44:10 UTC. The local database reads it at 18:44:10 in UTC+8 and its hash verifies. The online CSV reads it at 03:44:10, consistent with a UTC-7 session. All other fields of record #1 match the local record. This configuration change addresses that mismatch; it does not establish that the entire history verifies. Refresh Audit Logs and report the failed ID if a warning remains.

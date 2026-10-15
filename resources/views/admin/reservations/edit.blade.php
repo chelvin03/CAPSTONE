@@ -32,13 +32,7 @@
             <h2 class="mb-5 text-lg font-bold text-slate-900">Reservation Information</h2>
             <div class="grid gap-5 md:grid-cols-2">
                 <div>
-                    <label for="facility_id" class="field-label">Facility *</label>
-                    <select id="facility_id" name="facility_id" required class="field">
-                        <option value="">Select facility</option>
-                        @foreach ($facilities as $facility)
-                            <option value="{{ $facility->id }}" @selected((string) old('facility_id', $reservation->facility_id) === (string) $facility->id)>{{ $facility->facility_name }} - Capacity: {{ number_format(\App\Support\GymCapacity::MAX_ATTENDEES) }}</option>
-                        @endforeach
-                    </select>
+                    <p class="field-label">Gym</p><p>MCST Gymnasium</p>
                 </div>
                 <div>
                     <label for="reservation_type" class="field-label">Reservation Type *</label>
@@ -64,8 +58,6 @@
                 <div><label for="reservation_date" class="field-label">Reservation Date *</label><input id="reservation_date" name="reservation_date" type="date" value="{{ old('reservation_date', $reservation->reservation_date->toDateString()) }}" required class="field"></div>
                 <div><label for="start_time" class="field-label">Start Time *</label><input id="start_time" name="start_time" type="time" value="{{ old('start_time', substr((string) $reservation->start_time, 0, 5)) }}" required class="field"></div>
                 <div><label for="end_time" class="field-label">End Time *</label><input id="end_time" name="end_time" type="time" value="{{ old('end_time', substr((string) $reservation->end_time, 0, 5)) }}" required class="field"></div>
-                <div><label for="setup_time" class="field-label">Setup Time</label><input id="setup_time" name="setup_time" type="time" value="{{ old('setup_time', $reservation->setup_time ? substr((string) $reservation->setup_time, 0, 5) : '') }}" class="field"></div>
-                <div><label for="cleanup_time" class="field-label">Cleanup Time</label><input id="cleanup_time" name="cleanup_time" type="time" value="{{ old('cleanup_time', $reservation->cleanup_time ? substr((string) $reservation->cleanup_time, 0, 5) : '') }}" class="field"></div>
             </div>
         </section>
 

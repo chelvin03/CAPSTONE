@@ -47,6 +47,7 @@ public function reservationStatusChanges(): HasMany
         'first_name',
         'last_name',
         'email',
+        'recovery_email',
         'email_verified_at',
         'password',
         'role',
@@ -73,5 +74,14 @@ public function reservationStatusChanges(): HasMany
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    public function routeNotificationForMail($notification): string
+    {
+        if ($notification instanceof \Illuminate\Auth\Notifications\ResetPassword) {
+            return $this->role === 'admin' ? (string) $this->recovery_email : '';
+        }
+
+        return $this->email;
     }
 }

@@ -30,7 +30,12 @@ class AdminScheduleService
             $state = $pastDate ? 'closed' : (! $hours ? 'unknown' : ($mixed ? 'partial' : ($available > 0
                 ? 'available'
                 : ($segments->contains('state', 'occupied') ? 'occupied' : ($segments->contains('state', 'pending') ? 'pending' : 'closed')))));
+            $held = $segments->where('withinHours', true)->whereIn('state', ['occupied', 'pending'])->sum('seconds');
+            $calendarState = $pastDate || ! $hours ? 'closed' : ($available > 0 ? ($held > 0 || $closed > 0 && $mixed ? 'partial' : 'available') : ($held > 0 ? 'full' : 'closed'));
+            $calendarLabel = $calendarState === 'full' ? 'Fully Booked / Held'
+                : match ($calendarState) { 'partial' => 'Partial - Available Time', 'available' => 'Available', default => 'Closed / Unavailable' };
             $days[$date->toDateString()] = [
+                'calendarState' => $calendarState, 'calendarLabel' => $calendarLabel,
                 'date' => $date->toDateString(), 'number' => $date->day, 'label' => $date->format('l, F j, Y'),
                 'today' => $date->isToday(), 'state' => $state,
                 'stateLabel' => match ($state) {
@@ -51,7 +56,7 @@ class AdminScheduleService
         $close = config('gym.reservation.closing_time');
         if (! is_string($open) || ! is_string($close)
             || ! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $open)
-            || ! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $close) || $close <= $open) {
+            || ($close !== '24:00' && ! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $close)) || $close <= $open) {
             return null;
         }
 

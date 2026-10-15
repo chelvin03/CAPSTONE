@@ -38,10 +38,10 @@ class AuditLogController extends Controller
 
         return response()->streamDownload(function () use ($query): void {
             $handle = fopen('php://output', 'wb');
-            fputcsv($handle, ['ID', 'Date/Time', 'Actor', 'Email', 'Role', 'Action', 'Module', 'Affected Record', 'Description', 'Old Values', 'New Values', 'IP Address', 'Request ID', 'Transaction ID', 'Integrity Hash']);
+            fputcsv($handle, ['ID', 'Date/Time', 'Actor', 'Email', 'Role', 'Action', 'Module', 'Affected Record', 'Description', 'Old Values', 'New Values', 'IP Address', 'Request ID', 'Transaction ID', 'Integrity Hash', 'Timestamp Matching Hash']);
             $query->chunkById(500, function ($logs) use ($handle): void {
                 foreach ($logs as $log) {
-                    fputcsv($handle, [$log->id, $log->created_at?->toIso8601String(), $log->actor_name ?? 'System', $log->actor_email, $log->actor_role, $log->action, $log->module, class_basename((string) $log->auditable_type).' #'.$log->auditable_id, $log->description, json_encode($log->old_values), json_encode($log->new_values), $log->ip_address, $log->request_id, $log->transaction_id, $log->entry_hash]);
+                    fputcsv($handle, [$log->id, $log->created_at?->toIso8601String(), $log->actor_name ?? 'System', $log->actor_email, $log->actor_role, $log->action, $log->module, class_basename((string) $log->auditable_type).' #'.$log->auditable_id, $log->description, json_encode($log->old_values), json_encode($log->new_values), $log->ip_address, $log->request_id, $log->transaction_id, $log->entry_hash, $log->timestampMatchingHash()]);
                 }
             });
             fclose($handle);

@@ -6,6 +6,13 @@ use Illuminate\Support\Facades\Mail;
 
 beforeEach(fn () => Mail::fake());
 
+test('verification accepts Gmail and school email domains without a domain restriction', function () {
+    foreach (['requestor@gmail.com', 'requestor@mcst.edu.ph'] as $email) {
+        $this->postJson('/reserve/send-code', [...publicOtpDetails(), 'email' => $email])->assertOk();
+        Mail::assertSent(PublicRegistrationCode::class, fn ($mail) => $mail->hasTo($email));
+    }
+});
+
 function publicOtpDetails(): array
 {
     return ['email' => 'public@example.com', 'contact_person' => 'Public Requestor', 'contact_number' => '09123456789', 'reservation_type' => 'external'];
@@ -55,9 +62,9 @@ test('public details are validated before any email is sent', function () {
     Mail::assertNothingSent();
 });
 
-test('step three is rendered only for verified requests and details survive reload', function () {
+test('reservation details are available before verification and contact details survive reload', function () {
     $this->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));
-    $this->get(route('reservation.create'))->assertOk()->assertDontSee('name="event_name"', false);
+    $this->get(route('reservation.create'))->assertOk()->assertSee('name="event_name"', false);
     $this->postJson('/reserve/send-code', publicOtpDetails())->assertOk();
     $code = Mail::sent(PublicRegistrationCode::class)->sole()->code;
     Mail::assertSent(PublicRegistrationCode::class, fn ($mail) => $mail->hasTo('public@example.com') && $mail->mailer === 'smtp');
@@ -65,7 +72,7 @@ test('step three is rendered only for verified requests and details survive relo
     $this->postJson('/reserve/verify-code', ['email' => 'public@example.com', 'code' => $code])->assertOk();
     $this->get(route('reservation.create', ['step' => 3]))->assertOk()->assertSee('name="event_name"', false)->assertSee('Public Requestor');
     $this->postJson('/reserve/edit-details')->assertOk()->assertSessionMissing('public_email_verified');
-    $this->get(route('reservation.create'))->assertOk()->assertSee('Public Requestor')->assertDontSee('name="event_name"', false);
+    $this->get(route('reservation.create'))->assertOk()->assertSee('Public Requestor')->assertSee('name="event_name"', false);
     $this->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));
 });
 
@@ -138,7 +145,7 @@ test('reservation confirmation presents facility information without a selector'
         'public_reservation_details' => ['contact_email' => 'public@example.com', 'contact_person' => 'Public Requestor', 'purpose' => 'Sports practice', 'organization_department' => 'Athletics'],
     ])->get(route('reservation.create'))
         ->assertOk()
-        ->assertSee('FACILITY &amp; CONFIRMATION', false)
+        ->assertSee('GYM &amp; CONFIRMATION', false)
         ->assertSee('2,000 persons')
         ->assertSee('<option value="">Select Requestor Type</option>', false)
         ->assertSee('<option value="internal">Internal</option>', false)

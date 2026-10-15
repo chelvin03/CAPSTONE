@@ -115,7 +115,7 @@
 .booking-day { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; width: 100%; min-height: 132px; border: 1px solid #b8c6d4; border-radius: 12px; padding: 18px 14px; background: #fff; color: #24374a; text-align: left; }
 .booking-day-number { font-size: 28px; line-height: 1; font-weight: 700; }
 .booking-day-status { font-size: 15px; line-height: 1.5; font-weight: 600; }
-.booking-day.day-full { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+.booking-day.day-full { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
 .booking-day:disabled { cursor: not-allowed; }
 .booking-day:disabled:not(.day-full):not(.day-partial) { background: #f1f5f9; color: #64748b; border-style: dashed; }
 .booking-day.day-selected { outline: 3px solid #172b3c; outline-offset: 2px; }
@@ -155,4 +155,90 @@
 .gym-use-rules ul li { margin-top: 4px; }
 .wizard-card .gym-use-consent { display: flex; align-items: flex-start; gap: 12px; border-top: 1px solid #bfdbfe; padding-top: 18px; font-size: 14px; font-weight: 600; }
 .gym-use-consent input { flex-shrink: 0; width: 20px; height: 20px; margin-top: 3px; accent-color: #2563eb; }
-.booking-day.day-partial { background: #facc15; border-color: #facc15; color: #172b3c; }
+.booking-day.day-partial { background: #fef9c3; border-color: #fde047; color: #854d0e; }
+
+/* Compact public reservation layout. */
+.reservation-page { background: #f1f5f9; }
+.reservation-page #main-content { max-width: 1120px; margin-inline: auto; padding: 28px 20px 48px; }
+.reservation-wizard { max-width: 1040px; margin-inline: auto; }
+.wizard-intro h1 { color: #1e3a8a; text-shadow: none; }
+.wizard-intro p, .wizard-privacy { color: #64748b; text-shadow: none; }
+.wizard-card { background: #fff; box-shadow: 0 1px 3px #0f172a12; }
+.wizard-card label, .wizard-card input:not([type=checkbox]):not([type=hidden]), .wizard-card select, .wizard-card textarea { font-size: 14px; }
+.wizard-card input:not([type=checkbox]):not([type=hidden]), .wizard-card select { min-height: 40px; padding: 8px 12px; }
+.wizard-card div:has(> #permit) { padding: 0; background: transparent; border: 0; }
+.wizard-primary, .wizard-secondary { min-height: 42px; font-size: 14px; padding: 10px 20px; }
+#equipment-request-heading { font-size: 14px; }
+section[aria-labelledby=equipment-request-heading] { padding: 16px; border: 1px solid #dbeafe; border-radius: 8px; }
+.booking-calendar { padding: 16px; margin: 24px 0; border-radius: 10px; }
+.booking-calendar h3 { font-size: 18px; }
+.booking-calendar p, .booking-legend { font-size: 13px; }
+.booking-month-nav { margin: 16px 0; }
+.booking-month-nav h4 { font-size: 18px; }
+.booking-month-nav button { width: 36px; height: 36px; }
+.booking-weekdays, .booking-day-grid { min-width: 0; gap: 6px; font-size: 12px; }
+.booking-day { min-height: 42px; padding: 8px 2px; }
+.booking-day-number { font-size: 13px; }
+.booking-day-status, .booking-day > span:last-child { display: none; }
+.booking-slot-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.booking-slot { padding: 10px; min-height: 54px; font-size: 13px; }
+.booking-slot-time { font-size: 13px; }
+@media (max-width: 640px) {
+    .reservation-page #main-content { padding: 20px 12px; }
+    .booking-weekdays { font-size: 10px; }
+}
+
+/* Fit the entire month inside phones and tablets. */
+@media (max-width: 768px) {
+    .booking-calendar { min-width: 0; padding: 12px; margin-inline: 0; }
+    .booking-calendar-scroll { width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 3px 8px; }
+    .booking-weekdays, .booking-day-grid { width: 100%; min-width: 0; gap: 4px; }
+    .booking-weekdays { margin-bottom: 8px; font-size: 11px; }
+    .booking-weekdays > span {
+        width: 3ch;
+        justify-self: center;
+        overflow: hidden;
+        white-space: nowrap;
+        font-family: monospace;
+        text-align: left;
+    }
+    .booking-day-grid > div { min-width: 0; }
+    .booking-day {
+        min-width: 0;
+        min-height: 44px;
+        box-sizing: border-box;
+        align-items: center;
+        padding: 8px 2px;
+        gap: 0;
+        border-radius: 6px;
+        text-align: center;
+    }
+    .booking-day-number { font-size: 14px; }
+    .booking-day-status, .booking-day > span:last-child { display: none; }
+    .booking-day.day-selected { outline-width: 2px; outline-offset: 0; }
+    .booking-month-nav { gap: 8px; margin: 12px 0; }
+    .booking-month-nav h4 { min-width: 0; font-size: 17px; line-height: 1.4; }
+    .booking-month-nav button { flex: 0 0 40px; width: 40px; height: 44px; font-size: 20px; }
+    .booking-slot-grid { grid-template-columns: minmax(0, 1fr); }
+    .booking-slot-section h4 span { display: block; margin-top: 4px; font-size: 14px; }
+    .booking-full-period > div { min-width: 0; flex-basis: 100%; }
+    .booking-full-period .wizard-secondary { max-width: 100%; white-space: normal; }
+}
+
+/* Availability remains visible before selection on every screen size. */
+.booking-day.day-available { background: #dcfce7; border-color: #86efac; color: #166534; }
+.booking-day.day-partial { background: #fef9c3; border-color: #fde047; color: #854d0e; }
+.booking-day .booking-day-status { display: block; font-size: 11px; line-height: 1.25; overflow-wrap: anywhere; }
+.booking-day { gap: 5px; min-height: 72px; }
+@media (max-width: 768px) { .booking-day .booking-day-status { font-size: 9px; } }
+
+.equipment-request-list { display: grid; gap: 16px; margin-top: 16px; }
+.equipment-request-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(100px, 1fr) auto; align-items: end; gap: 12px; padding: 16px; border: 1px solid #dbe3eb; border-radius: 12px; background: #f8fafc; }
+.equipment-request-list > button { justify-self: start; }
+@media (max-width: 640px) { .equipment-request-row { grid-template-columns: minmax(0, 1fr); } .equipment-remove { justify-self: start; } }
+
+.equipment-request-list .equipment-remove { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+.equipment-request-list .equipment-remove:hover { background: #991b1b; border-color: #991b1b; }
+.equipment-request-list .equipment-add { background: #2563eb; border-color: #2563eb; color: #fff; }
+.equipment-request-list .equipment-add:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
+.equipment-request-list .equipment-add:disabled { opacity: .5; cursor: not-allowed; }

@@ -17,6 +17,14 @@ class ProfileUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'recovery_email' => $this->user()->role === 'admin'
+                ? ['sometimes', 'nullable', 'email', 'max:255']
+                : ['prohibited'],
+            'recovery_password' => $this->user()->role === 'admin'
+                && $this->exists('recovery_email')
+                && $this->input('recovery_email') !== $this->user()->recovery_email
+                    ? ['required', 'current_password']
+                    : ['sometimes', 'nullable'],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'email' => [

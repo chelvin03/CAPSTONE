@@ -13,10 +13,13 @@
             </p>
         </div>
 
+        <div class="flex flex-wrap gap-2">
+        <a href="{{ route('admin.reservations.create', ['pencil_booking' => 1]) }}" class="btn-secondary"><i class="bi bi-pencil" aria-hidden="true"></i> Pencil Booking</a>
         <a href="{{ route('admin.reservations.create') }}"
            class="btn-primary">
             <i class="bi bi-plus-lg" aria-hidden="true"></i> New Reservation
         </a>
+        </div>
     </div>
 
     <form method="GET" class="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(12rem,1fr)_12rem_auto_auto]" role="search">
@@ -37,10 +40,11 @@
             name="status"
             aria-label="Filter by status"
             class="field"
+            onchange="this.form.requestSubmit()"
         >
             <option value="">All Status</option>
 
-            @foreach(['new','validated','approved','rejected','waiting_list','cancelled','completed','pending'] as $item)
+            @foreach(['pencil','new','validated','approved','rejected','waiting_list','cancelled','completed','pending'] as $item)
                 <option
                     value="{{ $item }}"
                     @selected(request('status')==$item)

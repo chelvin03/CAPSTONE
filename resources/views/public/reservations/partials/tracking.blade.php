@@ -1,5 +1,5 @@
 @php
-    $labels = ['new' => 'New - Submitted', 'validated' => 'Validated', 'approved' => 'Approved', 'waiting_list' => 'Waiting List', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled', 'completed' => 'Completed'];
+    $labels = ['new' => 'Pending', 'validated' => 'Validated', 'approved' => 'Approved', 'waiting_list' => 'Waiting List', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled', 'completed' => 'Completed'];
     $messages = [
         'new' => 'Your reservation request has been submitted and is waiting for administrator review.',
         'validated' => 'Your reservation request has been reviewed and validated by the administrator.',
@@ -9,9 +9,11 @@
         'cancelled' => 'Your reservation has been cancelled.',
         'completed' => 'Your reservation has been completed.',
     ];
-    $stages = ['new' => 'Submitted', 'validated' => 'Validated', 'approved' => 'Approved', 'completed' => 'Completed'];
-    $rank = array_search($reservation->status, array_keys($stages), true);
-    $reached = $reservation->statusHistories->pluck('new_status')->all();
+    $statusColor = match ($reservation->status) {
+        'approved', 'completed' => 'approved',
+        'cancelled', 'rejected' => 'declined',
+        default => 'pending',
+    };
 @endphp
 <section class="reservation-tracking" aria-labelledby="tracking-heading">
     <div class="tracking-reference" x-data="{ copied: false, copyError: false }">
@@ -19,14 +21,13 @@
         <button type="button" class="tracking-button" @click="try { await navigator.clipboard.writeText(@js($reservation->reference_number)); copied = true; copyError = false; } catch (error) { copyError = true; }" x-text="copied ? 'Copied!' : 'Copy Reference Number'">Copy Reference Number</button>
         <span role="status" x-show="copyError">Please select and copy the reference number above.</span>
     </div>
-    <div class="tracking-heading"><h2 id="tracking-heading">Reservation Tracking</h2><span class="tracking-status">{{ $labels[$reservation->status] ?? ucwords(str_replace('_', ' ', $reservation->status)) }}</span></div>
-    <ol class="tracking-timeline" aria-label="Reservation progress">
-        @foreach($stages as $status => $label)
-            @php($done = $status === 'new' || ($rank !== false && $loop->index <= $rank) || in_array($status, $reached, true))
-            <li @class(['tracking-stage', 'is-reached' => $done]) @if($reservation->status === $status) aria-current="step" @endif><span aria-hidden="true">{{ $done ? '✓' : '○' }}</span><strong>{{ $label }}</strong><span class="sr-only">{{ $done ? 'Reached' : 'Upcoming' }}</span></li>
-        @endforeach
-    </ol>
+    <div class="tracking-heading"><h2 id="tracking-heading">Reservation Tracking</h2><span class="tracking-status tracking-status-{{ $statusColor }}">{{ $labels[$reservation->status] ?? ucwords(str_replace('_', ' ', $reservation->status)) }}</span></div>
     <p class="tracking-message" role="status">{{ $messages[$reservation->status] ?? 'Your reservation is being processed.' }}</p>
+    @if($reservation->status === 'cancelled')
+        <p class="tracking-message"><strong>Cancellation reason:</strong> {{ $reservation->cancellation_reason ?: 'Please contact the administrator for details.' }}</p>
+        <p>Please reschedule by submitting a new reservation request for an available date and time.</p>
+        <a href="{{ route('reservation.create') }}">Choose a new schedule</a>
+    @endif
     <h3>Reservation Details</h3>
     <dl class="tracking-details">
         @foreach([

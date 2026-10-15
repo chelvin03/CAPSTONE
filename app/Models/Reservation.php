@@ -84,6 +84,15 @@ class Reservation extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function requestorCancellationAllowed(): bool
+    {
+        return in_array($this->status, ['new', 'pending', 'validated', 'approved', 'waiting_list', 'pencil'], true)
+            && $this->created_at !== null && now()->lte($this->created_at->copy()->addHours(48))
+            && now()->lt($this->reservation_date->copy()->startOfDay()->addMinutes(
+                (int) substr($this->start_time, 0, 2) * 60 + (int) substr($this->start_time, 3, 2)
+            ));
+    }
+
     public function facility(): BelongsTo
     {
         return $this->belongsTo(Facility::class);

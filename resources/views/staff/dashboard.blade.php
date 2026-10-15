@@ -1,31 +1,69 @@
 @extends('layouts.app')
 @section('title', 'Staff Dashboard')
 @section('content')
-<div class="page-shell">
-    <header class="card mb-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-8">
-        <img src="{{ asset('images/mcst-logo.png') }}" alt="MCST Logo" class="h-16 w-16 shrink-0 object-contain">
-        <div><p class="text-sm font-semibold text-blue-700">MCST Gymnasium</p><h1 class="page-title mt-1">Staff Dashboard</h1><p class="mt-2 font-semibold">Welcome, {{ auth()->user()->full_name }}.</p><p class="page-description">Monitor today’s schedules, upcoming reservations, facility availability, and equipment status.</p></div>
+<link rel="stylesheet" href="{{ asset('css/dashboard-reference.css') }}?v={{ filemtime(public_path('css/dashboard-reference.css')) }}">
+<link rel="stylesheet" href="{{ asset('css/staff-dashboard.css') }}?v={{ filemtime(public_path('css/staff-dashboard.css')) }}">
+@php
+    $selectedYear = (string) ($filters['year'] ?? 'all');
+    $canSelectDay = $selectedYear !== 'all' && isset($filters['month']);
+    $monthDays = $canSelectDay ? \Carbon\CarbonImmutable::create((int) $selectedYear, (int) $filters['month'], 1)->daysInMonth : 0;
+@endphp
+<div class="reference-dashboard staff-dashboard">
+    <header class="reference-heading">
+        <div><p class="reference-eyebrow">MCST GYMNASIUM</p><h1>Staff Dashboard</h1><p>Welcome, {{ auth()->user()->full_name }}.</p><p>Monitor gym schedules, upcoming events, and equipment readiness.</p></div>
+        <span class="staff-readonly"><i class="bi bi-eye" aria-hidden="true"></i> View-only monitoring</span>
     </header>
-    <aside class="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-        <p><strong>Staff access is view-only.</strong> Staff members can monitor reservations, schedules, facility availability, and equipment status. Approval, rejection, cancellation, rescheduling, record modification, report generation, and data export are restricted to the Gym Administrator.</p>
-    </aside>
-    <p class="mb-4 text-sm text-slate-600">{{ $now->format('l, F d, Y') }} · Updated {{ $now->format('g:i A') }} ({{ config('app.timezone') }})</p>
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Operational summary">
-        <a class="card p-5" href="{{ route('staff.schedules.index', ['date' => $today]) }}"><i class="bi bi-calendar-event text-2xl text-blue-700" aria-hidden="true"></i><h2 class="mt-3 text-sm font-semibold text-slate-600">Today’s Events</h2><p class="mt-2 text-3xl font-bold">{{ $todayCount }}</p><p class="mt-2 text-xs text-slate-500">Approved and completed events today</p></a>
-        <a class="card p-5" href="{{ route('staff.reservations.index', ['status' => 'approved']) }}"><i class="bi bi-calendar-week text-2xl text-blue-700" aria-hidden="true"></i><h2 class="mt-3 text-sm font-semibold text-slate-600">Upcoming Reservations</h2><p class="mt-2 text-3xl font-bold">{{ $upcomingCount }}</p><p class="mt-2 text-xs text-slate-500">Approved bookings after today through {{ $sevenDaysThrough }}</p></a>
-        <a class="card p-5" href="{{ route('staff.facilities.index') }}"><i class="bi bi-building text-2xl text-blue-700" aria-hidden="true"></i><h2 class="mt-3 text-sm font-semibold text-slate-600">Facility Status</h2><ul class="mt-2 space-y-3 text-sm">@forelse ($facilities as $facility)<li><span class="mb-1 block font-semibold">{{ $facility->facility_name }}</span><x-operational-status :status="$facility->status" />@if ($facility->status === 'available')<span class="mt-1 block text-xs text-slate-600">{{ $facility->blocked_now ? 'Schedule block in effect' : ($facility->scheduled_now ? 'In use by schedule' : ($facility->reserved_today ? 'Reserved later today' : 'No remaining approved bookings today')) }}</span>@endif</li>@empty<li>No facility records available.</li>@endforelse</ul><p class="mt-2 text-xs text-slate-500">Stored status; actual presence is not tracked.</p></a>
-        <a class="card p-5" href="{{ route('staff.equipment.index') }}"><i class="bi bi-tools text-2xl text-blue-700" aria-hidden="true"></i><h2 class="mt-3 text-sm font-semibold text-slate-600">Equipment Status</h2><p class="mt-2 font-bold">{{ $equipmentCounts->get('available', 0) }} available</p><p class="mt-1 text-sm">{{ $equipmentCounts->get('maintenance', 0) }} under maintenance · {{ $equipmentCounts->get('unavailable', 0) }} unavailable</p><p class="mt-2 text-xs text-slate-500">Counts of equipment records, not individual units or live stock. {{ $equipmentCounts->sum() }} total records.</p></a>
+    <p class="reference-updated">{{ $now->format('l, F j, Y') }} &middot; Updated {{ $now->format('g:i A') }} ({{ config('app.timezone') }})</p>
+    <section class="reference-stats" aria-label="Live operational summary">
+        <article class="reference-stat tone-blue"><span class="reference-icon"><i class="bi bi-calendar-event" aria-hidden="true"></i></span><div><h2>Today's Events</h2><p class="reference-value">{{ number_format($todayCount) }}</p><p class="reference-detail">Approved or completed events scheduled today.</p></div></article>
+        <article class="reference-stat tone-green"><span class="reference-icon"><i class="bi bi-calendar-week" aria-hidden="true"></i></span><div><h2>Upcoming Reservations</h2><p class="reference-value">{{ number_format($upcomingCount) }}</p><p class="reference-detail">Approved bookings tomorrow through {{ \Carbon\CarbonImmutable::parse($sevenDaysThrough)->format('M j') }}.</p></div></article>
+        <article class="reference-stat tone-blue"><span class="reference-icon"><i class="bi bi-building" aria-hidden="true"></i></span><div><h2>Gym Availability</h2>
+            @forelse($facilities as $facility)
+                <x-operational-status :status="$facility->status" />
+                <p class="reference-detail">{{ $facility->facility_name }}</p>
+                <p class="reference-detail">{{ $facility->blocked_now ? 'Schedule block in effect.' : ($facility->scheduled_now ? 'In use by approved schedule.' : ($facility->reserved_today ? 'Reserved later today.' : 'No remaining approved bookings today.')) }}</p>
+            @empty<p class="reference-detail">Gym information is unavailable.</p>@endforelse
+            <p class="reference-detail">Stored facility status and schedule; live presence is not tracked.</p>
+        </div></article>
+        <article class="reference-stat tone-amber"><span class="reference-icon"><i class="bi bi-tools" aria-hidden="true"></i></span><div><h2>Equipment Status</h2><p class="reference-value">{{ number_format($equipmentCounts->get('available', 0)) }} <small>available</small></p><p class="reference-detail"><strong>{{ number_format($equipmentAttention) }} needing attention</strong> &middot; {{ number_format($equipmentCounts->sum()) }} total records.</p><p class="reference-detail">{{ $equipmentCounts->get('maintenance', 0) }} under maintenance &middot; {{ $equipmentCounts->get('unavailable', 0) }} unavailable. Counts are equipment records, not units.</p></div></article>
     </section>
-    <section class="card mt-6 p-5" aria-labelledby="attention-title"><h2 id="attention-title" class="font-bold">Attention Needed</h2>
-        <ul class="mt-3 space-y-3 text-sm">@forelse ($notices as $notice)<li class="flex items-start gap-3"><i class="bi bi-exclamation-circle text-amber-700" aria-hidden="true"></i><a class="text-slate-700 underline decoration-slate-300 underline-offset-4" href="{{ $notice['url'] }}">{{ $notice['text'] }}</a></li>@empty<li class="text-slate-500">No operational notices at this time.</li>@endforelse</ul>
-        @if ($notices->isNotEmpty())<p class="mt-3 text-xs text-slate-500">Attendance notices cover today and the next seven days; changes and cancellations cover the last seven days. Up to five notices of each reservation type.</p>@endif
+    <section class="reference-panel staff-today" aria-labelledby="staff-today-title">
+        <header><h2 id="staff-today-title">Today's Gymnasium Schedule</h2><p>{{ $now->format('F j, Y') }} &middot; Approved and completed events, ordered by start time.</p></header>
+        @include('staff.partials.dashboard-events', ['rows' => $todayReservations, 'caption' => "Today's Gymnasium Schedule", 'showPreparation' => true, 'emptyMessage' => 'No gymnasium events are scheduled for today.'])
+        @if($todayReservations->hasPages())<div class="staff-pagination">{{ $todayReservations->links() }}</div>@endif
     </section>
-    <section class="card mt-6 overflow-hidden"><div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5"><div><h2 class="font-bold">Today’s Gymnasium Schedule</h2><p class="mt-1 text-sm text-slate-500">{{ $todayCount }} approved or completed events · Ordered by start time</p></div><a class="font-semibold text-blue-700 underline" href="{{ route('staff.schedules.index', ['date' => $today]) }}">View Schedule</a></div>
-        @include('staff.partials.reservations-table', ['rows' => $todayReservations, 'caption' => 'Today’s Gymnasium Schedule', 'emptyMessage' => 'No gymnasium events are scheduled for today.'])
-        @if ($todayReservations->hasPages())<div class="border-t p-5">{{ $todayReservations->links() }}</div>@endif
+    <section class="staff-filter-section" aria-labelledby="staff-filter-title">
+        <h2 id="staff-filter-title">Browse Reservation Activity</h2>
+        <p>Filters apply to upcoming events and the status overview. Summary cards and today's schedule always show current operations.</p>
+        @if($errors->any())<div class="alert-error" role="alert"><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+        <form method="GET" action="{{ route('staff.dashboard') }}" class="reference-date-selectors staff-filters">
+            <label for="staff-year">Year<select id="staff-year" name="year" onchange="this.form.elements.day.value = ''; this.form.requestSubmit()"><option value="all" @selected($selectedYear === 'all')>All years</option>@foreach($years as $year)<option value="{{ $year }}" @selected($selectedYear === (string) $year)>{{ $year }}</option>@endforeach</select></label>
+            <label for="staff-month">Month<select id="staff-month" name="month" onchange="this.form.elements.day.value = ''; this.form.requestSubmit()"><option value="">All months</option>@foreach(range(1, 12) as $month)<option value="{{ $month }}" @selected((int)($filters['month'] ?? 0) === $month)>{{ \Carbon\CarbonImmutable::create(2000, $month, 1)->format('F') }}</option>@endforeach</select></label>
+            <label for="staff-day">Day<select id="staff-day" name="day" @disabled(!$canSelectDay) onchange="this.form.requestSubmit()"><option value="">All days</option>@if($canSelectDay)@foreach(range(1, $monthDays) as $day)<option value="{{ $day }}" @selected((int)($filters['day'] ?? 0) === $day)>{{ $day }}</option>@endforeach @endif</select></label>
+            <button type="submit" class="btn-primary">Apply Filters</button><a class="staff-reset" href="{{ route('staff.dashboard') }}">Reset</a>
+        </form>
+        <p class="staff-period">Showing: {{ $selectedYear === 'all' ? 'All years' : $selectedYear }} &middot; {{ isset($filters['month']) ? \Carbon\CarbonImmutable::create(2000, (int)$filters['month'], 1)->format('F') : 'All months' }} &middot; {{ isset($filters['day']) ? 'Day '.$filters['day'] : 'All days' }}. Choose a year and month to filter by day.</p>
     </section>
-    <section class="card mt-6 overflow-hidden"><div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5"><div><h2 class="font-bold">Upcoming Approved Reservations</h2><p class="mt-1 text-sm text-slate-500">Next five after today, ordered by scheduled date and start time. This list may extend beyond seven days.</p></div><a class="font-semibold text-blue-700 underline" href="{{ route('staff.reservations.index') }}">View All Reservations</a></div>
-        @include('staff.partials.reservations-table', ['rows' => $upcomingReservations, 'caption' => 'Upcoming Approved Reservations', 'emptyMessage' => 'No upcoming approved reservations.'])
+    <div class="reference-panels staff-monitoring-panels">
+        <section class="reference-panel" aria-labelledby="staff-status-title">
+            <header><h2 id="staff-status-title">Reservation Status Overview</h2><p>{{ number_format($statusTotal) }} reservations in the selected period &middot; All recorded statuses.</p></header>
+            <div class="staff-status-chart" role="list" aria-label="Reservation counts by status">
+                @if($statusTotal === 0)<p class="staff-empty">No reservations match the selected period.</p>@endif
+                @foreach($statusBreakdown as $item)
+                    <div class="staff-status-row" role="listitem"><div class="staff-status-label"><span>{{ $item['label'] }}</span><strong>{{ number_format($item['count']) }} <small>({{ $item['percent'] }}%)</small></strong></div><div class="staff-status-track" aria-hidden="true"><span style="width: {{ $item['percent'] }}%; background-color: {{ $item['color'] }}"></span></div></div>
+                @endforeach
+            </div>
+        </section>
+        <section class="reference-panel" aria-labelledby="staff-attention-title">
+            <header><h2 id="staff-attention-title">Attention Needed</h2><p>Current equipment, facility, and scheduling notices.</p></header>
+            <ul class="staff-notices">@forelse($notices as $notice)<li><i class="bi bi-exclamation-circle" aria-hidden="true"></i><a href="{{ $notice['url'] }}">{{ $notice['text'] }}</a></li>@empty<li class="staff-empty">No operational notices at this time.</li>@endforelse</ul>
+            @if($notices->isNotEmpty())<p class="reference-note">Attendance notices cover today and the next seven days. Cancellations and schedule changes cover the last seven days.</p>@endif
+        </section>
+    </div>
+    <section class="reference-panel staff-upcoming" aria-labelledby="staff-upcoming-title">
+        <header><h2 id="staff-upcoming-title">Upcoming Gymnasium Events</h2><p>Approved reservations after today in the selected period, nearest event first.</p></header>
+        @include('staff.partials.dashboard-events', ['rows' => $upcomingReservations, 'caption' => 'Upcoming Gymnasium Events', 'showPreparation' => false, 'emptyMessage' => 'No upcoming approved reservations match the selected period.'])
+        @if($upcomingReservations->hasPages())<div class="staff-pagination">{{ $upcomingReservations->links() }}</div>@endif
     </section>
 </div>
 @endsection

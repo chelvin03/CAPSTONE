@@ -18,10 +18,10 @@ beforeEach(function () {
 test('submission confirmation immediately shows tracking and complete reservation details', function () {
     $this->get(route('reservation.success', $this->reservation->reference_number))->assertOk()
         ->assertSee('Reservation Request Submitted Successfully')->assertSee('Reservation Tracking')
-        ->assertSee('Copy Reference Number')->assertSee('Submitted')->assertSee('Validated')->assertSee('Approved')->assertSee('Completed')
+        ->assertSee('Copy Reference Number')->assertSee('Pending')->assertDontSee('tracking-timeline')->assertDontSee('Validated')->assertDontSee('Completed')
         ->assertSee('waiting for administrator review')->assertSee('Requestor Name')->assertSee('Sports Day')
         ->assertSee('Basketball')->assertSee('Date Submitted')->assertSee('Number of Participants')
-        ->assertSee('8:00 AM')->assertSee('5:00 PM')->assertSee('View Reservation')->assertSee('Back to Home')->assertSee('Make Another Reservation')
+        ->assertSee('8:00 AM')->assertSee('5:00 PM')->assertSee('View Reservation')->assertDontSee('Back to Home')->assertDontSee('Make Another Reservation')
         ->assertSee(route('home'), false);
 });
 
@@ -46,10 +46,32 @@ test('admin approval changes the public tracking response without a new request'
     expect(Reservation::count())->toBe(1);
 });
 
-test('reservation history shows only references saved in this browser', function () {
+test('cancelled tracking displays the saved reason and invites the requestor to reschedule', function () {
+    $this->reservation->update(['status' => 'cancelled', 'cancellation_reason' => 'Emergency roof repairs.']);
+    $response = $this->getJson(route('reservation.track', ['reference' => $this->reservation->reference_number]))
+        ->assertOk()->assertJsonPath('status', 'cancelled');
+    expect($response->json('html'))->toContain('Cancellation reason:', 'Emergency roof repairs.',
+        'Please reschedule', route('reservation.create'));
+});
+
+test('reservation history stays hidden even with references saved in this browser', function () {
     $this->withSession(['public_reservation_references' => [$this->reservation->reference_number]])
-        ->get(route('reservation.track'))->assertOk()->assertSee('My Reservation History')->assertSee('Sports Day');
+        ->get(route('reservation.track'))->assertOk()->assertDontSee('My Reservation History')->assertDontSee('Sports Day')->assertDontSee($this->reservation->reference_number);
     $this->withSession(['public_reservation_references' => []])->get(route('reservation.track'))
         ->assertOk()->assertDontSee('Sports Day');
     $this->getJson(route('reservation.track', ['reference' => 'UNKNOWN']))->assertNotFound();
 });
+
+
+test('tracking shows a single status with its matching color', function ($status, $label, $color) {
+    $this->reservation->update(['status' => $status]);
+    $html = $this->getJson(route('reservation.track', ['reference' => $this->reservation->reference_number]))
+        ->assertOk()->json('html');
+    expect($html)->toContain('tracking-status tracking-status-'.$color.'">'.$label.'</span>')
+        ->not->toContain('tracking-timeline', 'Reservation progress');
+})->with([
+    ['new', 'Pending', 'pending'],
+    ['approved', 'Approved', 'approved'],
+    ['cancelled', 'Cancelled', 'declined'],
+    ['rejected', 'Rejected', 'declined'],
+]);

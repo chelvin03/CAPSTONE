@@ -12,31 +12,18 @@
 
     <div class="grid gap-5 p-6 md:grid-cols-2">
 
-        <div>
-            <label for="facility_id" class="mb-2 block text-sm font-semibold text-slate-700">
-                Facility <span class="text-red-500">*</span>
-            </label>
-
-            <select
-                id="facility_id"
-                name="facility_id"
-                x-model="facility"
-                @change="loadAvailability"
-                required
-                class="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            >
-                <option value="">Select facility</option>
-
-                @foreach ($facilities as $facility)
-                    <option
-                        value="{{ $facility->id }}"
-                        @selected(old('facility_id') == $facility->id)
-                    >
-                        {{ $facility->facility_name }}
-                        — Capacity: {{ number_format(\App\Support\GymCapacity::MAX_ATTENDEES) }}
-                    </option>
-                @endforeach
+        <div class="md:col-span-2">
+            <label for="pencil_booking" class="mb-2 block text-sm font-semibold text-slate-700">Booking option</label>
+            <select id="pencil_booking" name="pencil_booking" class="w-full rounded-lg border-slate-300">
+                <option value="0" @selected(!old('pencil_booking', request('pencil_booking', 0)))>Regular reservation</option>
+                <option value="1" @selected(old('pencil_booking', request('pencil_booking', 0)))>Pencil booking (tentative hold)</option>
             </select>
+            <p class="mt-2 text-sm text-slate-500">A pencil booking holds the date and time until an admin confirms or cancels it. It does not expire automatically.</p>
+            @error('pencil_booking')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
+        </div>
+
+        <div>
+            <p class="field-label">Gym</p><p>MCST Gymnasium</p><input type="hidden" name="facility_id" x-model="facility">
         </div>
 
         <div>
@@ -166,7 +153,7 @@
                     <div class="grid gap-5 md:grid-cols-2">
                         <div><label class="mb-2 block text-sm font-semibold">Event Title *</label><input name="event_name" value="{{ old('event_name') }}" required class="w-full rounded-lg border-slate-300"></div>
                         <div><label class="mb-2 block text-sm font-semibold">Event Type</label><input name="event_type" value="{{ old('event_type') }}" class="w-full rounded-lg border-slate-300" placeholder="Sports Event"></div>
-                        <div><label class="mb-2 block text-sm font-semibold">Facility *</label><select name="facility_id" x-model="facility" @change="loadAvailability" required class="w-full rounded-lg border-slate-300"><option value="">Select facility</option>@foreach($facilities as $facility)<option value="{{ $facility->id }}">{{ $facility->facility_name }}</option>@endforeach</select></div>
+                        <div><p class="field-label">Gym</p><p>MCST Gymnasium</p></div>
                         <div><label class="mb-2 block text-sm font-semibold">Estimated Participants *</label><input name="expected_attendees" type="number" min="1" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300"></div>
                         <div class="md:col-span-2"><label class="mb-2 block text-sm font-semibold">Purpose *</label><textarea name="purpose" rows="3" required class="w-full rounded-lg border-slate-300">{{ old('purpose') }}</textarea></div>
                     </div>
@@ -245,37 +232,11 @@
             >
         </div>
 
-        <div>
-            <label for="setup_time" class="mb-2 block text-sm font-semibold text-slate-700">
-                Setup Time
-            </label>
 
-            <input
-                id="setup_time"
-                type="time"
-                name="setup_time"
-                value="{{ old('setup_time') }}"
-                class="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            >
-        </div>
-
-        <div>
-            <label for="cleanup_time" class="mb-2 block text-sm font-semibold text-slate-700">
-                Cleanup Time
-            </label>
-
-            <input
-                id="cleanup_time"
-                type="time"
-                name="cleanup_time"
-                value="{{ old('cleanup_time') }}"
-                class="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            >
-        </div>
 
         <label class="md:col-span-2 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <input type="checkbox" name="priority_override" value="1" @checked(old('priority_override')) class="mt-1 rounded border-amber-300">
-            <span><strong>Authorized priority reservation override.</strong> If this schedule is occupied or pending, move affected reservations to the waiting list and notify their requestors.</span>
+            <span><strong>Authorized priority reservation override.</strong> If this schedule is occupied or pending, cancel affected reservations and email their requestors with the reason and instructions to reschedule.</span>
         </label>
 
     </div>

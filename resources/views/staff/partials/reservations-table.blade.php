@@ -17,7 +17,7 @@
                     <td class="px-4 py-4">{{ number_format($row->expected_attendees) }}</td>
                     <td class="px-4 py-4">{{ $row->facility?->facility_name ?? 'Not assigned' }}</td>
                     <td class="px-4 py-4"><x-operational-status :status="$row->status" /></td>
-                    <td class="px-4 py-4"><a class="font-semibold text-blue-700 underline" href="{{ route('staff.reservations.show', $row) }}" aria-label="View {{ $row->reference_number }}">View</a></td>
+                    <td class="px-4 py-4"><a class="font-semibold text-blue-700 underline" href="{{ route('staff.reservations.show', $row) }}" aria-label="View {{ $row->reference_number }}">View</a>@if(in_array($row->status, ['approved', 'completed'], true))<a class="mt-2 block whitespace-nowrap font-semibold text-blue-700 underline" href="{{ route('staff.reservations.receipt', $row) }}" target="_blank" rel="noopener" aria-label="Print acknowledgement for {{ $row->reference_number }}"><i class="bi bi-printer" aria-hidden="true"></i> Manage AR</a>@endif</td>
                 </tr>
             @empty
                 <tr><td colspan="9" class="px-5 py-10 text-center text-slate-500">{{ $emptyMessage }}</td></tr>

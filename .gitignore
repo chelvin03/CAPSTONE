@@ -4,6 +4,7 @@
 .env.backup
 .enr.backup
 /.tmp/
+/.audit-inspection/
 .env.production
 .env.*
 !.env.example

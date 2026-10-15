@@ -11,7 +11,6 @@ use App\Http\Controllers\Admin\ScheduleController;
 use App\Http\Controllers\Admin\SystemSettingsController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\EquipmentController;
-use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicReservationController;
 use App\Http\Controllers\Staff\ReportController;
@@ -49,6 +48,9 @@ Route::get('/reserve/availability', [PublicReservationController::class, 'availa
 
 Route::get('/track', [PublicReservationController::class, 'track'])
     ->name('reservation.track');
+
+Route::post('/reservation/{reservation}/cancel', [PublicReservationController::class, 'cancel'])
+    ->middleware('throttle:10,1')->name('reservation.cancel');
 
 Route::get('/reservation/{reservation}/equipment-access', [\App\Http\Controllers\EquipmentRequestController::class, 'access'])
     ->middleware(['signed', 'throttle:30,1'])->name('reservation.equipment.access');
@@ -104,11 +106,8 @@ Route::middleware([
             Route::get('/dashboard', DashboardController::class)
                 ->name('dashboard');
 
-            Route::resource('facilities', FacilityController::class)
-                ->except(['show']);
-
             Route::resource('staff', StaffController::class)
-                ->only(['index', 'create', 'store']);
+                ->only(['index', 'create', 'store', 'edit', 'update']);
             Route::patch('/staff/{staff}/permissions', [StaffController::class, 'updatePermissions'])->name('staff.permissions');
 
             Route::get('/reports', [AdminReportController::class, 'index'])
@@ -193,11 +192,6 @@ Route::middleware([
                 [\App\Http\Controllers\Staff\ReservationController::class, 'show']
             )->name('reservations.show');
 
-            Route::get(
-                '/facilities',
-                [FacilityController::class, 'staffIndex']
-            )->name('facilities.index');
-
             Route::get('/equipment', [EquipmentController::class, 'staffIndex'])
                 ->name('equipment.index');
 
@@ -228,3 +222,5 @@ Route::middleware([
 });
 
 require __DIR__.'/auth.php';
+require __DIR__.'/feedback.php';
+require __DIR__.'/reservation-documents.php';

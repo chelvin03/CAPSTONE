@@ -1,0 +1,5 @@
+﻿Upload htdocs/resources/views/public/reservations/create.blade.php from this package to the same path on your hosting account.
+Back up the current online file before replacing it.
+Refresh with Ctrl+F5 and click Reserve Now. The privacy notice opens before Step 1.
+If the old view persists, remove only compiled .php view files inside online htdocs/storage/framework/views. Keep the folder and .gitignore.
+No database or .env changes are needed. Do not upload this instruction file.

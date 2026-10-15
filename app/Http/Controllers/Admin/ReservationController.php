@@ -15,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ReservationController extends Controller
@@ -68,7 +67,7 @@ class ReservationController extends Controller
 
     public function create(): View
     {
-        $facilities = Facility::query()
+        $facilities = Facility::gym()
             ->where('status', 'available')
             ->orderBy('facility_name')
             ->get();
@@ -91,6 +90,7 @@ class ReservationController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge(['facility_id' => Facility::gymId()]);
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
             'reservation_type' => ['required', 'string', 'max:50'],
@@ -110,7 +110,12 @@ class ReservationController extends Controller
             'equipment.*' => ['array:quantity_requested'],
             'equipment.*.quantity_requested' => ['nullable', 'integer', 'min:1'],
             'priority_override' => ['nullable', 'boolean'],
+            'pencil_booking' => ['nullable', 'boolean'],
         ], ['expected_attendees.max' => \App\Support\GymCapacity::ERROR]);
+
+        if (($validated['pencil_booking'] ?? false) && ($validated['priority_override'] ?? false)) {
+            return back()->withInput()->withErrors(['pencil_booking' => 'A pencil booking cannot use priority override.']);
+        }
 
         app(\App\Services\EquipmentRequestService::class)->validateRequests($validated['reservation_type'], $validated['equipment'] ?? []);
 
@@ -135,17 +140,15 @@ class ReservationController extends Controller
 
         DB::transaction(function () use ($request, $validated, $conflictingReservations): void {
             app(\App\Services\EquipmentRequestService::class)->lockInventory();
+            if ($validated['pencil_booking'] ?? false) {
+                $this->assertPencilSchedule($validated);
+            }
             if ($validated['priority_override'] ?? false) {
                 foreach ($conflictingReservations as $conflict) {
-                    $previousStatus = $conflict->status;
-                    $conflict->update(['status' => 'waiting_list']);
-                    ReservationStatusHistory::create([
-                        'reservation_id' => $conflict->id,
-                        'changed_by' => $request->user()->id,
-                        'previous_status' => $previousStatus,
-                        'new_status' => 'waiting_list',
-                        'remarks' => 'Schedule reassigned due to an authorized priority reservation.',
-                    ]);
+                    app(\App\Services\ReservationCancellationService::class)->cancel(
+                        $conflict, $request->user()->id,
+                        'An authorized priority reservation requires this schedule.'
+                    );
                 }
             }
 
@@ -166,7 +169,7 @@ class ReservationController extends Controller
                 'end_time' => $validated['end_time'],
                     'setup_time' => $validated['setup_time'] ?? null,
                     'cleanup_time' => $validated['cleanup_time'] ?? null,
-                'status' => ($validated['priority_override'] ?? false) ? 'approved' : 'new',
+                'status' => ($validated['pencil_booking'] ?? false) ? 'pencil' : (($validated['priority_override'] ?? false) ? 'approved' : 'new'),
                 'priority_number' => ($validated['priority_override'] ?? false) ? 1 : null,
                 'approved_by' => ($validated['priority_override'] ?? false) ? $request->user()->id : null,
                 'approved_at' => ($validated['priority_override'] ?? false) ? now() : null,
@@ -179,30 +182,17 @@ class ReservationController extends Controller
                 'changed_by' => $request->user()->id,
                 'previous_status' => null,
                 'new_status' => $reservation->status,
-                'remarks' => ($validated['priority_override'] ?? false) ? 'Authorized priority reservation created and approved.' : 'Reservation created.',
+                'remarks' => ($validated['pencil_booking'] ?? false) ? 'Pencil booking created. Schedule held until confirmed or cancelled by an administrator.' : (($validated['priority_override'] ?? false) ? 'Authorized priority reservation created and approved.' : 'Reservation created.'),
             ]);
             AuditLog::record(($validated['priority_override'] ?? false) ? 'reservation.priority_override' : 'reservation.created', $reservation, [
                 'status' => $reservation->status,
-                'conflicts_reassigned' => $conflictingReservations->pluck('reference_number')->all(),
+                'conflicts_cancelled' => $conflictingReservations->pluck('reference_number')->all(),
             ]);
         });
 
-        if ($validated['priority_override'] ?? false) {
-            foreach ($conflictingReservations->whereNotNull('contact_email') as $conflict) {
-                try {
-                    Mail::raw(
-                        "Your MCST Gym reservation {$conflict->reference_number} was moved to the waiting list because an authorized priority reservation requires the selected schedule. Please track your request for further updates: ".route('reservation.track', ['reference' => $conflict->reference_number]),
-                        fn ($message) => $message->to($conflict->contact_email)->subject('MCST Gym Reservation Schedule Reassigned')
-                    );
-                } catch (\Throwable $exception) {
-                    Log::error('Priority reassignment notification failed.', ['reservation_id' => $conflict->id, 'exception' => $exception]);
-                }
-            }
-        }
-
         return redirect()
             ->route('admin.reservations.index')
-            ->with('success', 'Reservation created successfully.');
+            ->with('success', ($validated['pencil_booking'] ?? false) ? 'Pencil booking created. The schedule is held until you confirm or cancel it.' : 'Reservation created successfully.');
     }
 
     public function show(Reservation $reservation): View
@@ -224,7 +214,7 @@ class ReservationController extends Controller
 
     public function edit(Reservation $reservation): View
     {
-        $facilities = Facility::query()
+        $facilities = Facility::gym()
             ->orderBy('facility_name')
             ->get();
 
@@ -236,6 +226,7 @@ class ReservationController extends Controller
 
     public function update(Request $request, Reservation $reservation): RedirectResponse
     {
+        $request->merge(['facility_id' => Facility::gymId()]);
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
             'reservation_type' => ['required', 'string', 'max:50'],
@@ -299,7 +290,7 @@ class ReservationController extends Controller
             'equipment.*.quantity_approved' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        if (! in_array($reservation->status, ['new', 'validated', 'waiting_list'], true)) {
+        if (! in_array($reservation->status, ['new', 'validated', 'waiting_list', 'pencil'], true)) {
             return back()->withErrors([
                 'status' => 'This reservation can no longer be approved.',
             ]);
@@ -309,10 +300,19 @@ class ReservationController extends Controller
             $service = app(\App\Services\EquipmentRequestService::class);
             $service->lockInventory();
             $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
-            if (!in_array($reservation->status, ['new', 'validated', 'waiting_list'], true)) {
+            if (!in_array($reservation->status, ['new', 'validated', 'waiting_list', 'pencil'], true)) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['status' => 'This reservation can no longer be approved.']);
             }
             $previousStatus = $reservation->status;
+
+            if ($previousStatus === 'pencil') {
+                $this->assertPencilSchedule([
+                    'facility_id' => $reservation->facility_id,
+                    'reservation_date' => $reservation->reservation_date->toDateString(),
+                    'start_time' => substr($reservation->start_time, 0, 5),
+                    'end_time' => substr($reservation->end_time, 0, 5),
+                ], $reservation->id);
+            }
 
             $reservation->update([
                 'status' => 'approved',
@@ -391,6 +391,25 @@ class ReservationController extends Controller
         return back()->with('success', 'Reservation rejected successfully.');
     }
 
+    private function assertPencilSchedule(array $details, ?int $except = null): void
+    {
+        $gym = Facility::whereKey($details['facility_id'])->lockForUpdate()->firstOrFail();
+        $conflict = Reservation::where('facility_id', $gym->id)
+            ->when($except, fn ($q) => $q->whereKeyNot($except))
+            ->whereDate('reservation_date', $details['reservation_date'])
+            ->whereNotIn('status', ['rejected', 'cancelled'])
+            ->where('start_time', '<', $details['end_time'])
+            ->where('end_time', '>', $details['start_time'])->exists();
+        $blocked = \App\Models\ScheduleBlock::whereDate('starts_on', '<=', $details['reservation_date'])
+            ->whereDate('ends_on', '>=', $details['reservation_date'])
+            ->where(fn ($q) => $q->whereNull('facility_id')->orWhere('facility_id', $gym->id))
+            ->where(fn ($q) => $q->whereNull('start_time')->orWhere('start_time', '<', $details['end_time']))
+            ->where(fn ($q) => $q->whereNull('end_time')->orWhere('end_time', '>', $details['start_time']))->exists();
+        if ($gym->status !== 'available' || $conflict || $blocked || $details['reservation_date'] < now()->toDateString()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['reservation_date' => 'This schedule is unavailable for a pencil booking. Choose another date or time.']);
+        }
+    }
+
     public function cancel(Request $request, Reservation $reservation): RedirectResponse
     {
         $validated = $request->validate([
@@ -428,6 +447,7 @@ class ReservationController extends Controller
 
     public function reschedule(Request $request, Reservation $reservation): RedirectResponse
     {
+        $request->merge(['facility_id' => Facility::gymId()]);
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
             'reservation_date' => ['required', 'date'],
@@ -504,14 +524,6 @@ class ReservationController extends Controller
 
     private function generateReferenceNumber(): string
     {
-        do {
-            $reference = 'MCST-' . now()->format('Ymd') . '-' . Str::upper(Str::random(6));
-        } while (
-            Reservation::query()
-                ->where('reference_number', $reference)
-                ->exists()
-        );
-
-        return $reference;
+        return app(\App\Services\ReservationReferenceService::class)->next();
     }
 }

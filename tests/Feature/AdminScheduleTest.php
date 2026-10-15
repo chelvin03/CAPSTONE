@@ -20,11 +20,67 @@ function adminScheduleBooking(Facility $facility, array $overrides = []): Reserv
 }
 
 beforeEach(function () {
+    \Illuminate\Support\Facades\Mail::fake();
     $this->travelTo(Carbon::parse('2026-10-05 10:00:00', config('app.timezone')));
     config(['gym.reservation.opening_time' => '08:00', 'gym.reservation.closing_time' => '17:00']);
     $this->admin = User::factory()->create(['role' => 'admin']);
     $this->facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 200, 'status' => 'available']);
     $this->actingAs($this->admin);
+});
+
+test('a partial admin block cancels only overlapping approved bookings and emails the reason', function () {
+    $affected = adminScheduleBooking($this->facility);
+    $unaffected = adminScheduleBooking($this->facility, ['start_time' => '11:00', 'end_time' => '12:00']);
+    $pending = adminScheduleBooking($this->facility, ['status' => 'new']);
+    $completed = adminScheduleBooking($this->facility, ['status' => 'completed']);
+    $this->post(route('admin.schedule.blocks.store'), ['title' => 'Emergency maintenance',
+        'reason' => 'Roof repairs are required.', 'starts_on' => '2026-10-06', 'ends_on' => '2026-10-06',
+        'start_time' => '10:00', 'end_time' => '11:00'])->assertSessionHasNoErrors();
+    expect($affected->refresh()->status)->toBe('cancelled')
+        ->and($affected->cancellation_reason)->toContain('Emergency maintenance', 'Roof repairs')
+        ->and($affected->cancelled_by)->toBe($this->admin->id)
+        ->and($affected->cancelled_at)->not->toBeNull()
+        ->and($unaffected->refresh()->status)->toBe('approved')
+        ->and($pending->refresh()->status)->toBe('new')
+        ->and($completed->refresh()->status)->toBe('completed');
+    \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\ReservationCancelled::class,
+        fn ($mail) => $mail->hasTo($affected->contact_email) && $mail->reservation->id === $affected->id);
+    \Illuminate\Support\Facades\Mail::assertSentCount(1);
+    $this->assertDatabaseHas('reservation_status_histories', ['reservation_id' => $affected->id,
+        'previous_status' => 'approved', 'new_status' => 'cancelled', 'remarks' => $affected->cancellation_reason]);
+    $this->getJson(route('reservation.track', ['reference' => $affected->reference_number]))
+        ->assertOk()->assertJsonPath('status', 'cancelled');
+    $this->delete(route('admin.schedule.blocks.destroy', ScheduleBlock::sole()))->assertRedirect();
+    expect($affected->refresh()->status)->toBe('cancelled');
+});
+
+test('an all day block cancels approved bookings across its inclusive date range', function () {
+    $first = adminScheduleBooking($this->facility);
+    $last = adminScheduleBooking($this->facility, ['reservation_date' => '2026-10-08']);
+    $outside = adminScheduleBooking($this->facility, ['reservation_date' => '2026-10-09']);
+    $this->post(route('admin.schedule.blocks.store'), ['title' => 'Gym closure',
+        'starts_on' => '2026-10-06', 'ends_on' => '2026-10-08'])->assertSessionHasNoErrors();
+    expect($first->refresh()->status)->toBe('cancelled')->and($last->refresh()->status)->toBe('cancelled')
+        ->and($outside->refresh()->status)->toBe('approved');
+    \Illuminate\Support\Facades\Mail::assertSentCount(2);
+    $mail = new \App\Mail\ReservationCancelled($first);
+    expect($mail->render())->toContain($first->reference_number, 'Gym closure', 'Please reschedule', route('reservation.create'));
+});
+
+test('calendar colors distinguish available time and fully held pencil bookings', function () {
+    $response = $this->get(route('admin.schedule.index'));
+    expect($response->viewData('days')['2026-10-06']['calendarState'])->toBe('available');
+    $booking = adminScheduleBooking($this->facility, ['status' => 'pencil', 'start_time' => '08:00', 'end_time' => '17:00']);
+    $response = $this->get(route('admin.schedule.index', ['status' => 'pencil']));
+    $day = $response->viewData('days')['2026-10-06'];
+    expect($day['calendarState'])->toBe('full')->and($day['calendarLabel'])->toBe('Fully Booked / Held');
+    $response->assertSee('availability-full', false);
+    $booking->update(['end_time' => '10:00']);
+    $day = $this->get(route('admin.schedule.index'))->viewData('days')['2026-10-06'];
+    expect($day['calendarState'])->toBe('partial')->and($day['calendarLabel'])->toBe('Partial - Available Time');
+    $response->assertSee('availability-partial', false);
+    $booking->update(['status' => 'cancelled']);
+    expect($this->get(route('admin.schedule.index'))->viewData('days')['2026-10-06']['calendarLabel'])->toBe('Available');
 });
 
 test('admin schedule displays exact approved and available intervals without contacts', function () {
@@ -104,16 +160,13 @@ test('configured hours and current-day past times are respected', function () {
     expect($response->viewData('days')['2026-10-04']['hasAvailable'])->toBeFalse();
 });
 
-test('facilities have independent occupancy and the filter only appears for multiple reservable facilities', function () {
-    $this->get(route('admin.schedule.index'))->assertOk()->assertDontSee('id="schedule-facility"', false);
+test('the schedule always shows the gym without a facility selector', function () {
     $second = Facility::create(['facility_name' => 'Second Gymnasium', 'capacity' => 100, 'status' => 'available']);
     adminScheduleBooking($this->facility);
-    $response = $this->get(route('admin.schedule.index'))->assertOk()->assertSee('id="schedule-facility"', false);
+    $response = $this->get(route('admin.schedule.index', ['facility_id' => $second->id]))
+        ->assertOk()->assertDontSee('id="schedule-facility"', false);
     $panels = collect($response->viewData('days')['2026-10-06']['facilities']);
-    expect(collect($panels->firstWhere('id', $second->id)['intervals'])->where('state', 'occupied'))->toHaveCount(0);
-    $filtered = $this->get(route('admin.schedule.index', ['facility_id' => $second->id]))->assertOk();
-    expect($filtered->viewData('days')['2026-10-06']['state'])->toBe('available')
-        ->and($filtered->viewData('days')['2026-10-06']['facilities'])->toHaveCount(1);
+    expect($panels)->toHaveCount(1)->and($panels->first()['id'])->toBe($this->facility->id);
 });
 
 test('month and date navigation handles leap years and invalid filters', function () {
@@ -138,7 +191,7 @@ test('empty data and unavailable facilities do not invent bookings or availabili
     $response = $this->get(route('admin.schedule.index'))->assertOk()->assertSee('No reservations match');
     expect($response->viewData('days')['2026-10-06']['state'])->toBe('closed');
     $this->facility->delete();
-    $response = $this->get(route('admin.schedule.index'))->assertOk()->assertSee('No facilities configured');
+    $response = $this->get(route('admin.schedule.index'))->assertOk()->assertSee('Gym information unavailable');
     expect($response->viewData('days')['2026-10-06']['hasAvailable'])->toBeFalse();
 });
 

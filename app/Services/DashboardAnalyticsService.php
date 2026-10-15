@@ -29,7 +29,7 @@ class DashboardAnalyticsService
             ->when($filters['requestor_type'] ?? null, fn ($q, $value) => $q->where('reservation_type', $value))
             ->when($filters['status'] ?? null, fn ($q, $value) => $q->where('status', $value))
             ->when($filters['month'] ?? null, fn ($q, $value) => $q->whereMonth('reservation_date', $value))
-            ->when($withDates, fn ($q) => $q->where('reservation_date', '>=', $filters['date_from'])
+            ->when($withDates && ! ($filters['all_time'] ?? false), fn ($q) => $q->where('reservation_date', '>=', $filters['date_from'])
                 ->where('reservation_date', '<', CarbonImmutable::parse($filters['date_to'])->addDay()->toDateString()));
     }
 
@@ -58,7 +58,7 @@ class DashboardAnalyticsService
         $oldPending = (clone $query)->whereIn('status', ['new', 'validated'])->where('created_at', '<=', $now->subDays(7))->count();
         $previousTo = $from->subDay();
         $previousFrom = $from->subDays((int) $from->diffInDays($to) + 1);
-        $previousTotal = $this->query(array_merge($filters, ['date_from' => $previousFrom->toDateString(), 'date_to' => $previousTo->toDateString()]))->count();
+        $previousTotal = ($filters['all_time'] ?? false) ? 0 : $this->query(array_merge($filters, ['date_from' => $previousFrom->toDateString(), 'date_to' => $previousTo->toDateString()]))->count();
 
         // Aggregate by reservation date; all-years filters may span more than three years.
         $daily = (clone $query)->selectRaw('reservation_date, COUNT(*) AS total')->groupBy('reservation_date')->orderBy('reservation_date')->pluck('total', 'reservation_date');
@@ -175,7 +175,7 @@ class DashboardAnalyticsService
     {
         $open = config('gym.reservation.opening_time');
         $close = config('gym.reservation.closing_time');
-        if (! is_string($open) || ! is_string($close) || ! preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', $open) || ! preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', $close) || $close <= $open) {
+        if (! is_string($open) || ! is_string($close) || ! preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', $open) || ($close !== '24:00' && ! preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', $close)) || $close <= $open) {
             return null;
         }
         $seconds = fn ($value) => (int) substr($value, 0, 2) * 3600 + (int) substr($value, 3, 2) * 60;

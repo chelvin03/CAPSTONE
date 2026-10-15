@@ -14,109 +14,9 @@ beforeEach(function (): void {
     $this->actingAs($this->admin);
 });
 
-test('facility maintenance supports validation and CRUD without affecting other records', function () {
-    $other = Facility::create([
-        'facility_name' => 'Existing Gym',
-        'location' => 'Main Campus',
-        'capacity' => 500,
-        'status' => 'available',
-    ]);
-
-    $this->post(route('admin.facilities.store'), [
-        'facility_name' => '',
-        'capacity' => 0,
-        'status' => 'invalid',
-    ])->assertSessionHasErrors(['facility_name', 'capacity', 'status']);
-
-    $createResponse = $this->post(route('admin.facilities.store'), [
-        'facility_name' => 'QA Training Court',
-        'description' => 'File maintenance test',
-        'location' => 'North Wing',
-        'capacity' => 120,
-        'status' => 'available',
-    ]);
-
-    $createResponse
-        ->assertRedirect(route('admin.facilities.index'))
-        ->assertSessionHas('success', 'Facility added successfully.');
-
-    $facility = Facility::where('facility_name', 'QA Training Court')->firstOrFail();
-
-    $this->post(route('admin.facilities.store'), [
-        'facility_name' => 'QA Training Court',
-        'capacity' => 100,
-        'status' => 'available',
-    ])->assertSessionHasErrors('facility_name');
-
-    $this->get(route('admin.facilities.index', ['search' => 'Training']))
-        ->assertOk()
-        ->assertSee('QA Training Court')
-        ->assertDontSee('Existing Gym');
-
-    $this->put(route('admin.facilities.update', $facility), [
-        'facility_name' => 'QA Updated Court',
-        'description' => 'Updated test',
-        'location' => 'South Wing',
-        'capacity' => 130,
-        'status' => 'maintenance',
-    ])->assertRedirect(route('admin.facilities.index'))
-        ->assertSessionHas('success', 'Facility updated successfully.');
-
-    $this->assertDatabaseHas('facilities', [
-        'id' => $facility->id,
-        'facility_name' => 'QA Updated Court',
-        'capacity' => 130,
-        'status' => 'maintenance',
-    ]);
-    $this->assertDatabaseHas('facilities', [
-        'id' => $other->id,
-        'facility_name' => 'Existing Gym',
-    ]);
-
-    $this->delete(route('admin.facilities.destroy', $facility))
-        ->assertRedirect(route('admin.facilities.index'))
-        ->assertSessionHas('success', 'Facility deleted successfully.');
-
-    $this->assertDatabaseMissing('facilities', ['id' => $facility->id]);
-    $this->assertDatabaseHas('facilities', ['id' => $other->id]);
-});
-
-test('a facility used by a reservation is retained with a helpful warning', function () {
-    $facility = Facility::create([
-        'facility_name' => 'Reserved Gym',
-        'capacity' => 200,
-        'status' => 'available',
-    ]);
-
-    Reservation::create([
-        'reference_number' => 'QA-FACILITY-DELETE',
-        'user_id' => $this->admin->id,
-        'facility_id' => $facility->id,
-        'reservation_type' => 'internal',
-        'event_name' => 'QA Event',
-        'purpose' => 'Deletion protection test',
-        'contact_person' => 'QA Tester',
-        'contact_number' => '09123456789',
-        'expected_attendees' => 20,
-        'reservation_date' => now()->addDay()->toDateString(),
-        'start_time' => '08:00',
-        'end_time' => '09:00',
-        'status' => 'new',
-    ]);
-
-    $this->delete(route('admin.facilities.destroy', $facility))
-        ->assertRedirect(route('admin.facilities.index'))
-        ->assertSessionHas(
-            'error',
-            'This facility cannot be deleted because it is used by one or more reservations. Set its status to unavailable instead.'
-        );
-
-    $this->assertDatabaseHas('facilities', ['id' => $facility->id]);
-});
-
 test('admin can open and update a reservation from the management actions', function () {
     $facility = Facility::create([
-        'facility_name' => 'Editable Gym',
+        'facility_name' => 'MCST Gymnasium',
         'capacity' => 200,
         'status' => 'available',
     ]);
@@ -290,7 +190,6 @@ test('staff can only access staff maintenance lists', function () {
     $staffPages = [
         route('staff.dashboard'),
         route('staff.reservations.index'),
-        route('staff.facilities.index'),
         route('staff.equipment.index'),
         route('staff.schedules.index'),
     ];
@@ -302,13 +201,12 @@ test('staff can only access staff maintenance lists', function () {
             ->assertOk()
             ->assertSee(route('staff.dashboard'), false)
             ->assertSee(route('staff.reservations.index'), false)
-            ->assertSee(route('staff.facilities.index'), false)
             ->assertSee(route('staff.equipment.index'), false)
             ->assertSee(route('staff.schedules.index'), false)
             ->assertDontSee(route('staff.reports.index'), false)
             ->assertDontSee(route('admin.dashboard'), false);
     }
 
-    $this->get(route('admin.facilities.index'))
-        ->assertForbidden();
+    $this->get('/admin/facilities')->assertNotFound();
+    $this->get('/staff/facilities')->assertNotFound();
 });

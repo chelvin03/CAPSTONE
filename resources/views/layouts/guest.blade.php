@@ -9,7 +9,11 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="min-h-screen bg-slate-50 font-sans text-slate-900">
+<body class="min-h-screen bg-slate-50 font-sans text-slate-900"
+    @if(request()->routeIs('login'))
+        style="background-image: linear-gradient(rgba(15, 23, 42, .28), rgba(15, 23, 42, .42)), url('{{ asset('images/gym-login-background.jpg') }}'); background-size: cover; background-position: center; background-repeat: no-repeat; background-attachment: fixed;"
+    @endif
+>
 
     <main class="flex min-h-screen items-center justify-center px-4 py-10">
 

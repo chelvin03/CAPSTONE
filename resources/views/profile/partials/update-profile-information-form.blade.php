@@ -55,6 +55,20 @@
             @endif
         </div>
 
+        @if ($user->role === 'admin')
+            <div>
+                <x-input-label for="recovery_email" :value="__('Recovery Email (admin only)')" />
+                <x-text-input id="recovery_email" name="recovery_email" type="email" class="mt-1 block w-full" :value="old('recovery_email', $user->recovery_email)" />
+                <p class="mt-2 text-sm text-gray-600">Use a real email you can access. Password reset links go here. Keep the Email field above unchanged to keep your existing login.</p>
+                <x-input-error class="mt-2" :messages="$errors->get('recovery_email')" />
+            </div>
+            <div>
+                <x-input-label for="recovery_password" :value="__('Current Password (required to change recovery email)')" />
+                <x-text-input id="recovery_password" name="recovery_password" type="password" class="mt-1 block w-full" autocomplete="current-password" />
+                <x-input-error class="mt-2" :messages="$errors->get('recovery_password')" />
+            </div>
+        @endif
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
 

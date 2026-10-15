@@ -9,6 +9,30 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+test('all time ignores date bounds while retaining reservation filters and export scope', function () {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $gym = Facility::create(['facility_name' => 'Scope Gym', 'capacity' => 100, 'status' => 'available']);
+    $other = Facility::create(['facility_name' => 'Other Scope Gym', 'capacity' => 100, 'status' => 'available']);
+    foreach (['2020-01-01', '2026-10-31', '2026-11-12'] as $date) {
+        analyticsReservation($gym, ['reservation_date' => $date, 'reference_number' => 'SCOPE-'.$date]);
+    }
+    analyticsReservation($gym, ['status' => 'cancelled']);
+    analyticsReservation($other);
+    analyticsReservation($gym, ['reservation_type' => 'government']);
+    analyticsReservation($gym, ['event_type' => 'Assembly']);
+    $filters = ['date_from' => '2025-11-01', 'date_to' => '2026-10-31', 'status' => 'approved',
+        'facility_id' => $gym->id, 'requestor_type' => 'school', 'category' => 'Sports', 'grouping' => 'annual'];
+    $this->actingAs($admin)->get(route('admin.dashboard', $filters))->assertOk()->assertViewHas('totalReservations', 1);
+    $response = $this->get(route('admin.dashboard', $filters + ['all_time' => 1]))->assertOk()
+        ->assertSee('All time')->assertViewHas('totalReservations', 3)
+        ->assertViewHas('filters', fn ($actual) => $actual['all_time'] === true && $actual['grouping'] === 'annual'
+            && $actual['status'] === 'approved' && $actual['facility_id'] == $gym->id
+            && $actual['requestor_type'] === 'school' && $actual['category'] === 'Sports');
+    $csv = $this->get(route('admin.dashboard', $response->viewData('filters') + ['export' => 'csv']))->assertOk()->streamedContent();
+    expect($csv)->toContain('SCOPE-2020-01-01')->toContain('SCOPE-2026-11-12');
+    expect(app(\App\Services\DashboardAnalyticsService::class)->query(['all_time' => true, 'date_from' => '2026-01-01', 'date_to' => '2026-12-31'])->count())->toBe(7);
+});
+
 test('dashboard reporting presets select calendar ranges and clear other filters', function (string $period, string $from, string $to, string $grouping) {
     Carbon::setTestNow('2026-09-10 12:00:00');
     try {
@@ -24,7 +48,7 @@ test('dashboard reporting presets select calendar ranges and clear other filters
             ->assertViewHas('filters', ['date_from' => $from, 'date_to' => $to, 'grouping' => $grouping])
             ->assertViewHas('selectedPeriod', $period)
             ->assertViewHas('totalReservations', match ($period) { 'today' => 1, 'month' => 2, 'year' => 3 })
-            ->assertSee('Gymnasium Business Intelligence')->assertSee('Apply Filters');
+            ->assertSee('Gymnasium Business Intelligence')->assertSee('Today')->assertSee('This Month')->assertSee('This Year');
     } finally {
         Carbon::setTestNow();
     }

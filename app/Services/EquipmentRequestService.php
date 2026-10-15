@@ -51,8 +51,14 @@ class EquipmentRequestService
             throw ValidationException::withMessages(['equipment' => 'Only Internal MCST requestors may request MCST equipment.']);
         }
         foreach ($checkInventory ? $requested : [] as $id => $row) {
-            if (!ctype_digit((string) $id) || !Equipment::whereKey($id)->where('status', 'available')->exists()) {
+            $item = ctype_digit((string) $id) ? Equipment::whereKey($id)->where('status', 'available')->first() : null;
+            if (! $item) {
                 throw ValidationException::withMessages(['equipment' => 'Please select equipment from the available inventory.']);
+            }
+            if ($row['quantity_requested'] > $item->total_quantity) {
+                throw ValidationException::withMessages([
+                    'equipment.'.$id.'.quantity_requested' => $item->equipment_name.' has only '.$item->total_quantity.' in inventory. Request no more than this quantity.',
+                ]);
             }
         }
     }

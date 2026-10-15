@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class User extends Authenticatable
+{
+    use HasFactory, Notifiable;
+
+    public function reservations(): HasMany
+{
+    return $this->hasMany(Reservation::class);
+}
+
+public function approvedReservations(): HasMany
+{
+    return $this->hasMany(Reservation::class, 'approved_by');
+}
+
+public function rejectedReservations(): HasMany
+{
+    return $this->hasMany(Reservation::class, 'rejected_by');
+}
+
+public function cancelledReservations(): HasMany
+{
+    return $this->hasMany(Reservation::class, 'cancelled_by');
+}
+
+public function uploadedReservationDocuments(): HasMany
+{
+    return $this->hasMany(ReservationDocument::class, 'uploaded_by');
+}
+
+public function reservationStatusChanges(): HasMany
+{
+    return $this->hasMany(
+        ReservationStatusHistory::class,
+        'changed_by'
+    );
+}
+    protected $fillable = [
+        'first_name',
+        'last_name',
+        'email',
+        'recovery_email',
+        'email_verified_at',
+        'password',
+        'role',
+        'can_priority_override',
+        'requestor_category',
+        'contact_number',
+        'status',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'can_priority_override' => 'boolean',
+        ];
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return "{$this->first_name} {$this->last_name}";
+    }
+
+    public function routeNotificationForMail($notification): string
+    {
+        if ($notification instanceof \Illuminate\Auth\Notifications\ResetPassword) {
+            return $this->role === 'admin' ? (string) $this->recovery_email : '';
+        }
+
+        return $this->email;
+    }
+}

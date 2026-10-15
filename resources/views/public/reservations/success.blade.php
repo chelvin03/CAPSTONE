@@ -15,8 +15,6 @@
         @include('public.reservations.partials.live-tracking')
         <div class="tracking-actions">
             <a href="{{ route('reservation.track', ['reference' => $reservation->reference_number]) }}" class="tracking-button tracking-primary">View Reservation<span class="sr-only"> — Track Reservation</span></a>
-            <a href="{{ route('home') }}" class="tracking-button">Back to Home</a>
-            <a href="{{ route('reservation.create', ['step' => 1]) }}" class="tracking-button">Make Another Reservation</a>
         </div>
     </div>
 </div>

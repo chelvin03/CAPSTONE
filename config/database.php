@@ -46,6 +46,7 @@ return [
 
         'mysql' => [
             'driver' => 'mysql',
+            'timezone' => env('DB_TIMEZONE', '+08:00'),
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),
@@ -66,6 +67,7 @@ return [
 
         'mariadb' => [
             'driver' => 'mariadb',
+            'timezone' => env('DB_TIMEZONE', '+08:00'),
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),

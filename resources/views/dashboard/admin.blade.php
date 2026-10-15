@@ -1,87 +1,90 @@
 @extends('layouts.app')
 @section('title', 'Gymnasium Business Intelligence')
 @section('content')
+<link rel="stylesheet" href="{{ asset('css/dashboard-reference.css') }}?v={{ filemtime(public_path('css/dashboard-reference.css')) }}">
 @php
     $label = fn ($value) => \App\Services\DashboardAnalyticsService::label($value);
-    $selectedYear = request('year', $filters['year'] ?? '');
     $segments = $statusBreakdown->where('count', '>', 0);
     $offset = 0;
+    $selectedYear = (string) ($filters['year'] ?? \Carbon\CarbonImmutable::parse($filters['date_to'])->year);
+    $canSelectDay = $selectedYear !== 'all' && isset($filters['month']);
+    $monthDays = $canSelectDay ? \Carbon\CarbonImmutable::create((int)$selectedYear, (int)$filters['month'], 1)->daysInMonth : 0;
 @endphp
-<div class="page-shell bi-dashboard max-w-none">
-    <header class="bi-header">
-        <div>
-            <h1 class="page-title">Gymnasium Business Intelligence</h1>
-            <p class="page-description">Monitor gymnasium reservations, utilization, and event activities.</p>
-        </div>
-        <form method="GET" action="{{ route('admin.dashboard') }}" class="bi-filters" x-data="{ loading: false }" @submit="loading = true" :aria-busy="loading">
-            <label>Year<select name="year" class="field">
-                <option value="all" @selected($selectedYear === 'all')>All Years</option>
-                @foreach ($years as $year)<option value="{{ $year }}" @selected((string) $selectedYear === (string) $year)>{{ $year }}</option>@endforeach
-            </select></label>
-            <label>Month<select name="month" class="field">
-                <option value="">All Months</option>
-                @for ($month = 1; $month <= 12; $month++)<option value="{{ $month }}" @selected((int) ($filters['month'] ?? 0) === $month)>{{ \Carbon\CarbonImmutable::create(2000, $month, 1)->format('F') }}</option>@endfor
-            </select></label>
-            <label>Reservation Status<select name="status" class="field">
-                <option value="">All Statuses</option>
-                @foreach ($statusOptions as $status)<option value="{{ $status }}" @selected(($filters['status'] ?? '') === $status)>{{ $label($status) }}</option>@endforeach
-            </select></label>
-            <label>Event Type<select name="category" class="field">
-                <option value="">All Event Types</option>
-                @foreach ($categories as $category)<option value="{{ $category }}" @selected(($filters['category'] ?? '') === $category)>{{ $category }}</option>@endforeach
-            </select></label>
-            <div class="bi-filter-actions">
-                <button class="btn-primary" :disabled="loading"><span x-show="!loading">Apply Filters</span><span x-show="loading" x-cloak role="status">Loading…</span></button>
-                <a href="{{ route('admin.dashboard') }}" class="bi-link">Reset Filters</a>
-            </div>
-        </form>
+<div class="reference-dashboard">
+    <header class="reference-heading">
+        <div><p class="reference-eyebrow">MCST GYMNASIUM</p><h1>Business Intelligence Dashboard</h1><p>Monitor reservation activity, gym availability, and booking demand.</p></div>
+        <a class="btn-primary" href="{{ route('admin.reservations.index') }}">Manage Reservations</a>
     </header>
     @if ($errors->any())
-        <div class="alert-error" role="alert"><div><strong>Please check your filters.</strong><ul class="mt-1 list-inside list-disc">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>
+        <div class="alert-error" role="alert"><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
     @endif
-    <p class="bi-period">{{ \Carbon\CarbonImmutable::parse($filters['date_from'])->format('M d, Y') }} – {{ \Carbon\CarbonImmutable::parse($filters['date_to'])->format('M d, Y') }}@if(isset($filters['month'])) · {{ \Carbon\CarbonImmutable::create(2000, (int) $filters['month'], 1)->format('F') }} only @endif</p>
-    <section class="bi-stats" aria-label="Reservation summary">
-        <article class="card bi-stat"><h2>Expected Attendees</h2><p class="bi-stat-value">{{ number_format($expectedAttendees) }}</p><p class="bi-stat-detail">Total across approved and completed events; expected attendance, not actual attendance.</p></article>
-        <article class="card bi-stat"><h2>Average Attendance Capacity Usage</h2><p class="bi-stat-value">{{ $averageAttendanceCapacityUsage === null ? 'N/A' : $averageAttendanceCapacityUsage.'%' }}</p><p class="bi-stat-detail">Average expected attendees per approved or completed event / {{ number_format($gymCapacity) }} persons. Separate from utilization by booked hours.</p></article>
-        <article class="card bi-stat"><span class="bi-stat-icon bi-blue"><i class="bi bi-calendar2-week" aria-hidden="true"></i></span><h2>Total Reservations</h2><p class="bi-stat-value">{{ number_format($totalReservations) }}</p><p class="bi-stat-detail">Matching reservation records</p></article>
-        <article class="card bi-stat"><span class="bi-stat-icon bi-green"><i class="bi bi-check-circle" aria-hidden="true"></i></span><h2>Approved Reservations</h2><p class="bi-stat-value">{{ number_format($approvedReservations) }}</p><p class="bi-stat-detail">Approved status</p></article>
-        <article class="card bi-stat"><span class="bi-stat-icon bi-amber"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span><h2>Pending Reservations</h2><p class="bi-stat-value">{{ number_format($pendingReservations) }}</p><p class="bi-stat-detail">New + Validated reservations</p></article>
-        <article class="card bi-stat"><span class="bi-stat-icon bi-blue"><i class="bi bi-clock" aria-hidden="true"></i></span><h2>Gymnasium Utilization Rate</h2><p class="bi-stat-value">{{ $utilizationRate === null ? 'N/A' : $utilizationRate.'%' }}</p><p class="bi-stat-detail">{{ $availableHours === null ? 'Operating hours or facility unavailable' : ($availableHours == 0 ? 'No bookable hours in this period' : $utilizedHours.' booked / '.$availableHours.' bookable hours') }}</p></article>
-        <article class="card bi-stat"><span class="bi-stat-icon bi-blue"><i class="bi bi-trophy" aria-hidden="true"></i></span><h2>Most Common Event Type</h2><p class="bi-stat-value bi-event-value">{{ $mostCommonEventType }}</p><p class="bi-stat-detail">{{ $eventDemand->isEmpty() ? 'No matching reservations' : $eventDemand->first()['count'].' reservations · ties sorted alphabetically' }}</p></article>
+    <div class="reference-toolbar">
+        <form method="GET" action="{{ route('admin.dashboard') }}" class="reference-date-selectors">
+            <label for="dashboard-year">Year<select id="dashboard-year" name="year" onchange="this.form.elements.day.value = ''; this.form.requestSubmit()">
+                <option value="all" @selected($selectedYear === 'all')>All years</option>
+                @foreach($years as $year)<option value="{{ $year }}" @selected($selectedYear === (string) $year)>{{ $year }}</option>@endforeach
+            </select></label>
+            <label for="dashboard-month">Month<select id="dashboard-month" name="month" onchange="this.form.elements.day.value = ''; this.form.requestSubmit()">
+                <option value="">All months</option>
+                @foreach(range(1,12) as $month)<option value="{{ $month }}" @selected((int)($filters['month'] ?? 0) === $month)>{{ \Carbon\CarbonImmutable::create(2000,$month,1)->format('F') }}</option>@endforeach
+            </select></label>
+            <label for="dashboard-day">Day<select id="dashboard-day" name="day" @disabled(!$canSelectDay) onchange="this.form.requestSubmit()" @if(!$canSelectDay) title="Choose a specific year and month first" @endif>
+                <option value="">All days</option>
+                @if($canSelectDay)
+                    @foreach(range(1,$monthDays) as $day)<option value="{{ $day }}" @selected((int)($filters['day'] ?? 0) === $day)>{{ $day }}</option>@endforeach
+                @endif
+            </select></label>
+            <noscript><button class="btn-primary" type="submit">Apply</button></noscript>
+        </form>
+    </div>
+    <p class="reference-period">{{ \Carbon\CarbonImmutable::parse($filters['date_from'])->format('M j, Y') }}–{{ \Carbon\CarbonImmutable::parse($filters['date_to'])->format('M j, Y') }}@if(isset($filters['month'])) · {{ \Carbon\CarbonImmutable::create(2000,(int)$filters['month'],1)->format('F') }} only @endif</p>
+    <section class="reference-stats" aria-label="Reservation summary">
+        @foreach([
+            ['Total Reservations', number_format($totalReservations), 'bi-calendar2-week', 'blue', 'All recorded statuses in this period'],
+            ['Approved Reservations', number_format($approvedReservations), 'bi-check-circle', 'green', 'Confirmed bookings'],
+            ['Pending Review', number_format($pendingReservations), 'bi-hourglass-split', 'amber', 'New and validated requests'],
+            ['Gym Utilization', $utilizationRate === null ? 'N/A' : $utilizationRate.'%', 'bi-clock', 'orange', 'Approved hours / bookable hours'],
+            ['Most Common Event', $mostCommonEventType, 'bi-trophy', 'rose', 'Most recorded event type in this period'],
+        ] as [$title,$value,$icon,$tone,$detail])
+            <article class="reference-stat tone-{{ $tone }}"><span class="reference-icon"><i class="bi {{ $icon }}" aria-hidden="true"></i></span><div><h2>{{ $title }}</h2><p class="reference-value">{{ $value }}</p><p class="reference-detail">{{ $detail }}</p></div></article>
+        @endforeach
     </section>
-    <div class="bi-panels">
-        <section class="card bi-overview" aria-labelledby="overview-title">
-            <header class="bi-panel-header"><div><h2 id="overview-title">Reservation Overview</h2><p>Summary of reservation activities.</p></div><a href="{{ route('admin.reservations.index', \Illuminate\Support\Arr::except($filters, ['year', 'grouping', 'period'])) }}" class="bi-link">View All <i class="bi bi-arrow-right" aria-hidden="true"></i></a></header>
-            <div class="overflow-x-auto">
-                <table class="bi-table">
-                    <caption class="sr-only">Latest five matching reservations, ordered by reservation date and start time descending.</caption>
-                    <thead><tr>@foreach (['Reference Number', 'Event Name', 'Event Type', 'Reservation Date', 'Time', 'Status'] as $heading)<th scope="col">{{ $heading }}</th>@endforeach</tr></thead>
-                    <tbody>@forelse ($overviewReservations as $reservation)
-                        <tr><td><a class="bi-link" href="{{ route('admin.reservations.show', $reservation) }}">{{ $reservation->reference_number }}</a></td><td>{{ $label($reservation->event_name) }}</td><td>{{ $reservation->event_type ?: 'Not specified' }}</td><td class="whitespace-nowrap">{{ $reservation->reservation_date->format('M d, Y') }}</td><td class="whitespace-nowrap">{{ \Carbon\CarbonImmutable::parse($reservation->start_time)->format('g:i A') }} – {{ \Carbon\CarbonImmutable::parse($reservation->end_time)->format('g:i A') }}</td><td><x-operational-status :status="$reservation->status" /></td></tr>
-                    @empty<tr><td colspan="6" class="bi-empty">No reservations match these filters. Try another year, month, status, or event type.</td></tr>@endforelse</tbody>
-                </table>
-            </div>
-            <p class="bi-table-footer">Showing {{ $overviewReservations->count() }} of {{ number_format($totalReservations) }} reservations</p>
+    <div class="reference-panels">
+        <section class="reference-panel">
+            <header><h2>Booking Activity</h2><p>Summary for the selected reporting period.</p></header>
+            <dl class="reference-activity">
+                <div><dt>Completed events</dt><dd>{{ number_format($completedEvents) }}</dd></div>
+                <div><dt>Cancelled reservations</dt><dd>{{ number_format($cancelledReservations) }}</dd></div>
+                <div><dt>Requests overdue for review</dt><dd>{{ number_format($oldPending) }}</dd></div>
+                <div><dt>Expected attendees</dt><dd>{{ number_format($expectedAttendees) }}</dd></div>
+                <div><dt>Average processing time</dt><dd>{{ $processingHours === null ? 'N/A' : $processingHours.' hrs' }}</dd></div>
+            </dl>
+            <p class="reference-note">Expected attendance covers approved and completed events. Utilization reflects scheduled approved hours, with overlaps merged and blackout periods excluded.</p>
         </section>
-        <section class="card bi-status-panel" aria-labelledby="status-title">
-            <header class="bi-panel-header"><div><h2 id="status-title">Reservation Status Overview</h2><p>Distribution of reservations by status.</p></div></header>
-            <div class="bi-donut" role="img" aria-label="{{ $totalReservations ? 'Status distribution for '.$totalReservations.' reservations. Counts and percentages are listed below.' : 'No matching reservations. No status distribution available.' }}">
-                <svg viewBox="0 0 120 120" aria-hidden="true">
-                    <circle cx="60" cy="60" r="45" fill="none" stroke="#e2e8f0" stroke-width="14" />
-                    @foreach ($segments as $segment)
-                        @php $length = $segment['count'] / $totalReservations * 100; @endphp
-                        <circle cx="60" cy="60" r="45" fill="none" stroke="{{ $statusColors[$segment['status']] ?? '#64748b' }}" stroke-width="14" pathLength="100" stroke-dasharray="{{ $length }} {{ 100 - $length }}" stroke-dashoffset="{{ -$offset }}" transform="rotate(-90 60 60)" />
-                        @php $offset += $length; @endphp
+        <section class="reference-panel">
+            <header><h2>Reservation Status Overview</h2><p>Counts and share of reservations in this period.</p></header>
+            <div class="reference-status-body">
+                <div class="reference-donut" role="img" aria-label="{{ number_format($totalReservations) }} reservations; status counts and percentages are listed alongside.">
+                    <svg viewBox="0 0 120 120" aria-hidden="true">
+                        <circle cx="60" cy="60" r="45" fill="none" stroke="#e2e8f0" stroke-width="15" />
+                        @foreach($segments as $segment)
+                            @php($length = $segment['count'] / $totalReservations * 100)
+                            <circle cx="60" cy="60" r="45" fill="none" stroke="{{ $statusColors[$segment['status']] ?? '#64748b' }}" stroke-width="15" pathLength="100" stroke-dasharray="{{ $length }} {{ 100-$length }}" stroke-dashoffset="{{ -$offset }}" transform="rotate(-90 60 60)" />
+                            @php($offset += $length)
+                        @endforeach
+                    </svg>
+                    <div><span>Total Reservations</span><strong>{{ number_format($totalReservations) }}</strong></div>
+                </div>
+                <ul class="reference-status-legend" aria-label="Reservation status counts">
+                    @foreach($statusBreakdown as $row)
+                        <li><span><i style="background: {{ $statusColors[$row['status']] ?? '#64748b' }}" aria-hidden="true"></i>{{ $label($row['status']) }}</span><small>{{ $row['percentage'] === null ? '—' : $row['percentage'].'%' }}</small><strong>{{ number_format($row['count']) }}</strong></li>
                     @endforeach
-                </svg>
-                <div class="bi-donut-center"><strong>{{ number_format($totalReservations) }}</strong><span>Total Reservations</span></div>
+                </ul>
             </div>
-            @if (! $totalReservations)<p class="bi-empty !py-2">No status data for these filters.</p>@endif
-            <ul class="bi-legend" aria-label="Status counts and percentages">
-                @foreach ($statusBreakdown as $row)<li><span class="bi-legend-label"><span class="bi-dot" style="background-color: {{ $statusColors[$row['status']] ?? '#64748b' }}" aria-hidden="true"></span>{{ $label($row['status']) }}</span><strong>{{ number_format($row['count']) }}</strong><span>{{ $row['percentage'] === null ? '—' : $row['percentage'].'%' }}</span></li>@endforeach
-            </ul>
+            @if(!$totalReservations)<p class="reference-note">No reservations in this period. Choose another month or year.</p>@endif
         </section>
     </div>
-    <footer class="bi-notes"><p>Utilization counts approved event hours within configured operating hours, with overlapping bookings merged per facility and date. Calendar blackouts are excluded from booked and bookable hours. Setup and cleanup are excluded under the current conflict rules.</p><a class="bi-link" href="{{ route('admin.dashboard', $filters + ['export' => 'csv']) }}">Export filtered analytics (CSV)</a></footer>
+    @include('dashboard.partials.trends')
+    <p class="reference-updated">Last updated: {{ $generatedAt->format('M j, Y g:i A T') }}</p>
 </div>
 @endsection
