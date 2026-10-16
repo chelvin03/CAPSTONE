@@ -23,7 +23,7 @@ class DashboardController extends Controller
             return $this->csv($analytics, $data, $request->user()->full_name);
         }
 
-        return view('dashboard.admin', $data + app(\App\Services\DashboardTrendService::class)->summarize($filters, $analytics) + [
+        return view('dashboard.admin', $data + app(\App\Services\DashboardInsightService::class)->summarize($filters, $analytics) + app(\App\Services\DashboardTrendService::class)->summarize($filters, $analytics) + [
             'selectedPeriod' => $request->input('period'),
             'overviewReservations' => $analytics->records($filters)->reorder()->orderByDesc('reservation_date')->orderByDesc('start_time')->orderByDesc('id')->limit(5)->get(),
         ]);
@@ -67,7 +67,7 @@ class DashboardController extends Controller
                 $write([$name, $value ?? 'N/A']);
             }
             $write(['Previous reporting period', $data['previousFrom']->toDateString(), $data['previousTo']->toDateString()]);
-            $write(['Utilization scope', 'Approved + completed scheduled times, clipped to configured operating hours. Overlaps merged per facility/day. Calendar-day capacity; closures not deducted. Not actual attendance or usage.']);
+            $write(['Utilization scope', 'Approved scheduled times clipped to configured operating hours. Overlaps merged per facility/day. Configured blackout intervals excluded from both occupied and bookable hours. Not actual attendance or usage.']);
             $write(['Operating hours', $data['operatingHours'] ? $data['operatingHours']['open'].' - '.$data['operatingHours']['close'] : 'Not configured']);
             $write(['Processing definition', 'Submission to first approval, rejection or cancellation from timestamps/history; records without a valid decision timestamp excluded.']);
             $write([]);

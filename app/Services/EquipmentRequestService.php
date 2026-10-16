@@ -100,6 +100,7 @@ class EquipmentRequestService
             throw ValidationException::withMessages(['equipment' => 'Wait for the requestor to accept the offered quantity before final approval.']);
         }
         $reservation->equipment()->updateExistingPivot($equipment->id, ['quantity_approved' => $quantity, 'status' => 'approved']);
+        if ((int) $item->pivot->quantity_approved !== $quantity) app(AcknowledgementReceiptService::class)->invalidateTask($reservation);
         AuditLog::record('equipment.approved', $reservation, ['equipment_id' => $equipment->id, 'quantity_approved' => $quantity]);
     }
 

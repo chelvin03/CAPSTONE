@@ -45,6 +45,7 @@ class EquipmentRequestController extends Controller
                 $service->approveQuantity($reservation, $equipment, $quantity);
                 if (isset($data['remarks'])) $reservation->equipment()->updateExistingPivot($equipment->id, ['remarks' => $data['remarks'], 'reply_sent_at' => now()]);
             } elseif ($data['action'] === 'reject') {
+                if ((int) $item->pivot->quantity_approved > 0) app(\App\Services\AcknowledgementReceiptService::class)->invalidateTask($reservation);
                 $reservation->equipment()->updateExistingPivot($equipment->id, ['status' => 'rejected', 'quantity_approved' => 0,
                     'remarks' => $data['remarks'], 'reply_sent_at' => now(), 'requires_response' => false, 'latest_offer_id' => null]);
                 AuditLog::record('equipment.rejected', $reservation, $details);
@@ -53,6 +54,7 @@ class EquipmentRequestController extends Controller
                     throw ValidationException::withMessages(['quantity_offered' => 'An offer cannot exceed requested or available stock. Confirmation requires a positive offer.']);
                 }
                 $offerId = (string) Str::uuid();
+                if ((int) $item->pivot->quantity_approved > 0) app(\App\Services\AcknowledgementReceiptService::class)->invalidateTask($reservation);
                 $reservation->equipment()->updateExistingPivot($equipment->id, [
                     'quantity_offered' => $quantity, 'quantity_approved' => null,
                     'status' => $quantity === 0 ? 'unavailable' : ($quantity < $item->pivot->quantity_requested ? 'partially_available' : 'available'),
@@ -92,6 +94,7 @@ class EquipmentRequestController extends Controller
                 'requestor_response' => $data['response'], 'requestor_responded_at' => now(),
                 'status' => $data['response'] === 'accepted' ? 'accepted_by_requestor' : 'declined_by_requestor', 'quantity_approved' => null,
             ]);
+            if ((int) $item->pivot->quantity_approved > 0) app(\App\Services\AcknowledgementReceiptService::class)->invalidateTask($reservation);
             $message = 'Reservation '.$reservation->reference_number.' '.($data['response'] === 'accepted' ? 'accepted the offer of '.$item->pivot->quantity_offered.' '.$item->equipment_name : 'declined the equipment request for '.$item->equipment_name).'.';
             $details = ['message' => $message, 'equipment_id' => $equipment->id, 'response' => $data['response'], 'reference' => $reservation->reference_number, 'reservation_id' => $reservation->id, 'audience' => 'admin'];
             $service->publish($reservation, $details, false);

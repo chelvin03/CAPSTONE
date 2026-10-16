@@ -12,12 +12,13 @@ class StaffReadOnly
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $arAction = $request->isMethod('POST') && $request->routeIs('staff.reservations.receipt.prepare', 'staff.reservations.receipt.send');
+        $arAction = $request->isMethod('POST') && $request->routeIs('staff.reservations.receipt.prepare', 'staff.reservations.receipt.send', 'staff.reservations.receipt.start', 'staff.reservations.receipt.complete');
         abort_unless($request->user()?->status === 'approved' && ($arAction || (
             in_array($request->method(), ['GET', 'HEAD'], true)
             && $request->routeIs(
                 'staff.dashboard', 'staff.reservations.index', 'staff.reservations.show',
-                'staff.schedules.index', 'staff.equipment.index', 'staff.reservations.receipt', 'staff.reservations.receipt.print'
+                'staff.schedules.index', 'staff.equipment.index', 'staff.reservations.receipt', 'staff.reservations.receipt.print',
+                'staff.ar.index', 'staff.reservations.receipt.pdf'
             ))), 403);
 
         return $next($request);

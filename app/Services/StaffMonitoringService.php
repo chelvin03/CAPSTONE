@@ -77,7 +77,8 @@ class StaffMonitoringService
         $statusCounts = $this->filterPeriod(Reservation::query(), $filters)
             ->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status');
         $statusTotal = (int) $statusCounts->sum();
-        $statusBreakdown = collect(self::STATUSES)->merge($statusCounts->keys())->unique()->map(fn ($status) => [
+        $recordedStatuses = Reservation::distinct()->pluck('status');
+        $statusBreakdown = collect(self::STATUSES)->merge($recordedStatuses)->unique()->filter(fn ($status) => $recordedStatuses->contains($status))->map(fn ($status) => [
             'status' => $status, 'label' => DashboardAnalyticsService::label($status),
             'count' => (int) $statusCounts->get($status, 0),
             'percent' => $statusTotal ? round((int) $statusCounts->get($status, 0) / $statusTotal * 100, 1) : 0,
@@ -125,6 +126,17 @@ class StaffMonitoringService
             $notices->push(['text' => $blockCount.' schedule block(s) affect today. Check blocked times before preparing the gym.', 'url' => route('staff.schedules.index', ['date' => $today])]);
         }
 
+        $arQuery = $this->filterPeriod($this->records()->where('status', 'approved'), $filters);
+        $pendingArCount = (clone $arQuery)->where(fn ($q) => $q->whereDoesntHave('acknowledgementTask')
+            ->orWhereHas('acknowledgementTask', fn ($task) => $task->where('status', '!=', 'completed')))->count();
+        $completedArCount = $this->filterPeriod(Reservation::query(), $filters)
+            ->whereHas('acknowledgementTask', fn ($task) => $task->where('status', 'completed')->whereNotNull('completed_at'))
+            ->whereHas('acknowledgementReceipt')->count();
+        $arReservations = app(AcknowledgementReceiptService::class)->orderedTasks((clone $arQuery)->with(['acknowledgementTask', 'acknowledgementReceipt']))->limit(8)->get();
+
+        $gymAvailability = $facilities->isEmpty() || $facilities->every(fn ($f) => $f->status !== 'available' || $f->blocked_now)
+            ? 'Unavailable' : ($facilities->contains(fn ($f) => $f->status === 'available' && ! $f->blocked_now && $f->scheduled_now) ? 'Occupied' : 'Available');
+
         return [
             'now' => $now, 'today' => $today, 'sevenDaysThrough' => $now->addDays(7)->toDateString(),
             'todayCount' => (clone $todayQuery)->count(),
@@ -134,6 +146,9 @@ class StaffMonitoringService
             'facilities' => $facilities, 'equipmentCounts' => $equipmentCounts, 'notices' => $notices,
             'filters' => $filters, 'years' => $years, 'statusBreakdown' => $statusBreakdown, 'statusTotal' => $statusTotal,
             'equipmentAttention' => (int) $equipmentCounts->reject(fn ($count, $status) => $status === 'available')->sum(),
+            'pendingArCount' => $pendingArCount, 'completedArCount' => $completedArCount,
+            'approvedPeriodCount' => (int) $statusCounts->get('approved', 0),
+            'arReservations' => $arReservations, 'gymAvailability' => $gymAvailability,
         ];
     }
 }

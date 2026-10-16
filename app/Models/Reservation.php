@@ -27,6 +27,14 @@ class Reservation extends Model
                 )->validate();
             }
         });
+        static::saved(function (self $reservation): void {
+            if ($reservation->status === 'approved') {
+                app(\App\Services\AcknowledgementReceiptService::class)->ensureTask($reservation);
+                if ($reservation->wasChanged(['reference_number', 'contact_person', 'contact_email', 'reservation_type', 'event_name', 'event_type', 'facility_id', 'reservation_date', 'start_time', 'end_time', 'expected_attendees', 'approved_by', 'approved_at'])) {
+                    $reservation->acknowledgementTask()->update(['status' => 'pending', 'completed_by' => null, 'completed_at' => null]);
+                }
+            }
+        });
     }
 
     protected $fillable = [
@@ -117,6 +125,16 @@ class Reservation extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(ReservationDocument::class);
+    }
+
+    public function acknowledgementTask()
+    {
+        return $this->hasOne(AcknowledgementTask::class);
+    }
+
+    public function acknowledgementReceipt()
+    {
+        return $this->hasOne(AcknowledgementReceipt::class);
     }
 
     public function statusHistories(): HasMany

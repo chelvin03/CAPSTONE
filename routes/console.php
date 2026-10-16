@@ -26,6 +26,10 @@ Artisan::command('reservations:auto-cancel-pending', function () {
 
 Schedule::command('reservations:auto-cancel-pending')->hourly();
 
+Artisan::command('ar:backfill-tasks', function (\App\Services\AcknowledgementReceiptService $receipts) {
+    $this->info($receipts->backfillTasks().' missing AR task(s) created.');
+})->purpose('Idempotently create missing tasks for approved reservations without replacing existing ARs');
+
 Artisan::command('backup:create {--scheduled}', function (BackupService $backups) {
     $record = $backups->create(null, $this->option('scheduled') ? 'scheduled' : 'command');
     $this->info('Backup created and verified: '.$record->filename);

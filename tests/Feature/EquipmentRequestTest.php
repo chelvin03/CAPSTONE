@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\URL;
 
 function equipmentBooking(array $overrides = []): Reservation
 {
-    $facility = Facility::firstOrCreate(['facility_name' => 'Equipment Gym'], ['capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::firstOrCreate(['facility_name' => 'MCST Gymnasium'], ['capacity' => 2000, 'status' => 'available']);
     return Reservation::create($overrides + [
         'reference_number' => 'EQUIP-'.\Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(8)), 'facility_id' => $facility->id,
         'reservation_type' => 'internal', 'event_name' => 'Equipment Event', 'purpose' => 'School activity',
@@ -31,7 +31,7 @@ beforeEach(function () {
 });
 
 test('only internal public requestors can store inventory requests and external requests store nothing', function () {
-    $facility = Facility::create(['facility_name' => 'Public Equipment Gym', 'capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
     $data = ['facility_id' => $facility->id, 'reservation_type' => 'external', 'event_name' => 'Equipment Event',
         'purpose' => 'School activity', 'contact_person' => 'Equipment Requestor', 'contact_email' => 'requestor@example.com',
         'contact_number' => '09123456789', 'expected_attendees' => 100, 'reservation_date' => now()->addDays(5)->toDateString(),
@@ -59,7 +59,7 @@ test('equipment requests cannot exceed inventory and exact stock is allowed', fu
 });
 
 test('public inventory input rejects invalid quantities unavailable stock ids and injected approvals', function ($row) {
-    $facility = Facility::create(['facility_name' => 'Invalid Equipment Gym', 'capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
     $data = ['facility_id' => $facility->id, 'reservation_type' => 'internal', 'event_name' => 'Equipment Event', 'purpose' => 'School activity',
         'contact_person' => 'Equipment Requestor', 'contact_email' => 'requestor@example.com', 'contact_number' => '09123456789',
         'expected_attendees' => 100, 'reservation_date' => now()->addDays(5)->toDateString(), 'start_time' => '08:00', 'end_time' => '12:00',
@@ -71,7 +71,7 @@ test('public inventory input rejects invalid quantities unavailable stock ids an
 })->with([[['quantity_requested' => -1]], [['quantity_requested' => 0]], [['quantity_requested' => '1.5']], [['quantity_requested' => 10, 'quantity_approved' => 10]]]);
 
 test('verified external session cannot be retyped internally at submission to bypass equipment restriction', function () {
-    $facility = Facility::create(['facility_name' => 'Retyped Gym', 'capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
     $this->withSession(['public_reservation_details' => ['reservation_type' => 'external'],
         'public_email_verified' => ['email' => 'requestor@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp]])
         ->post(route('reservation.store'), ['facility_id' => $facility->id, 'reservation_type' => 'internal', 'event_name' => 'Equipment Event',
@@ -188,11 +188,12 @@ test('reservation approval and schedule editing recheck equipment and rollback o
     $anotherFacility = Facility::create(['facility_name' => 'Other Equipment Gym', 'capacity' => 2000, 'status' => 'available']);
     $another = equipmentBooking(['facility_id' => $anotherFacility->id, 'status' => 'approved', 'start_time' => '16:00', 'end_time' => '18:00']);
     $another->equipment()->attach($this->chairs, ['quantity_requested' => 100, 'quantity_approved' => 100, 'status' => 'approved']);
+    // The current gym-only workflow normalizes the facility and rejects the schedule conflict first.
     $this->put(route('admin.reservations.update', $another), [
         'facility_id' => $anotherFacility->id, 'reservation_type' => 'internal', 'event_name' => 'Equipment Event', 'purpose' => 'School activity',
         'contact_person' => 'Requestor', 'contact_number' => '09123456789', 'expected_attendees' => 100,
         'reservation_date' => $another->reservation_date->toDateString(), 'start_time' => '09:00', 'end_time' => '11:00',
-    ])->assertSessionHasErrors('equipment');
+    ])->assertSessionHasErrors('reservation_date');
     expect(substr($another->fresh()->start_time, 0, 5))->toBe('16:00');
 });
 

@@ -197,15 +197,14 @@ class DashboardAnalyticsService
         }
         $blocks = ScheduleBlock::whereDate('starts_on', '<=', $to)->whereDate('ends_on', '>=', $from)->get();
         $bookingQuery = (clone $query)->where('status', 'approved')->whereColumn('end_time', '>', 'start_time');
+        $bookingsByDay = $bookingQuery->get(['reservation_date', 'facility_id', 'start_time', 'end_time'])
+            ->groupBy(fn ($row) => $row->reservation_date->toDateString());
         $available = $occupied = 0;
         for ($day = $from; $day->lte($to); $day = $day->addDay()) {
             if (isset($filters['month']) && $day->month !== (int) $filters['month']) {
                 continue;
             }
-            // Only retain one day's intervals, rather than the entire report period.
-            $bookings = (clone $bookingQuery)->where('reservation_date', '>=', $day->toDateString())
-                ->where('reservation_date', '<', $day->addDay()->toDateString())
-                ->select(['facility_id', 'start_time', 'end_time'])->get()->groupBy('facility_id');
+            $bookings = $bookingsByDay->get($day->toDateString(), collect())->groupBy('facility_id');
             foreach ($facilities as $facility) {
                 $closed = $blocks->filter(fn ($block) => ($block->facility_id === null || (int) $block->facility_id === (int) $facility->id)
                     && $block->starts_on->toDateString() <= $day->toDateString() && $block->ends_on->toDateString() >= $day->toDateString())

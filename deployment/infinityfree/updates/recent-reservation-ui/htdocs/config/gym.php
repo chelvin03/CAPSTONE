@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+
+    'auth' => [
+        'local_test_admin_password_only' => (bool) env('GYM_LOCAL_TEST_ADMIN_PASSWORD_ONLY', false),
+        'local_test_staff_password_only' => (bool) env('GYM_LOCAL_TEST_STAFF_PASSWORD_ONLY', false),
+    ],
+
+    'reservation' => [
+        'daily_limit' => (int) env('GYM_RESERVATION_DAILY_LIMIT', 5),
+        'minimum_notice_days' => (int) env('GYM_RESERVATION_MINIMUM_NOTICE_DAYS', 3),
+
+        'cancellation_notice_days' => (int) env(
+            'GYM_CANCELLATION_NOTICE_DAYS',
+            3
+        ),
+
+        'reference_prefix' => env(
+            'GYM_REFERENCE_PREFIX',
+            'MCST-GYM'
+        ),
+
+        'opening_time' => env('GYM_OPENING_TIME', '07:00'),
+
+        'closing_time' => env('GYM_CLOSING_TIME', '24:00'),
+    ],
+
+    'statuses' => [
+        'new',
+        'validated',
+        'approved',
+        'rejected',
+        'cancelled',
+        'completed',
+        'waiting_list',
+    ],
+
+    'roles' => [
+        'super_admin',
+        'gym_admin',
+        'requestor',
+    ],
+
+    'requestor_categories' => [
+        'student',
+        'faculty',
+        'staff',
+        'recognized_organization',
+        'external_organization',
+        'municipal_office',
+    ],
+
+    'documents' => [
+        'disk' => 'local',
+
+        'directory' => 'reservation-documents',
+
+        'max_size_kb' => (int) env(
+            'GYM_DOCUMENT_MAX_SIZE_KB',
+            5120
+        ),
+
+        'allowed_extensions' => [
+            'pdf',
+            'jpg',
+            'jpeg',
+            'png',
+        ],
+
+        'allowed_mime_types' => [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+        ],
+    ],
+
+    'equipment' => [
+        'standalone_reservations_enabled' => false,
+    ],
+
+    'backup' => [
+        'disk' => env('GYM_BACKUP_DISK', 'local'),
+        'directory' => env('GYM_BACKUP_DIRECTORY', 'backups'),
+        'retention_days' => (int) env('GYM_BACKUP_RETENTION_DAYS', 30),
+        'schedule_time' => env('GYM_BACKUP_SCHEDULE_TIME', '02:00'),
+    ],
+
+];

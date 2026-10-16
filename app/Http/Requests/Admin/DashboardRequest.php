@@ -44,6 +44,7 @@ class DashboardRequest extends FormRequest
             'status' => ['nullable', Rule::in(['new', 'validated', 'approved', 'rejected', 'waiting_list', 'cancelled', 'completed', 'pending', 'pencil'])],
             'grouping' => ['nullable', Rule::in(['daily', 'weekly', 'monthly', 'quarterly', 'annual'])],
             'export' => ['nullable', Rule::in(['csv'])],
+            'heat_scope' => ['nullable', Rule::in(['approved', 'all'])],
         ];
     }
 

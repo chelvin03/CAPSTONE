@@ -15,6 +15,57 @@ use Illuminate\Validation\ValidationException;
 
 class ReservationReceiptController extends Controller
 {
+    public function index(Request $request, AcknowledgementReceiptService $service)
+    {
+        $filters = $request->validate(['status' => ['nullable', 'in:pending,in_progress,completed'], 'history' => ['nullable', 'boolean']]);
+        $query = Reservation::whereHas('acknowledgementTask')
+            ->when(! $request->boolean('history'), fn ($q) => $q->where('status', 'approved'))
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->whereHas('acknowledgementTask', fn ($task) => $task->where('status', $status)))
+            ->with(['acknowledgementTask', 'acknowledgementReceipt']);
+        $reservations = $service->orderedTasks($query)->paginate(15)->withQueryString();
+        return view('staff.ar.index', compact('reservations', 'filters'));
+    }
+
+    public function start(Request $request, Reservation $reservation, AcknowledgementReceiptService $service)
+    {
+        $this->authorizeBooking($request, $reservation);
+        DB::transaction(function () use ($reservation, $service, $request) {
+            $locked = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            $this->authorizeBooking($request, $locked);
+            $task = $service->ensureTask($locked);
+            if ($task->status === 'pending') $task->update(['status' => 'in_progress']);
+        });
+        return redirect()->route('staff.reservations.receipt', $reservation);
+    }
+
+    public function complete(Request $request, Reservation $reservation, AcknowledgementReceiptService $service)
+    {
+        $this->authorizeBooking($request, $reservation);
+        $data = $request->validate(['version' => ['required', 'uuid']]);
+        DB::transaction(function () use ($request, $reservation, $service, $data) {
+            $locked = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            $this->authorizeBooking($request, $locked);
+            $receipt = AcknowledgementReceipt::where('reservation_id', $locked->id)->lockForUpdate()->first();
+            if (! $receipt || $receipt->version !== $data['version'] || ! $service->current($receipt, $locked)) {
+                throw ValidationException::withMessages(['receipt' => 'Generate the current AR before marking it completed.']);
+            }
+            $task = $service->ensureTask($locked);
+            if ($task->status !== 'completed') $task->update(['status' => 'completed', 'completed_by' => $request->user()->id, 'completed_at' => now()]);
+        });
+        return back()->with('success', 'Acknowledgement receipt marked as completed.');
+    }
+
+    public function pdf(Request $request, Reservation $reservation, AcknowledgementReceiptService $service, \App\Services\AcknowledgementPdfService $pdf)
+    {
+        $this->authorizeBooking($request, $reservation);
+        $receipt = AcknowledgementReceipt::where('reservation_id', $reservation->id)->first();
+        abort_unless($receipt && $service->current($receipt, $reservation), 409, 'Generate the current AR first.');
+        return response($pdf->render($receipt), 200, [
+            'Content-Type' => 'application/pdf', 'Content-Disposition' => 'attachment; filename="AR-'.$reservation->id.'.pdf"',
+            'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     private function authorizeBooking(Request $request, Reservation $reservation): void
     {
         abort_unless($request->user()?->status === 'approved', 403);
@@ -29,6 +80,8 @@ class ReservationReceiptController extends Controller
             'reservation' => $reservation, 'receipt' => $receipt,
             'isCurrent' => $receipt && $service->current($receipt, $reservation),
             'isStaff' => $request->user()->role === 'staff',
+            'task' => $reservation->acknowledgementTask,
+            'previewBooking' => $service->snapshot($reservation),
         ]);
     }
 
@@ -40,8 +93,12 @@ class ReservationReceiptController extends Controller
             $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
             $this->authorizeBooking($request, $reservation);
             $receipt = AcknowledgementReceipt::where('reservation_id', $reservation->id)->first();
+            $task = $service->ensureTask($reservation);
             $notes = $data['notes'] ?? null;
-            if ($receipt && $service->current($receipt, $reservation) && $receipt->notes === $notes) return;
+            if ($receipt && $service->current($receipt, $reservation) && $receipt->notes === $notes) {
+                if ($task->status === 'pending') $task->update(['status' => 'in_progress']);
+                return;
+            }
             AcknowledgementReceipt::updateOrCreate(['reservation_id' => $reservation->id], [
                 'receipt_number' => 'AR-'.$reservation->reference_number,
                 'prepared_by' => $request->user()->id,
@@ -49,6 +106,7 @@ class ReservationReceiptController extends Controller
                 'version' => (string) Str::uuid(), 'notes' => $notes,
                 'prepared_at' => now(), 'sent_at' => null, 'sent_to' => null,
             ]);
+            $task->update(['status' => 'in_progress', 'completed_at' => null, 'completed_by' => null]);
         });
         return back()->with('success', 'AR prepared. Review the printable receipt, then send it to the requestor.');
     }

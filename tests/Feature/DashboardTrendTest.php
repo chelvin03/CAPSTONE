@@ -42,12 +42,12 @@ test('forecast includes zero months and excludes current and future scheduled re
         ->and($data['dashboardForecast'][2]['label'])->toBe('January 2027');
 });
 
-test('short history has no forecast and quick filters replace the form', function () {
+test('short history has no forecast and calendar and category filters remain available', function () {
     ($this->addBooking)('2026-09-01');
     $this->actingAs($this->admin)->get(route('admin.dashboard', ['period' => 'today']))
-        ->assertOk()->assertSee('This Month')->assertSee('This Year')->assertSee('Monthly Reservation Trend')
-        ->assertSee('Yearly Reservation Trend')->assertSee('Not enough history')
-        ->assertSee('name="year"', false)->assertSee('name="month"', false)->assertDontSee('name="category"', false)
+        ->assertOk()->assertSee('Monthly Reservation Trend')
+        ->assertSee('Yearly Reservation Trend')->assertSee('Insufficient history')
+        ->assertSee('name="year"', false)->assertSee('name="month"', false)->assertSee('name="category"', false)
         ->assertViewHas('filters', fn ($filters) => $filters['date_from'] === '2026-10-12' && $filters['date_to'] === '2026-10-12');
 });
 

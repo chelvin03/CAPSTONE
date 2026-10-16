@@ -12,6 +12,7 @@
     <main class="receipt">
         <header class="letterhead"><img src="{{ asset('images/admin-mcst-logo.jpg') }}" alt="MCST logo"><div><h1>Mandaluyong College of Science and Technology</h1><p>MCST Gymnasium</p><p>Reservation and Utilization System</p></div></header>
         <h2>ACKNOWLEDGEMENT RECEIPT</h2>
+        <p><strong>Date Issued:</strong> {{ $receipt->prepared_at->format('F j, Y') }}</p>
         <div class="reference"><span><strong>AR Number:</strong> {{ $receiptNumber }}</span><span><strong>Approval Date:</strong> {{ $booking['approved_at'] ? \Carbon\CarbonImmutable::parse($booking['approved_at'])->format('F j, Y') : 'Not recorded' }}</span></div>
         <p>This acknowledges the approved reservation of the gymnasium for the event and schedule below.</p>
         <table class="details"><tbody>
@@ -20,6 +21,7 @@
                 'Requestor / Contact Person' => $booking['requestor'],
                 'Requestor Type' => ucwords(str_replace('_', ' ', $booking['requestor_type'])),
                 'Event Name' => $booking['event'],
+                'Event Type' => \App\Services\DashboardAnalyticsService::label($booking['event_type'] ?? null),
                 'Facility' => $booking['facility'],
                 'Reservation Date' => \Carbon\CarbonImmutable::parse($booking['date'])->format('F j, Y'),
                 'Time' => \Carbon\CarbonImmutable::parse($booking['start'])->format('g:i A').' – '.\Carbon\CarbonImmutable::parse($booking['end'])->format('g:i A'),
