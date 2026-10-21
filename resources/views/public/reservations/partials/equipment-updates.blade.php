@@ -3,7 +3,7 @@
 <section class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5" aria-labelledby="equipment-updates-heading">
     <h3 id="equipment-updates-heading">Messages / Equipment Updates</h3>
     @if($ownsReservation)
-        @foreach($reservation->notifications as $notification)
+        @foreach($reservation->notifications->where('type', \App\Notifications\EquipmentUpdate::class) as $notification)
             <article class="mt-4 rounded-lg border border-slate-200 bg-white p-4">
                 <strong>Equipment Request Update</strong><p>Reservation Reference: {{ $reservation->reference_number }}</p>
                 <p class="mt-2 whitespace-pre-line">{{ $notification->data['message'] ?? '' }}</p>

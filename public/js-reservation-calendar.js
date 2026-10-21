@@ -2,6 +2,10 @@ function gymBookingCalendar() {
     return {
         bookingMonth: '', bookingDays: {}, bookingLoading: false, bookingError: '', bookingRequest: 0,
         bookingOpening: '', bookingClosing: '', bookingPeriod: '',
+        get hasBlackoutConflict() {
+            return this.occupied.some(slot => slot.status === 'blackout' && this.startTime < slot.end_time.slice(0, 5) && this.endTime > slot.start_time.slice(0, 5));
+        },
+        get waitingListEligible() { return this.hasSelectedConflict && !this.hasBlackoutConflict; },
         bookingClockMonth: '', bookingClockTimer: null,
         get bookingYears() {
             const first = Number(this.minimumDate.slice(0, 4));
@@ -22,7 +26,7 @@ function gymBookingCalendar() {
             if (this.endTime <= this.startTime) return 'End Time must be after Start Time.';
             const minutes = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
             if (minutes(this.endTime) - minutes(this.startTime) < 120) return 'Reservations must be at least 2 hours.';
-            if (this.hasSelectedConflict) return 'Selected time overlaps with an existing reservation. Please choose from the remaining available time.';
+            if (this.hasBlackoutConflict) return 'This time is blocked by the administrator. Choose another time.';
             return '';
         },
         bookingFullAvailable() {
@@ -49,9 +53,9 @@ function gymBookingCalendar() {
         get bookingSelectedDay() { return this.bookingDays[this.date]; },
         get bookingCanSubmit() {
             const day = this.bookingSelectedDay;
-            return Boolean(!this.bookingLoading && !this.bookingError && day?.selectable && day.status !== 'full'
+            return Boolean(!this.bookingLoading && !this.bookingError && day?.selectable
                 && this.startTime && this.endTime > this.startTime && this.startTime >= this.bookingOpening
-                && this.endTime <= this.bookingClosing && !this.bookingTimeError && !this.hasSelectedConflict);
+                && this.endTime <= this.bookingClosing && !this.bookingTimeError && (!this.hasSelectedConflict || this.waitingListEligible));
         },
         bookingTime(time) { return time?.startsWith('24:00') ? '12:00 midnight' : (time ? new Date(`2000-01-01T${time}`).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : ''); },
         bookingCanMove(offset) {
@@ -102,7 +106,7 @@ function gymBookingCalendar() {
             finally { if (request === this.bookingRequest) this.bookingLoading = false; }
         },
         bookingSelectDate(day) {
-            if (this.bookingLoading || this.bookingError || !day.selectable || day.status === 'full') return;
+            if (this.bookingLoading || this.bookingError || !day.selectable) return;
             this.bookingPeriod = ''; this.date = day.date; this.occupied = day.occupied; this.startTime = ''; this.endTime = ''; this.message = '';
             this.updateBookingSummary();
         },

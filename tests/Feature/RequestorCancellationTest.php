@@ -4,6 +4,7 @@ use App\Models\Facility;
 use App\Models\Reservation;
 
 beforeEach(function () {
+    \Illuminate\Support\Facades\Mail::fake();
     $this->travelTo(now()->startOfSecond());
     $gym = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 500, 'status' => 'available']);
     $this->booking = Reservation::create(['reference_number' => 'CANCEL-TEST', 'facility_id' => $gym->id,
@@ -16,7 +17,7 @@ beforeEach(function () {
 
 test('requestor can cancel an approved reservation with a reason and release the slot', function () {
     $this->withSession($this->proof)->get(route('reservation.track', ['reference' => $this->booking->reference_number]))
-        ->assertOk()->assertSee('Cancellation reason')->assertSee('48 hours after submission');
+        ->assertOk()->assertSee('Cancellation reason')->assertSee('three days before');
     $this->post(route('reservation.cancel', $this->booking), ['cancellation_reason' => 'Our event was postponed.'])
         ->assertSessionHasNoErrors()->assertRedirect(route('reservation.track', ['reference' => $this->booking->reference_number]));
     expect($this->booking->refresh()->status)->toBe('cancelled')
@@ -27,6 +28,7 @@ test('requestor can cancel an approved reservation with a reason and release the
     $html = $this->getJson(route('reservation.track', ['reference' => $this->booking->reference_number]))
         ->assertJsonPath('status', 'cancelled')->json('html');
     expect($html)->toContain('Our event was postponed.');
+    \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\ReservationCancelled::class);
     $this->getJson(route('reservation.availability', ['month' => $this->booking->reservation_date->format('Y-m')]))
         ->assertJsonPath('days.'.$this->booking->reservation_date->toDateString().'.status', 'available');
 });
@@ -51,15 +53,22 @@ test('a matching verified email also authorizes cancellation', function () {
     expect($this->booking->refresh()->status)->toBe('cancelled');
 });
 
-test('cancellation closes immediately after the 48 hour deadline', function () {
-    $this->travelTo($this->booking->created_at->copy()->addHours(48)->addSecond());
+test('cancellation closes immediately after the three day notice deadline', function () {
+    $this->travelTo($this->booking->requestorCancellationDeadline()->addSecond());
     $this->withSession($this->proof)->post(route('reservation.cancel', $this->booking), ['cancellation_reason' => 'Too late'])
         ->assertSessionHasErrors('cancellation_reason');
     expect($this->booking->refresh()->status)->toBe('approved');
 });
 
-test('cancellation is allowed at the 48 hour boundary', function () {
-    $this->travelTo($this->booking->created_at->copy()->addHours(48));
+test('cancellation is allowed at exactly three days before the event', function () {
+    $this->travelTo($this->booking->requestorCancellationDeadline());
+    $this->withSession($this->proof)->post(route('reservation.cancel', $this->booking), ['cancellation_reason' => 'Plans changed.'])
+        ->assertSessionHasNoErrors();
+    expect($this->booking->refresh()->status)->toBe('cancelled');
+});
+
+test('older pending submissions can still cancel with three days notice', function () {
+    $this->booking->update(['status' => 'new', 'created_at' => now()->subDays(10)]);
     $this->withSession($this->proof)->post(route('reservation.cancel', $this->booking), ['cancellation_reason' => 'Plans changed.'])
         ->assertSessionHasNoErrors();
     expect($this->booking->refresh()->status)->toBe('cancelled');

@@ -14,6 +14,7 @@
         </div>
 
         <div class="flex flex-wrap gap-2">
+        <a href="{{ route('admin.reservations.waiting-list') }}" class="btn-primary"><i class="bi bi-people" aria-hidden="true"></i> Waiting List</a>
         <a href="{{ route('admin.reservations.create', ['pencil_booking' => 1]) }}" class="btn-secondary"><i class="bi bi-pencil" aria-hidden="true"></i> Pencil Booking</a>
         <a href="{{ route('admin.reservations.create') }}"
            class="btn-primary">
@@ -106,7 +107,7 @@
                     </td>
 
                     <td class="px-4 py-3">
-                        <span class="status-badge {{ match($reservation->status) { 'approved', 'completed' => 'bg-emerald-100 text-emerald-800', 'rejected', 'cancelled' => 'bg-red-100 text-red-800', default => 'bg-amber-100 text-amber-800' } }}">
+                        <span @if($reservation->status === 'validated') style="background-color:#ffedd5;color:#c2410c" @endif class="status-badge {{ match($reservation->status) { 'approved', 'completed' => 'bg-emerald-100 text-emerald-800', 'rejected', 'cancelled' => 'bg-red-100 text-red-800', default => 'bg-amber-100 text-amber-800' } }}">
                             {{ ucfirst($reservation->status) }}
                         </span>
                     </td>

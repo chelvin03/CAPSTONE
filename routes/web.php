@@ -123,6 +123,7 @@ Route::middleware([
             Route::get('/reports', [AdminReportController::class, 'index'])
                 ->name('reports.index');
             Route::get('/reports-export', [AdminReportController::class, 'export'])->name('reports.export');
+            Route::delete('/reports/recent/{key}', [AdminReportController::class, 'forgetRecent'])->name('reports.recent.destroy');
             Route::get('/reports/generate/excel', [AdminReportController::class, 'excel'])->name('reports.excel');
             Route::get('/reports/generate/pdf', [AdminReportController::class, 'pdf'])->name('reports.pdf');
             Route::get('/reports/generate/word', [AdminReportController::class, 'word'])->name('reports.word');
@@ -151,6 +152,9 @@ Route::middleware([
 
             Route::get('/reservation-follow-up', [\App\Http\Controllers\Admin\ReservationFollowUpController::class, 'index'])->name('reservations.follow-up');
             Route::post('/reservation-follow-up/send', [\App\Http\Controllers\Admin\ReservationFollowUpController::class, 'send'])->middleware('throttle:20,1')->name('reservations.follow-up.send');
+
+            Route::get('/reservations/waiting-list', [\App\Http\Controllers\Admin\WaitingListController::class, 'index'])->name('reservations.waiting-list');
+            Route::patch('/reservations/{reservation}/review', [\App\Http\Controllers\Admin\ReservationReviewController::class, 'update'])->name('reservations.review');
 
             Route::resource('reservations', ReservationController::class)
                 ->only([

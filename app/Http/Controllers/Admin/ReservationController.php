@@ -224,7 +224,8 @@ class ReservationController extends Controller
             'notifications',
         ]);
 
-        return view('admin.reservations.show', compact('reservation'));
+        $releasedWaitingList = app(\App\Services\WaitingListService::class)->eligibleForReleasedSlot($reservation);
+        return view('admin.reservations.show', compact('reservation', 'releasedWaitingList'));
     }
 
     public function edit(Reservation $reservation): View
@@ -328,6 +329,9 @@ class ReservationController extends Controller
                 throw \Illuminate\Validation\ValidationException::withMessages(['status' => 'This reservation can no longer be approved.']);
             }
             $previousStatus = $reservation->status;
+            if ($reservation->status === 'waiting_list' && $reservation->contact_email) {
+                \App\Models\RequestorRestriction::assertCanReserve($reservation->contact_email);
+            }
             $this->assertBookableSchedule([
                 'facility_id' => $reservation->facility_id,
                 'reservation_date' => $reservation->reservation_date->toDateString(),
@@ -372,6 +376,7 @@ class ReservationController extends Controller
                 'remarks' => $validated['admin_notes'] ?? 'Reservation approved.',
             ]);
             AuditLog::record('reservation.approved', $reservation, ['previous_status' => $previousStatus]);
+            app(\App\Services\ReservationStatusNotificationService::class)->approved($reservation);
         });
 
         return back()->with('success', 'Reservation approved successfully.');
@@ -415,6 +420,11 @@ class ReservationController extends Controller
     private function assertBookableSchedule(array $details, ?int $except = null): void
     {
         $gym = Facility::whereKey($details['facility_id'])->lockForUpdate()->firstOrFail();
+        app(\App\Services\WaitingListService::class)->assertDailyLimit($gym->id, $details['reservation_date'], $except);
+        if ($details['start_time'] < config('gym.reservation.opening_time', '07:00')
+            || $details['end_time'] > config('gym.reservation.closing_time', '24:00')) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['start_time' => 'Reservations must be within gym operating hours.']);
+        }
         $conflict = Reservation::where('facility_id', $gym->id)
             ->when($except, fn ($q) => $q->whereKeyNot($except))
             ->whereDate('reservation_date', $details['reservation_date'])

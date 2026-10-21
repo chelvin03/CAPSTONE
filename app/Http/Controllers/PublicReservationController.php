@@ -81,6 +81,7 @@ class PublicReservationController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        Log::warning('Public reservation submission reached controller.', ['diagnostic' => true]);
         $request->merge(['facility_id' => Facility::gymId()]);
         $quantityAttributes = ['equipment.*.quantity_requested' => 'Equipment quantity', 'requested_equipment_quantity' => 'Custom equipment quantity'];
         $equipmentIds = array_filter(array_keys((array) $request->input('equipment', [])), fn ($id) => ctype_digit((string) $id));
@@ -151,16 +152,6 @@ class PublicReservationController extends Controller
         }
 
         $calendar = app(\App\Services\PublicCalendarService::class);
-        $hasConflict = $calendar->hasReservationConflict(
-            (int) $validated['facility_id'], $validated['reservation_date'], $validated['start_time'], $validated['end_time']
-        );
-        if ($hasConflict) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'reservation_date' => 'Selected time overlaps with a reservation or its 30-minute cleanup buffer. Please choose from the remaining available time.',
-                ]);
-        }
 
         $hasBlackout = ScheduleBlock::query()->whereDate('starts_on', '<=', $validated['reservation_date'])->whereDate('ends_on', '>=', $validated['reservation_date'])
             ->where(fn ($query) => $query->whereNull('facility_id')->orWhere('facility_id', $validated['facility_id']))
@@ -177,8 +168,8 @@ class PublicReservationController extends Controller
                 $equipmentService->validateRequests($validated['reservation_type'], $validated['equipment'] ?? [], $validated['requested_equipment'] ?? null);
                 // Serialize submissions for this facility before the final overlap check.
                 $facility = Facility::whereKey($validated['facility_id'])->lockForUpdate()->firstOrFail();
+                $conflict = $calendar->hasReservationConflict((int) $facility->id, $validated['reservation_date'], $validated['start_time'], $validated['end_time']);
                 $unavailable = $facility->status !== 'available'
-                    || $calendar->hasReservationConflict((int) $facility->id, $validated['reservation_date'], $validated['start_time'], $validated['end_time'])
                     || ScheduleBlock::whereDate('starts_on', '<=', $validated['reservation_date'])->whereDate('ends_on', '>=', $validated['reservation_date'])
                         ->where(fn ($q) => $q->whereNull('facility_id')->orWhere('facility_id', $facility->id))
                         ->where(fn ($q) => $q->whereNull('start_time')->orWhere(fn ($times) => $times->where('start_time', '<', $validated['end_time'])->where('end_time', '>', $validated['start_time'])))->exists();
@@ -206,7 +197,7 @@ class PublicReservationController extends Controller
                     'cleanup_time' => $validated['cleanup_time'] ?? null,
                     'requested_equipment' => $validated['requested_equipment'] ?? null,
                     'requested_equipment_quantity' => $validated['requested_equipment_quantity'] ?? null,
-                    'status' => 'new',
+                    'status' => $conflict ? 'waiting_list' : 'new',
                     'agreement_accepted' => true,
                     'agreement_accepted_at' => now(),
                 ]);
@@ -236,8 +227,8 @@ class PublicReservationController extends Controller
                     'reservation_id' => $reservation->id,
                     'changed_by' => null,
                     'previous_status' => null,
-                    'new_status' => 'new',
-                    'remarks' => 'Reservation submitted by requestor.',
+                    'new_status' => $reservation->status,
+                    'remarks' => $conflict ? 'Automatically placed on the waiting list because the requested schedule is occupied or within its cleanup buffer.' : 'Reservation submitted by requestor.',
                 ]);
 
                 return $reservation;
@@ -258,7 +249,7 @@ class PublicReservationController extends Controller
                 $reservation->load('facility'),
                 $trackingUrl,
                 $body,
-                $template?->subject ?? 'MCST Gymnasium Reservation Request Confirmation',
+                $reservation->status === 'waiting_list' ? 'MCST Gymnasium: Your Request Is on the Waiting List' : ($template?->subject ?? 'MCST Gymnasium Reservation Request Confirmation'),
             ));
             $request->session()->flash('reservation_email_sent', true);
         } catch (\Throwable $exception) {
@@ -471,7 +462,7 @@ class PublicReservationController extends Controller
             $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
             if (! $reservation->requestorCancellationAllowed()) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'cancellation_reason' => 'Cancellation is allowed only within 48 hours after submission, before the event starts, for an active reservation.',
+                    'cancellation_reason' => 'Online cancellation requires at least three days before the scheduled start of an active reservation. Please contact the administrator for assistance.',
                 ]);
             }
             $previous = $reservation->status;
@@ -482,6 +473,7 @@ class PublicReservationController extends Controller
                 'remarks' => 'Cancelled by requestor: '.$validated['cancellation_reason']]);
             \App\Models\AuditLog::record('reservation.requestor_cancelled', $reservation,
                 ['previous_status' => $previous, 'reason' => $validated['cancellation_reason']]);
+            app(\App\Services\ReservationCancellationService::class)->notify($reservation);
         });
         return redirect()->route('reservation.track', ['reference' => $reservation->reference_number])
             ->with('success', 'Your reservation has been cancelled. Your reason has been recorded.');

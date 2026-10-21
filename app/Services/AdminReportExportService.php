@@ -34,7 +34,7 @@ class AdminReportExportService
                 ['Period end', $data['filters']['date_to']],
                 ...array_map(fn ($label, $value) => [$label, $value], array_keys($data['metrics']), array_values($data['metrics'])),
                 ['Calculation', $data['note']],
-            ]);
+            ], null, 'A1', true);
             $summary->getColumnDimension('A')->setWidth(35);
             $summary->getColumnDimension('B')->setWidth(90);
             $summary->getStyle('B1:B20')->getAlignment()->setWrapText(true);
@@ -81,41 +81,22 @@ class AdminReportExportService
 
     public function pdf(array $data, ReservationReportService $service): BinaryFileResponse
     {
-        $pdf = new class('L', 'mm', 'A4') extends \tFPDF {
-            public array $report;
-
-            public function Header()
-            {
-                $this->SetFont('DejaVu', '', 12);
-                $this->SetTextColor(30, 58, 138);
-                $this->Cell(0, 7, 'MCST Gymnasium Reservation and Utilization System', 0, 1);
-                $this->SetFont('DejaVu', '', 10);
-                $this->Cell(0, 6, $this->report['title'], 0, 1);
-                $this->SetTextColor(71, 85, 105);
-                $this->SetFont('DejaVu', '', 8);
-                $this->Cell(0, 6, 'Period: '.$this->report['filters']['date_from'].' to '.$this->report['filters']['date_to'].' | Generated: '.$this->report['generatedAt']->format('Y-m-d H:i T'), 0, 1);
-                $this->Ln(3);
-            }
-
-            public function Footer()
-            {
-                $this->SetY(-12);
-                $this->SetFont('DejaVu', '', 8);
-                $this->Cell(0, 6, 'MCST | Page '.$this->PageNo(), 0, 0, 'C');
-            }
-        };
+        $pdf = new ReportPdf('L', 'mm', 'A4');
         $pdf->report = $data;
         $pdf->SetTitle('MCST - '.$data['title']);
         $pdf->SetAuthor('MCST');
         $pdf->SetSubject($data['filters']['date_from'].' to '.$data['filters']['date_to']);
-        $pdf->AddFont('DejaVu', '', 'DejaVuSans.ttf', true);
+        $pdf->registerReportFont();
         $pdf->SetAutoPageBreak(true, 18);
         $pdf->AddPage();
         foreach ($data['metrics'] as $label => $value) $pdf->MultiCell(0, 6, $label.': '.$value);
         $pdf->Ln(2);
         $pdf->MultiCell(0, 5, $data['note']);
         $pdf->Ln(4);
-        $widths = count($data['headers']) === 2 ? [210, 67] : [35, 64, 27, 16, 16, 80, 39];
+        // Landscape A4 provides 277 mm between the default 10 mm margins.
+        $widths = count($data['headers']) === 2 ? [210, 67] : [32, 51, 27, 15, 15, 47, 32, 28, 30];
+        $scale = 277 / array_sum($widths);
+        $widths = array_map(fn ($width) => $width * $scale, $widths);
         $header = function () use ($pdf, $widths, $data): void {
             $pdf->SetFillColor(238, 242, 255);
             foreach ($data['headers'] as $index => $label) $pdf->Cell($widths[$index], 8, $label, 1, 0, 'L', true);
@@ -133,23 +114,33 @@ class AdminReportExportService
                 }
                 $wrapped[] = $lines;
             }
-            $height = max(array_map('count', $wrapped)) * 5;
-            if ($pdf->GetY() + $height > 190) {
-                $pdf->AddPage();
-                $header();
+            $remaining = max(array_map('count', $wrapped));
+            $offset = 0;
+            while ($remaining > 0) {
+                $fit = (int) floor((190 - $pdf->GetY()) / 5);
+                if ($fit < 1) {
+                    $pdf->AddPage();
+                    $header();
+                    $fit = (int) floor((190 - $pdf->GetY()) / 5);
+                }
+                $take = min($remaining, $fit);
+                $height = $take * 5;
+                $x = 10;
+                $y = $pdf->GetY();
+                foreach ($wrapped as $index => $lines) {
+                    $pdf->Rect($x, $y, $widths[$index], $height);
+                    $pdf->SetXY($x, $y);
+                    $pdf->MultiCell($widths[$index], 5, implode("\n", array_slice($lines, $offset, $take)));
+                    $x += $widths[$index];
+                }
+                $pdf->SetXY(10, $y + $height);
+                $offset += $take;
+                $remaining -= $take;
             }
-            $x = $pdf->GetX();
-            $y = $pdf->GetY();
-            foreach ($wrapped as $index => $lines) {
-                $pdf->Rect($x, $y, $widths[$index], $height);
-                $pdf->SetXY($x, $y);
-                $pdf->MultiCell($widths[$index], 5, implode("\n", $lines));
-                $x += $widths[$index];
-            }
-            $pdf->SetXY(10, $y + $height);
         }
         if ($data['total'] === 0) $pdf->MultiCell(0, 8, 'No reservations match the selected period.');
         $path = tempnam(sys_get_temp_dir(), 'mcst-pdf-');
+        if ($path === false) throw new \RuntimeException('The PDF temporary folder is not writable.');
         try {
             $pdf->Output('F', $path);
         } catch (\Throwable $exception) {

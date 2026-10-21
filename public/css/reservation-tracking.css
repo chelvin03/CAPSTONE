@@ -48,3 +48,4 @@
 .tracking-cancellation .tracking-danger:hover { background: #991b1b; border-color: #991b1b; }
 .tracking-cancellation .tracking-danger:focus-visible { outline-color: #b91c1c; }
 @media (max-width: 640px) { .tracking-cancellation .tracking-danger { width: 100%; } }
+.waiting-list-notice{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 32px));max-height:85dvh;overflow:auto;border:1px solid #dbe7fa;border-radius:16px;padding:26px;background:#fff;color:#172554;box-shadow:0 24px 70px #0f172a40}.waiting-list-notice::backdrop{background:rgba(15,23,42,.65)}.waiting-list-notice h2{font-size:23px;font-weight:700;color:#1d4ed8;line-height:1.3}.waiting-list-notice p{font-size:15px;line-height:1.6;margin-top:14px}.waiting-list-notice form{margin-top:22px}.waiting-list-notice button{width:100%}

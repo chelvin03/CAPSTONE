@@ -99,10 +99,14 @@ class Reservation extends Model
     public function requestorCancellationAllowed(): bool
     {
         return in_array($this->status, ['new', 'pending', 'validated', 'approved', 'waiting_list', 'pencil'], true)
-            && $this->created_at !== null && now()->lte($this->created_at->copy()->addHours(48))
-            && now()->lt($this->reservation_date->copy()->startOfDay()->addMinutes(
-                (int) substr($this->start_time, 0, 2) * 60 + (int) substr($this->start_time, 3, 2)
-            ));
+            && now()->lte($this->requestorCancellationDeadline());
+    }
+
+    public function requestorCancellationDeadline(): \Carbon\Carbon
+    {
+        return $this->reservation_date->copy()->startOfDay()->addMinutes(
+            (int) substr($this->start_time, 0, 2) * 60 + (int) substr($this->start_time, 3, 2)
+        )->subDays(3);
     }
 
     public function facility(): BelongsTo

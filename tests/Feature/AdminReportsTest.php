@@ -15,7 +15,7 @@ function adminReportFixture(array $overrides = []): Reservation
         'facility_id' => $facility->id, 'user_id' => User::first()->id,
         'reservation_type' => 'school', 'event_type' => 'Sports', 'event_name' => 'Gym event',
         'purpose' => 'Testing', 'contact_person' => 'Private Person', 'contact_email' => 'private@example.com',
-        'contact_number' => '09123456789', 'expected_attendees' => 20,
+        'contact_number' => '09123456789', 'expected_attendees' => 100,
         'reservation_date' => '2026-09-01', 'start_time' => '09:00', 'end_time' => '11:00', 'status' => 'approved',
     ], $overrides));
 }
@@ -26,7 +26,7 @@ test('all five previews and both exports match real reservation date totals', fu
     adminReportFixture(['reference_number' => 'BOUNDARY-END', 'reservation_date' => '2026-09-30', 'status' => 'cancelled', 'event_type' => 'Ceremony']);
     adminReportFixture(['reference_number' => 'OUTSIDE', 'reservation_date' => '2026-10-01']);
     $filters = ['report_type' => $type, 'date_from' => '2026-09-01', 'date_to' => '2026-09-30'];
-    $expected = in_array($type, ['utilization', 'cancellation']) ? 1 : 2;
+    $expected = match ($type) { 'utilization', 'cancellation' => 1, 'no_show', 'equipment' => 0, default => 2 };
     $this->actingAs($admin)->get(route('admin.reports.index', $filters))->assertOk()
         ->assertViewHas('data', fn ($data) => $data['total'] === $expected)
         ->assertDontSee('private@example.com')->assertDontSee('Private Person')->assertDontSee('OUTSIDE');
@@ -97,11 +97,34 @@ test('utilization shares dashboard merged hours closures and unavailable capacit
 
 test('quick reports use the current month and admin authorization is retained', function () {
     $this->travelTo(\Carbon\Carbon::parse('2026-10-05'));
-    $this->actingAs(User::factory()->create(['role' => 'admin']))->get(route('admin.reports.index'))->assertOk()->assertSee('2026-10-01 to 2026-10-31');
+    $this->actingAs(User::factory()->create(['role' => 'admin']))->get(route('admin.reports.index'))->assertOk()
+        ->assertViewHas('defaults', fn ($defaults) => $defaults['date_from'] === '2026-10-01' && $defaults['date_to'] === '2026-10-31')
+        ->assertSee('No-show Report')->assertSee('Equipment Request Report');
     $this->actingAs(User::factory()->create(['role' => 'staff']));
     foreach (['index', 'excel', 'pdf', 'word', 'export'] as $endpoint) $this->get(route('admin.reports.'.$endpoint))->assertForbidden();
     auth()->logout();
     $this->get(route('admin.reports.index'))->assertRedirect(route('login'));
+});
+
+test('report filters no-show equipment and session history work together', function () {
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $included = adminReportFixture(['status' => 'no_show', 'event_type' => 'Sports', 'reference_number' => 'INCLUDED-REPORT']);
+    adminReportFixture(['status' => 'new', 'reference_number' => 'EXCLUDED-REPORT']);
+    $equipment = \App\Models\Equipment::create(['equipment_name' => 'Report Speaker', 'total_quantity' => 10, 'unit' => 'piece', 'status' => 'available']);
+    $included->equipment()->attach($equipment->id, ['quantity_requested' => 3, 'quantity_approved' => 2, 'status' => 'approved']);
+    $filters = ['report_type' => 'no_show', 'date_from' => '2026-09-01', 'date_to' => '2026-09-30',
+        'status' => 'no_show', 'category' => 'Sports', 'facility_id' => $included->facility_id];
+    $this->get(route('admin.reports.index', $filters))->assertOk()->assertSee('INCLUDED-REPORT')->assertDontSee('EXCLUDED-REPORT')
+        ->assertViewHas('data', fn ($data) => $data['total'] === 1);
+    $filters['report_type'] = 'equipment';
+    $this->get(route('admin.reports.index', $filters))->assertOk()->assertSee('Report Speaker')
+        ->assertViewHas('data', fn ($data) => $data['rows']->first() === ['INCLUDED-REPORT', '2026-09-01', 'Report Speaker', 3, 2, 'Approved']);
+    $history = session('admin_report_history');
+    expect($history)->toHaveCount(2);
+    $this->delete(route('admin.reports.recent.destroy', array_key_first($history)))->assertRedirect(route('admin.reports.index'));
+    expect(session('admin_report_history'))->toHaveCount(1);
+    $filters['category'] = 'Ceremony';
+    $this->get(route('admin.reports.index', $filters))->assertViewHas('data', fn ($data) => $data['total'] === 0);
 });
 
 test('exports include records beyond pagination and database chunks and escape event content', function () {

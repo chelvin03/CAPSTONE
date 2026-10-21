@@ -17,6 +17,8 @@ class ReservationReportService
         'status' => 'Reservation Status Report',
         'event_type' => 'Event Type Report',
         'cancellation' => 'Cancellation Report',
+        'no_show' => 'No-show Report',
+        'equipment' => 'Equipment Request Report',
     ];
 
     public function reportFilters(Request $request): array
@@ -25,14 +27,19 @@ class ReservationReportService
             'report_type' => ['required', 'in:'.implode(',', array_keys(self::TYPES))],
             'date_from' => ['required', 'date_format:Y-m-d'],
             'date_to' => ['required', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'category' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'in:new,pending,pencil,validated,waiting_list,approved,rejected,cancelled,completed,no_show'],
+            'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
         ]);
     }
 
     public function reportQuery(array $filters): Builder
     {
-        return app(DashboardAnalyticsService::class)->records($filters)
+        return app(DashboardAnalyticsService::class)->records($filters)->with('eventOutcome')
             ->when($filters['report_type'] === 'cancellation', fn ($query) => $query->where('status', 'cancelled'))
-            ->when($filters['report_type'] === 'utilization', fn ($query) => $query->where('status', 'approved'));
+            ->when($filters['report_type'] === 'utilization', fn ($query) => $query->where('status', 'approved'))
+            ->when($filters['report_type'] === 'no_show', fn ($query) => $query->where('status', 'no_show'))
+            ->when($filters['report_type'] === 'equipment', fn ($query) => $query->whereHas('equipment'));
     }
 
     public function reportData(array $filters): array
@@ -43,7 +50,13 @@ class ReservationReportService
         $metrics = ['Reservations' => $total];
         $rows = null;
         $note = 'Reporting uses the reservation/event date, including both selected dates. Statuses reflect the current record status.';
-        if ($filters['report_type'] === 'status') {
+        if ($filters['report_type'] === 'equipment') {
+            $rows = (clone $query)->with('equipment')->get()->flatMap(fn ($record) => $record->equipment->map(fn ($item) => [
+                $record->reference_number, $record->reservation_date->format('Y-m-d'), $item->equipment_name,
+                $item->pivot->quantity_requested, $item->pivot->quantity_approved ?? 0,
+                DashboardAnalyticsService::label($item->pivot->status),
+            ]));
+        } elseif ($filters['report_type'] === 'status') {
             $statuses = array_unique(array_merge(['new', 'validated', 'approved', 'rejected', 'waiting_list', 'cancelled'], $counts->keys()->all()));
             $rows = collect($statuses)->map(fn ($status) => [DashboardAnalyticsService::label($status), (int) $counts->get($status, 0)]);
         } elseif ($filters['report_type'] === 'event_type') {
@@ -55,17 +68,22 @@ class ReservationReportService
             $metrics += ['Approved booked hours' => $usage['utilizedHours'] ?? 'Unavailable', 'Bookable hours' => $usage['availableHours'] ?? 'Unavailable', 'Utilization' => $usage['utilizationRate'] === null ? 'Unavailable' : $usage['utilizationRate'].'%'];
             $note .= ' Approved time intervals are merged per facility/day, clipped to configured operating hours, and reduced by schedule closures. Capacity covers all facilities and calendar days, matching the dashboard. Percentage is unavailable when hours are invalid or capacity is zero.';
         } elseif ($filters['report_type'] === 'reservation') {
-            $metrics += ['Approved' => (int) $counts->get('approved', 0), 'Cancelled' => (int) $counts->get('cancelled', 0)];
+            $actual = \App\Models\ReservationEventOutcome::where('outcome', 'completed')
+                ->whereIn('reservation_id', (clone $query)->reorder()->select('reservations.id')->where('status', 'completed'))
+                ->sum('actual_attendees');
+            $metrics += ['Approved' => (int) $counts->get('approved', 0), 'Cancelled' => (int) $counts->get('cancelled', 0),
+                'Completed' => (int) $counts->get('completed', 0), 'Recorded actual attendees' => (int) $actual];
         }
 
         return ['title' => self::TYPES[$filters['report_type']], 'filters' => $filters, 'metrics' => $metrics, 'rows' => $rows, 'total' => $total, 'note' => $note,
-            'headers' => $rows !== null ? [$filters['report_type'] === 'status' ? 'Status' : 'Event type', 'Reservations'] : ['Reference', 'Event', 'Reservation date', 'Start', 'End', 'Facility', 'Status'],
+            'headers' => $filters['report_type'] === 'equipment' ? ['Reference', 'Reservation date', 'Equipment', 'Requested', 'Approved', 'Status'] : ($rows !== null ? [$filters['report_type'] === 'status' ? 'Status' : 'Event type', 'Reservations'] : ['Reference', 'Event', 'Reservation date', 'Start', 'End', 'Facility', 'Status', 'Expected attendees', 'Actual attendees']),
             'generatedAt' => now()];
     }
 
     public function reportRow(Reservation $record): array
     {
-        return [$record->reference_number, $record->event_name, $record->reservation_date->format('Y-m-d'), substr($record->start_time, 0, 5), substr($record->end_time, 0, 5), $record->facility?->facility_name ?? 'Unassigned', DashboardAnalyticsService::label($record->status)];
+        return [$record->reference_number, $record->event_name, $record->reservation_date->format('Y-m-d'), substr($record->start_time, 0, 5), substr($record->end_time, 0, 5), $record->facility?->facility_name ?? 'Unassigned', DashboardAnalyticsService::label($record->status), $record->expected_attendees,
+            $record->eventOutcome && $record->eventOutcome->outcome === $record->status ? $record->eventOutcome->actual_attendees : 'Not recorded'];
     }
 
     public function exportRows(array $data): iterable

@@ -97,6 +97,7 @@ class ScheduleProposalService
                 $previous = $reservation->status;
                 $changes = $proposal->target;
                 if ($proposal->kind === 'waiting_list') {
+                    app(WaitingListService::class)->assertDailyLimit((int) $proposal->target['facility_id'], $proposal->target['reservation_date'], $reservation->id);
                     if ($reservation->status !== 'waiting_list') throw ValidationException::withMessages(['schedule' => 'This request is no longer waiting for a slot.']);
                     \App\Models\RequestorRestriction::assertCanReserve($reservation->contact_email);
                     $changes += ['status' => 'approved', 'approved_by' => $proposal->created_by, 'approved_at' => now()];

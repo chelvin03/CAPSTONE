@@ -9,6 +9,17 @@
     @if($errors->any())<div class="tracking-message" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
     @if($reservation && session('reservation_submitted') === $reservation->reference_number)
     <div class="tracking-success" role="status"><span aria-hidden="true">&#10003;</span><h1>Reservation Submitted Successfully</h1><p>Your reservation is saved. Follow its progress below.</p></div>
+    @if($reservation->status === 'waiting_list')
+    <dialog id="waiting-list-notice" class="waiting-list-notice" aria-labelledby="waiting-list-notice-title">
+        <h2 id="waiting-list-notice-title">Your request is on the waiting list</h2>
+        <p>Your selected schedule is occupied or within another booking’s cleanup buffer, so your request was automatically placed on the waiting list.</p>
+        <p>An administrator will review your request for approval when a suitable slot becomes available. Your booking is not confirmed yet.</p>
+        <p><strong>Reference:</strong> {{ $reservation->reference_number }}</p>
+        <p>@if(session('reservation_email_sent'))An email with your waiting-list status and tracking link has been sent to {{ $reservation->contact_email }}.@else Your request is saved, but its email could not be sent. Save your reference number and check the status here. You do not need to submit again.@endif</p>
+        <form method="dialog"><button class="tracking-button tracking-primary" autofocus>Understood</button></form>
+    </dialog>
+    <script>document.getElementById('waiting-list-notice').showModal();</script>
+    @endif
     @else
     <h1>Track Your Reservation</h1>
     @endif<p>Enter your reservation reference number from your confirmation screen or email.</p>
@@ -18,8 +29,8 @@
     @if($reservation && $ownsReservation && $reservation->requestorCancellationAllowed())
     <section class="tracking-cancellation" aria-labelledby="cancellation-heading">
         <h3 id="cancellation-heading">Cancel Reservation</h3>
-        <p>You may cancel within 48 hours after submission, before your event starts. A reason is required.</p>
-        <p class="tracking-cancellation-deadline"><strong>Cancellation deadline:</strong> {{ $reservation->created_at->copy()->addHours(48)->format('F d, Y g:i A') }} ({{ config('app.timezone') }}).</p>
+        <p>You may cancel online at least three days before your scheduled event starts. A reason is required.</p>
+        <p class="tracking-cancellation-deadline"><strong>Cancellation deadline:</strong> {{ $reservation->requestorCancellationDeadline()->format('F d, Y g:i A') }} ({{ config('app.timezone') }}).</p>
         <form method="POST" action="{{ route('reservation.cancel', $reservation) }}" onsubmit="return confirm('Cancel this reservation? Your schedule will be released.');">
             @csrf
             <p id="cancellation-help">Cancelling releases your reserved schedule. To reserve again, you will need to submit a new request.</p>
@@ -29,7 +40,7 @@
         </form>
     </section>
     @elseif($reservation && $ownsReservation && !in_array($reservation->status, ['cancelled', 'rejected', 'completed', 'no_show'], true))
-        <p class="tracking-message">Online cancellation is closed. Cancellation is allowed within 48 hours after submission and before the event starts. Please contact the administrator for assistance.</p>
+        <p class="tracking-message">Online cancellation is closed. Cancellation requires at least three days before the scheduled event starts. Please contact the administrator for assistance.</p>
     @endif
 </div></div>
 <script src="{{ asset('js-reservation-tracking.js') }}?v={{ filemtime(public_path('js-reservation-tracking.js')) }}"></script>

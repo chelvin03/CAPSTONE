@@ -26,11 +26,29 @@ class ReportController extends Controller
         $defaults = ['report_type' => 'reservation', 'date_from' => now()->startOfMonth()->toDateString(), 'date_to' => now()->endOfMonth()->toDateString()];
         $filters = $request->hasAny(['report_type', 'date_from', 'date_to']) ? $service->reportFilters($request) : $defaults;
         $data = $request->hasAny(['report_type', 'date_from', 'date_to']) ? $service->reportData($filters) : null;
+        if ($data) {
+            $history = $request->session()->get('admin_report_history', []);
+            $key = substr(hash('sha256', json_encode($filters)), 0, 20);
+            unset($history[$key]);
+            $history = [$key => ['title' => $data['title'], 'filters' => $filters, 'generated_at' => now()->toDateTimeString(), 'generated_by' => $request->user()->full_name]] + $history;
+            $request->session()->put('admin_report_history', array_slice($history, 0, 20, true));
+        }
         return view('admin.reports.index', [
             'types' => ReservationReportService::TYPES, 'filters' => $filters, 'defaults' => $defaults, 'data' => $data,
             'records' => $data && $data['rows'] === null ? $service->reportQuery($filters)->paginate(25)->withQueryString() : null,
             'service' => $service,
+            'recentReports' => $request->session()->get('admin_report_history', []),
+            'facilities' => \App\Models\Facility::orderBy('facility_name')->get(['id', 'facility_name']),
+            'eventTypes' => Reservation::whereNotNull('event_type')->distinct()->orderBy('event_type')->pluck('event_type'),
         ]);
+    }
+
+    public function forgetRecent(Request $request, string $key)
+    {
+        $history = $request->session()->get('admin_report_history', []);
+        unset($history[$key]);
+        $request->session()->put('admin_report_history', $history);
+        return redirect()->route('admin.reports.index')->with('success', 'Report removed from recent history.');
     }
 
     public function show(AnalyticsReport $report): View
@@ -104,9 +122,23 @@ class ReportController extends Controller
         return response()->download($path, 'mcst-reservation-report-'.now()->format('Y-m-d-His').'.xlsx')->deleteFileAfterSend(true);
     }
 
-    public function pdf(Request $request, ReservationReportService $service): BinaryFileResponse
+    public function pdf(Request $request, ReservationReportService $service): BinaryFileResponse|\Illuminate\Http\RedirectResponse
     {
-        return app(\App\Services\AdminReportExportService::class)->pdf($service->reportData($service->reportFilters($request)), $service);
+        $filters = $service->reportFilters($request);
+        try {
+            return app(\App\Services\AdminReportExportService::class)->pdf($service->reportData($filters), $service);
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::error('PDF report export failed.', [
+                'exception_type' => get_class($exception),
+                'report_type' => $filters['report_type'],
+                'error_message' => $exception->getMessage(),
+                'error_file' => basename($exception->getFile()),
+                'error_line' => $exception->getLine(),
+            ]);
+            return redirect()->route('admin.reports.index', $filters)->withErrors([
+                'export' => 'The PDF could not be generated. Please try again. If this continues, ask the administrator to check the PDF font files, PHP extensions, temporary-folder permissions, and application log.',
+            ]);
+        }
     }
 
     public function word(Request $request, ReservationReportService $service): BinaryFileResponse

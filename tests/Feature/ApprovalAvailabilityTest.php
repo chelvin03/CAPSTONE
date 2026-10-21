@@ -28,8 +28,8 @@ test('unapproved requests do not consume either availability endpoint', function
         ->assertJsonPath('days.'.$this->date.'.occupied', []);
 })->with(['new', 'pending', 'validated', 'waiting_list', 'pencil', 'cancelled', 'rejected']);
 
-test('multiple requests can be submitted for a pending slot but not after approval', function () {
-    $payload = ['reservation_type' => 'internal', 'event_name' => 'Practice', 'purpose' => 'Sports', 'contact_person' => 'Requestor',
+test('pending slots accept new requests and occupied slots automatically create waiting requests', function () {
+    $payload = ['reservation_type' => 'internal', 'event_type' => config('event-types')[0], 'purpose' => 'Sports', 'contact_person' => 'Requestor',
         'contact_email' => 'requestor@example.com', 'contact_number' => '09123456789', 'expected_attendees' => 100,
         'reservation_date' => $this->date, 'start_time' => '09:00', 'end_time' => '11:00', 'agreement' => 1, 'agreement_accepted' => 1,
         'permit' => \Illuminate\Http\UploadedFile::fake()->create('letter.pdf', 10, 'application/pdf')];
@@ -41,7 +41,8 @@ test('multiple requests can be submitted for a pending slot but not after approv
     $this->actingAs($this->admin)->patch(route('admin.reservations.approve', $first))->assertSessionHasNoErrors();
     $this->patch(route('admin.reservations.approve', Reservation::latest('id')->first()))->assertSessionHasErrors('reservation_date');
     $this->getJson(route('reservation.availability', ['date' => $this->date]))->assertOk()->assertJsonCount(1);
-    $this->withSession($proof)->post(route('reservation.store'), $payload)->assertSessionHasErrors('reservation_date');
+    $this->withSession($proof)->post(route('reservation.store'), $payload)->assertSessionHasNoErrors();
+    expect(Reservation::latest('id')->first()->status)->toBe('waiting_list');
     expect(Reservation::where('status', 'approved')->count())->toBe(1);
 });
 

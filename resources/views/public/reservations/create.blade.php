@@ -67,7 +67,8 @@
 
 <div class="booking-calendar" aria-labelledby="booking-calendar-heading" :aria-busy="bookingLoading">
     <h3 id="booking-calendar-heading">Reservation Calendar / Gym Availability</h3>
-    <p>Select an available date, then choose a time. Your selection updates the summary below.</p>
+    <p class="booking-notice">If your selected schedule is occupied, your submitted request will automatically be placed on the waiting list for administrator review. Administrator closures remain unavailable.</p>
+    <p>Select a date, then choose your preferred time. Your selection updates the summary below.</p>
     <div class="flex flex-wrap items-center justify-center gap-3 mb-4">
         <label>Month <select aria-label="Calendar month" :value="Number(bookingMonth.slice(5, 7))" @change="bookingChooseMonth(bookingMonth.slice(0, 4), $event.target.value)" :disabled="bookingLoading" class="rounded-lg border-slate-300">
             @foreach (range(1, 12) as $monthNumber)
@@ -76,20 +77,20 @@
         </select></label>
         <label>Year <select aria-label="Calendar year" :value="Number(bookingMonth.slice(0, 4))" @change="bookingChooseMonth($event.target.value, bookingMonth.slice(5, 7))" :disabled="bookingLoading" class="rounded-lg border-slate-300"><template x-for="year in bookingYears" :key="year"><option :value="year" x-text="year"></option></template></select></label>
     </div>
-    <p class="booking-notice">Submitting a request does not hold the slot. Other requests may use the same time until an administrator approves a booking.</p><p class="booking-notice">Green: Available. Yellow: Partly reserved, with available times. Red: Unavailable. Select a green or yellow date to see available times.</p>
+    <p class="booking-notice">Submitting a request does not hold the slot. Other requests may use the same time until an administrator approves a booking.</p><p class="booking-notice">Green: Available. Yellow: Partly reserved, with available times. Red: Fully booked or unavailable. Occupied schedules can be requested for the waiting list. Administrator closures cannot be requested.</p>
     <div class="booking-month-nav"><button type="button" @click="bookingMoveMonth(-1)" :disabled="!bookingCanMove(-1) || bookingLoading" aria-label="Previous calendar month">&larr;</button><h4 x-text="bookingMonthLabel"></h4><button type="button" @click="bookingMoveMonth(1)" :disabled="!bookingCanMove(1) || bookingLoading" aria-label="Next calendar month">&rarr;</button></div>
     <p x-show="bookingLoading" role="status">Loading date availability...</p>
     <div x-show="bookingError" role="alert"><p x-text="bookingError"></p><button type="button" @click="loadBookingMonth" class="wizard-secondary">Retry availability</button></div>
     <div class="booking-calendar-scroll" tabindex="0" role="region" aria-label="Monthly reservation calendar; scroll horizontally on small screens">
         <div class="booking-weekdays"><span>Sunday</span><span>Monday</span><span>Tuesday</span><span>Wednesday</span><span>Thursday</span><span>Friday</span><span>Saturday</span></div>
-        <div class="booking-day-grid"><template x-for="(day, index) in bookingCells" :key="day ? day.date : 'blank-' + index"><div><template x-if="day"><button type="button" class="booking-day" :class="{'day-selected': date === day.date, 'day-full': !!day.status && (!day.selectable || day.status === 'full'), 'day-partial': day.selectable && day.status === 'partial', 'day-available': day.selectable && day.status === 'available'}" :disabled="bookingLoading || !!bookingError || !day.selectable || day.status === 'full'" @click="bookingSelectDate(day)" :aria-pressed="date === day.date" :aria-label="day.date + ': ' + (day.label || 'Loading') + (!day.selectable ? ', outside booking window' : '')"><span class="booking-day-number" x-text="day.number"></span><span class="booking-day-status" x-text="day.status && !day.selectable ? 'Unavailable' : (day.label || 'Loading...')"></span><span x-show="date === day.date">Selected date</span></button></template></div></template></div>
+        <div class="booking-day-grid"><template x-for="(day, index) in bookingCells" :key="day ? day.date : 'blank-' + index"><div><template x-if="day"><button type="button" class="booking-day" :class="{'day-selected': date === day.date, 'day-full': !!day.status && (!day.selectable || day.status === 'full'), 'day-partial': day.selectable && day.status === 'partial', 'day-available': day.selectable && day.status === 'available'}" :disabled="bookingLoading || !!bookingError || !day.selectable" @click="bookingSelectDate(day)" :aria-pressed="date === day.date" :aria-label="day.date + ': ' + (day.label || 'Loading') + (!day.selectable ? ', outside booking window' : '')"><span class="booking-day-number" x-text="day.number"></span><span class="booking-day-status" x-text="day.status && !day.selectable ? 'Unavailable' : (day.label || 'Loading...')"></span><span x-show="date === day.date">Selected date</span></button></template></div></template></div>
     </div>
     <p class="booking-notice" x-show="bookingOpening && !bookingError">Gymnasium Operating Hours: <span x-text="bookingTime(bookingOpening) + ' - ' + bookingTime(bookingClosing)"></span></p>
     <p class="booking-notice">Available times allow a 30-minute cleanup gap between reservations. Book at least 2 hours, with start and end times on the hour or half-hour.</p>
     <div class="booking-slot-section"><h4>Booking Time Slots <span x-show="date" x-text="' - ' + selectedDateLabel"></span></h4>
         <p x-show="!date">Select a date to see available times.</p>
         <p x-show="date && !bookingSelectedDay && !bookingLoading && !bookingError">View the selected date's month to see its time slots.</p>
-        <p x-show="bookingSelectedDay?.status === 'full'">Fully Booked &mdash; no remaining gym time slots on this date.</p>
+        <p x-show="bookingSelectedDay?.status === 'full'">Fully booked or unavailable. You may enter your preferred time below for the waiting list if the schedule is occupied. Administrator closures remain blocked.</p>
         <div class="booking-slot-grid"><template x-for="slot in bookingAvailablePeriods" :key="slot.start_time"><button type="button" class="booking-slot" :class="{'slot-selected': startTime === slot.start_time && endTime === slot.end_time}" :disabled="!slot.available || bookingLoading || !!bookingError || !bookingSelectedDay?.selectable" @click="bookingSelectSlot(slot)" :aria-pressed="startTime === slot.start_time && endTime === slot.end_time"><span class="booking-slot-time" x-text="bookingTime(slot.start_time) + ' - ' + bookingTime(slot.end_time)"></span><span x-text="slot.label"></span><span x-show="slot.available && startTime === slot.start_time && endTime === slot.end_time">Selected time</span></button></template></div>
         <div class="booking-custom-times" x-show="bookingSelectedDay && !bookingLoading && !bookingError">
             <div class="booking-full-period">
@@ -98,10 +99,10 @@
             </div>
             <div><label for="start_time">Start Time</label><input type="time" id="start_time" name="start_time" x-model="startTime" min="07:00" max="23:30" step="1800" required @change="updateBookingSummary" aria-describedby="booking-time-status"></div>
                         <div><label for="end_time">End Time</label><input type="time" id="end_time" name="end_time" x-model="endTime" min="07:00" max="23:30" step="1800" :required="endTime !== '24:00'" :disabled="endTime === '24:00'" x-show="endTime !== '24:00'" @change="updateBookingSummary" aria-describedby="booking-time-status"><input type="hidden" name="end_time" value="24:00" :disabled="endTime !== '24:00'"><label class="mt-3 flex items-center gap-2" x-show="bookingClosing === '24:00'"><input type="checkbox" :checked="endTime === '24:00'" @change="endTime = $event.target.checked ? '24:00' : ''; updateBookingSummary()">End at 12:00 midnight</label></div>
-            <p id="booking-time-status" class="booking-time-status" :style="(bookingTimeError || (!bookingCanSubmit && eventNextError)) ? 'color: #b91c1c; font-weight: 600' : ''" role="status" x-text="(bookingTimeError || (!bookingCanSubmit && eventNextError)) ? 'Time Unavailable - ' + (bookingTimeError || eventNextError) : (bookingCanSubmit ? 'Time Available' : 'Choose your Start Time and End Time.')"></p>
+            <p id="booking-time-status" class="booking-time-status" :style="(bookingTimeError || (!bookingCanSubmit && eventNextError)) ? 'color: #b91c1c; font-weight: 600' : ''" role="status" x-text="(bookingTimeError || (!bookingCanSubmit && eventNextError)) ? 'Time Unavailable - ' + (bookingTimeError || eventNextError) : (bookingCanSubmit ? (waitingListEligible ? 'Waiting list only - administrator approval required' : 'Time Available') : 'Choose your Start Time and End Time.')"></p>
         </div>
         <p class="booking-notice" x-show="startTime && endTime">Selected Reservation Time: <strong x-text="bookingTime(startTime) + ' - ' + bookingTime(endTime)"></strong></p>
-        <p class="booking-notice" x-show="date && !bookingCanSubmit && !bookingLoading && !bookingError">Choose an available time slot before submitting.</p>
+        <p class="booking-notice" x-show="date && !bookingCanSubmit && !bookingLoading && !bookingError">Choose a valid date and time before submitting. Occupied schedules are automatically placed on the waiting list; administrator closures cannot be requested.</p>
     </div>
 </div>
 
@@ -121,7 +122,7 @@
                             @error('purpose')<p id="purpose-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
 <div><label for="additional_notes" class="mb-2 block font-semibold">Additional Notes</label><textarea name="additional_notes" id="additional_notes" rows="3" class="w-full rounded-lg border-slate-300">{{ old('additional_notes') }}</textarea></div>
-                <p x-show="hasSelectedConflict" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The selected time overlaps an approved reservation or cleaning buffer. Choose another time.</p>
+                <p x-show="hasSelectedConflict && !waitingListEligible" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The selected time overlaps an approved reservation or cleaning buffer. Choose another time.</p>
 <p class="wizard-info">Please make sure all reservation details are correct before proceeding.</p>
 <div class="wizard-actions"><button type="button" @click="continueToRequestor" class="wizard-primary">Next &rarr;</button></div>
 </div></section>
@@ -244,7 +245,7 @@
 <h3 class="confirmation-subheading">Gym Information</h3><dl class="facility-information"><div><dt>Gym</dt><dd>MCST Gymnasium</dd></div><div><dt>Location</dt><dd>MCST Gymnasium</dd></div><div><dt>Capacity</dt><dd>{{ number_format(\App\Support\GymCapacity::MAX_ATTENDEES) }} persons</dd></div><div><dt>Gym Status</dt><dd x-text="facilityStatus"></dd></div></dl>
 <h3 class="confirmation-subheading">Reservation Summary</h3><dl class="reservation-summary"><template x-for="item in summary" :key="item.label"><div><dt x-text="item.label"></dt><dd x-text="item.value || '?'"></dd></div></template></dl>
 <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-blue-900"><input name="agreement" value="1" type="checkbox" required x-model="requestConfirmed" @change="confirmRequest" class="mt-1 rounded border-blue-300"><span>I confirm that the information is correct and understand that this request still requires administrator approval.</span></label>
-<div class="wizard-actions"><button type="button" @click="step = 2" class="wizard-secondary">&larr; Back</button><button type="submit" :disabled="!requestConfirmed || !agreementAccepted || !bookingCanSubmit || hasSelectedConflict || availabilityLoading || !!availabilityError || !emailVerification.verified || facilityStatus !== 'Available'" class="wizard-primary">Submit Reservation</button></div></section>
+<div class="wizard-actions"><button type="button" @click="step = 2" class="wizard-secondary">&larr; Back</button><button type="submit" :disabled="!requestConfirmed || !agreementAccepted || !bookingCanSubmit || (hasSelectedConflict && !waitingListEligible) || availabilityLoading || !!availabilityError || !emailVerification.verified || (facilityStatus !== 'Available' && !waitingListEligible)" class="wizard-primary">Submit Reservation</button></div></section>
 <dialog x-ref="agreementDialog" class="gym-use-agreement agreement-dialog" aria-labelledby="gym-use-agreement-heading" @cancel="agreementAccepted = false; requestConfirmed = false">
     <h3 id="gym-use-agreement-heading">MCST Gymnasium Use Agreement</h3>
     <p>By submitting this reservation request, I understand and agree to follow the rules for the proper use of the MCST Gymnasium:</p>
@@ -289,9 +290,9 @@
     <dialog x-ref="conflictDialog" aria-labelledby="conflict-title" aria-describedby="conflict-description"
         @cancel.prevent="closeConflictWarning" class="w-full max-w-md rounded-2xl border-0 bg-white p-6 shadow-xl"
         style="max-width: min(28rem, calc(100vw - 2rem));">
-        <h2 id="conflict-title" class="text-xl font-bold text-red-700">This time is unavailable</h2>
-        <p id="conflict-description" class="mt-3 text-slate-700">The selected time overlaps an approved reservation, cleaning buffer, or blocked schedule. Please choose another time.</p>
-        <button type="button" autofocus @click="closeConflictWarning" class="mt-6 w-full rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700">Choose another time</button>
+        <h2 id="conflict-title" class="text-xl font-bold text-blue-700" x-text="waitingListEligible ? 'This schedule is occupied' : 'This time is unavailable'">This schedule is occupied</h2>
+        <p id="conflict-description" class="mt-3 text-slate-700"><span x-show="waitingListEligible">If you submit this request, it will automatically be placed on the waiting list because your selected schedule is occupied or within its cleanup buffer. You will receive an email with your waiting-list status. An administrator will review it for approval when a slot becomes available.</span><span x-show="!waitingListEligible">This time is blocked by the administrator. Please choose another time.</span></p>
+        <button type="button" autofocus @click="closeConflictWarning" class="mt-6 w-full rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700" x-text="waitingListEligible ? 'Continue with request' : 'Choose another time'">Continue with request</button>
     </dialog>
     <style>dialog::backdrop { background: rgb(15 23 42 / 60%); } dialog.agreement-dialog { width: min(42rem, calc(100vw - 2rem)); max-height: 85vh; overflow-y: auto; margin: auto; padding: 24px; border: 0; border-radius: 16px; background: white; box-shadow: 0 24px 60px rgb(15 23 42 / 25%); }</style>
 </div>
@@ -451,7 +452,7 @@ this.requestConfirmed = false;
         },
         closeConflictWarning() {
             this.$refs.conflictDialog.close();
-            this.$nextTick(() => { if (this.step === 3) this.step = 1; this.$refs.reservationForm.querySelector('.booking-slot:not(:disabled)')?.focus(); });
+            this.$nextTick(() => { if (this.step === 3 && !this.waitingListEligible) this.step = 1; this.$refs.reservationForm.querySelector('.booking-slot:not(:disabled)')?.focus(); });
         },
         availabilityLoading: false,
         availabilityError: '',
