@@ -6,6 +6,10 @@
     @if(in_array($reservation->status, ['approved', 'completed'], true))
         <div class="card mb-5 p-5"><h2 class="font-bold">Acknowledgement Receipt (AR)</h2><p class="mt-2 text-sm text-slate-600">Admin approved this booking. Prepare the AR, review it, then send the print-ready link to the requestor.</p><a class="btn-primary mt-3" href="{{ route('staff.reservations.receipt', $reservation) }}" target="_blank" rel="noopener"><i class="bi bi-printer" aria-hidden="true"></i> Prepare / Send AR</a></div>
     @endif
+    @if(session('success'))<p class="card mb-4 p-4 text-green-800" role="status">{{ session('success') }}</p>@endif
+    @if($errors->any())<div class="card mb-4 p-4 text-red-700" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
+    @include('reservations.event-outcome')
+    @include('reservations.equipment-returns')
     <section class="card p-6"><h2 class="text-lg font-bold">{{ $reservation->event_name }}</h2><dl class="mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         @foreach (['Reference Number' => $reservation->reference_number, 'Event Type' => $reservation->event_type ?: 'Not specified', 'Facility' => $reservation->facility?->facility_name ?? 'Not assigned', 'Scheduled Date' => $reservation->reservation_date->format('F d, Y'), 'Start–End Time' => substr($reservation->start_time, 0, 5).'–'.substr($reservation->end_time, 0, 5), 'Expected Attendees' => number_format($reservation->expected_attendees)] as $heading => $value)
             <div><dt class="text-sm font-semibold text-slate-500">{{ $heading }}</dt><dd class="mt-2 text-sm">{{ $value }}</dd></div>

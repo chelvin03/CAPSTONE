@@ -1,0 +1,41 @@
+BI DASHBOARD LAYOUT AND CONSISTENT SIDEBAR - 2026-10-19
+
+Prepared locally. Not deployed. Requires the previously uploaded reservation
+operations release and its three SQL imports. No additional SQL or npm build.
+
+Back up existing matching destination files first. Upload individual files from
+this package's htdocs into matching hosted /htdocs folders. Do not nest htdocs.
+
+1. Upload public/css/workspace-shell.css and public/css/bi-workspace.css (new).
+2. Replace public/css/admin-dashboard.css.
+3. Replace app/Services/EventOutcomeAnalyticsService.php and
+   app/Http/Controllers/Admin/DashboardController.php. These matching files are
+   included to correct the reported undefined eventResults variable caused by
+   a dashboard controller/view mismatch. Do not hide the error with empty data.
+4. Upload the five new workspace-*.blade.php files in
+   resources/views/dashboard/partials. Replace kpi-cards.blade.php there.
+5. Replace resources/views/dashboard/admin.blade.php.
+6. Replace resources/views/components/sidebar.blade.php.
+7. Replace resources/views/layouts/app.blade.php last, after the CSS exists.
+
+Clear only generated .php files in storage/framework/views. Preserve the
+directory and .gitignore. Refresh the dashboard with Ctrl+Shift+R.
+
+The dashboard follows the supplied nine-section reference: overview, KPIs,
+reservation trends/status, facility utilization, processing/aging, cancellation,
+event outcomes/attendance, insights/recommendations and administrative tools.
+All numbers remain computed from the selected filters. All statuses are shown
+in the status chart so total counts reconcile. Existing data-quality charts,
+evidence, KPI target configuration and detailed analysis remain expandable.
+Export remains the real CSV export; no decorative PDF/Excel or chart dropdown
+controls were added. KPI goals remain administrator configured.
+
+The shared sidebar is fixed at 224px on desktop, with consistent branding and
+navigation rows on every page using layouts.app. Phone navigation remains a
+248px drawer. Long navigation scrolls within the same fixed-height sidebar.
+Dashboard-only sidebar overrides were removed.
+
+Verified: 47 dashboard/KPI/performance tests passed (336 assertions), isolated
+screen rendering passed, desktop sidebar measured 224px and identical link
+heights on dashboard/follow-up/reservation pages, and phone layouts fit at 390px.
+Live hosting and real mail were not accessed or verified.

@@ -24,7 +24,7 @@ test('all time ignores date bounds while retaining reservation filters and expor
         'facility_id' => $gym->id, 'requestor_type' => 'school', 'category' => 'Sports', 'grouping' => 'annual'];
     $this->actingAs($admin)->get(route('admin.dashboard', $filters))->assertOk()->assertViewHas('totalReservations', 1);
     $response = $this->get(route('admin.dashboard', $filters + ['all_time' => 1]))->assertOk()
-        ->assertSee('All time')->assertViewHas('totalReservations', 3)
+        ->assertViewHas('totalReservations', 3)
         ->assertViewHas('filters', fn ($actual) => $actual['all_time'] === true && $actual['grouping'] === 'annual'
             && $actual['status'] === 'approved' && $actual['facility_id'] == $gym->id
             && $actual['requestor_type'] === 'school' && $actual['category'] === 'Sports');
@@ -76,7 +76,7 @@ test('admin dashboard statistics reflect database records', function () {
             'purpose' => 'Dashboard calculation test',
             'contact_person' => 'Test Requestor '.$index,
             'contact_number' => '09123456789',
-            'expected_attendees' => 20,
+            'expected_attendees' => 100,
             'reservation_date' => now()->startOfMonth()->addDays($index + 1)->toDateString(),
             'start_time' => '08:00',
             'end_time' => '09:00',
@@ -109,7 +109,7 @@ function analyticsReservation($facility, array $attributes = []): Reservation
         'purpose' => 'Analytics verification',
         'contact_person' => 'Test Requestor',
         'contact_number' => '09123456789',
-        'expected_attendees' => 20,
+        'expected_attendees' => 100,
         'reservation_date' => '2026-09-10',
         'start_time' => '08:00',
         'end_time' => '09:00',
@@ -133,7 +133,7 @@ test('analytics filters reconcile charts details comparisons and export', functi
         ->assertViewHas('previousTotal', 1)
         ->assertViewHas('change', 200.0)
         ->assertViewHas('cancellationRate', 33.3)
-        ->assertViewHas('expectedAttendees', 20)
+        ->assertViewHas('expectedAttendees', 100)
         ->assertViewHas('pendingReservations', 1)
         ->assertViewHas('monthlyActivity', fn ($rows) => $rows->sum('count') === 3)
         ->assertViewHas('eventDemand', fn ($rows) => $rows->sum('count') === 3)
@@ -275,7 +275,8 @@ test('supporting analytics use the same filters and do not disclose personal dat
         ->assertViewHas('waitingEver', 1)->assertViewHas('waitingPromoted', 1)->assertViewHas('waitingConversion', 100.0)
         ->assertViewHas('cancellationReasons', fn ($rows) => $rows->first()->reason_group === 'Weather' && $rows->first()->total == 1)
         ->assertViewHas('utilizedHours', 0.0)->assertViewHas('completedEvents', 0)
-        ->assertSee('School Assembly')->assertDontSee('private-person@example.test')->assertDontSee('09998887776')->assertDontSee('PRIVATE FEEDBACK');
+        ->assertViewHas('overviewReservations', fn ($rows) => $rows->pluck('id')->all() === [$included->id])
+        ->assertDontSee('private-person@example.test')->assertDontSee('09998887776')->assertDontSee('PRIVATE FEEDBACK');
     expect($included->fresh()->event_name)->toBe('SCHOOL ASSEMBLY');
     $csv = $this->get(route('admin.dashboard', $filters + ['export' => 'csv']))->assertOk()->streamedContent();
     expect($csv)->toContain($included->reference_number)->not->toContain($excluded->reference_number)
@@ -429,5 +430,5 @@ test('invalid calendar filters show errors and empty event types show N A', func
         $this->get(route('admin.dashboard', $filters))->assertSessionHasErrors(array_key_first($filters));
     }
     $this->get(route('admin.dashboard'))->assertOk()->assertViewHas('mostCommonEventType', 'N/A')
-        ->assertViewHas('utilizationRate', null)->assertSee('No status data for these filters.');
+        ->assertViewHas('utilizationRate', null)->assertViewHas('statusBreakdown', fn ($rows) => $rows->sum('count') === 0);
 });

@@ -1,0 +1,7 @@
+config/event-types.php
+resources/views/reservations/event-type-field.blade.php
+resources/views/public/reservations/create.blade.php
+resources/views/admin/reservations/_form.blade.php
+resources/views/admin/reservations/edit.blade.php
+app/Http/Controllers/PublicReservationController.php
+app/Http/Controllers/Admin/ReservationController.php

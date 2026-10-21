@@ -59,14 +59,14 @@ test('ordinary admin booking cannot use an occupied slot without priority overri
         'reference_number' => 'MCST-LOCKED', 'facility_id' => $facility->id,
         'reservation_type' => 'school', 'event_name' => 'Existing Event', 'purpose' => 'Test',
         'contact_person' => 'Existing User', 'contact_number' => '09123456789',
-        'expected_attendees' => 20, 'reservation_date' => now()->addDay()->toDateString(),
-        'start_time' => '09:00', 'end_time' => '11:00', 'status' => 'pending',
+        'expected_attendees' => 100, 'reservation_date' => now()->addDay()->toDateString(),
+        'start_time' => '09:00', 'end_time' => '11:00', 'status' => 'approved',
     ]);
 
     $this->actingAs($admin)->post(route('admin.reservations.store'), [
         'facility_id' => $facility->id, 'reservation_type' => 'school',
         'event_name' => 'Blocked Event', 'purpose' => 'Test', 'contact_person' => 'Admin',
-        'contact_number' => '09111111111', 'expected_attendees' => 20,
+        'contact_number' => '09111111111', 'expected_attendees' => 100,
         'reservation_date' => now()->addDay()->toDateString(), 'start_time' => '10:00', 'end_time' => '12:00',
     ])->assertSessionHasErrors('reservation_date');
 

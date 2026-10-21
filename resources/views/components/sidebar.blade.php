@@ -1,26 +1,8 @@
-<style>
-    #mobile-navigation .sidebar-brand { padding: clamp(8px, 1.5dvh, 16px) 20px; }
-    #mobile-navigation .sidebar-brand > a { gap: 6px !important; }
-    #mobile-navigation .sidebar-brand img { width: clamp(40px, 8dvh, 64px) !important; height: clamp(40px, 8dvh, 64px) !important; }
-    #mobile-navigation nav { padding: 8px 16px; overflow: visible; }
-    #mobile-navigation nav > p { padding-bottom: 4px; font-size: 12px; }
-    #mobile-navigation nav a, #mobile-navigation nav > span {
-        padding-top: clamp(3px, 1dvh, 9px); padding-bottom: clamp(3px, 1dvh, 9px);
-        font-size: clamp(12px, 1.8dvh, 16px); line-height: 1.4;
-    }
-    #mobile-navigation .sidebar-logout { padding: 8px 16px; }
-    #mobile-navigation .sidebar-logout button { padding-top: 8px; padding-bottom: 8px; }
-    @media (max-height: 600px) {
-        #mobile-navigation .sidebar-brand > a { flex-direction: row !important; text-align: left !important; gap: 10px !important; }
-        #mobile-navigation nav { padding-top: 4px; padding-bottom: 4px; }
-        #mobile-navigation nav > p { display: none; }
-    }
-</style>
 <div x-show="navigationOpen" x-transition.opacity class="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" @click="navigationOpen = false" aria-hidden="true"></div>
 <aside id="mobile-navigation"
     :class="navigationOpen ? 'translate-x-0' : '-translate-x-full'"
     class="fixed inset-y-0 left-0 z-50 flex h-screen min-h-screen w-72 shrink-0 flex-col overflow-y-auto text-white transition-transform lg:sticky lg:top-0 lg:z-20 lg:translate-x-0"
-    style="background-color: #136be7; height: 100dvh; min-height: 0; overflow: hidden; isolation: isolate;"
+    style="background-color: #136be7; height: 100dvh; min-height: 0; overflow-y: auto; isolation: isolate;"
 >
     @if (in_array(auth()->user()?->role, ['admin', 'staff'], true))
         <img src="{{ asset('images/admin-mcst-logo.jpg') }}" alt="" aria-hidden="true" style="position: absolute; width: 330px; max-width: none; height: 330px; object-fit: contain; bottom: 55px; right: -85px; opacity: .12; filter: grayscale(1) invert(1); mix-blend-mode: screen; pointer-events: none; z-index: -1;">
@@ -80,14 +62,14 @@
                     : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
         >
             <i class="bi bi-house" aria-hidden="true"></i>
-            <span>Dashboard</span>
+            <span>BI Dashboard</span>
         </a>
 
         {{-- Reservations --}}
         <a
             href="{{ route('admin.reservations.index') }}"
             class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition
-                {{ request()->routeIs('admin.reservations.*')
+                {{ request()->routeIs('admin.reservations.*') && !request()->routeIs('admin.reservations.follow-up', 'admin.reservations.follow-up.*')
                     ? 'bg-white/10 text-white'
                     : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
         >
@@ -97,6 +79,7 @@
         <a href="{{ route('admin.schedule.index') }}" class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition {{ request()->routeIs('admin.schedule.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-calendar3" aria-hidden="true"></i><span>Schedule</span></a>
 
         {{-- Equipment --}}
+        <a href="{{ route('admin.reservations.follow-up') }}" @if(request()->routeIs('admin.reservations.follow-up', 'admin.reservations.follow-up.*')) aria-current="page" @endif class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition {{ request()->routeIs('admin.reservations.follow-up', 'admin.reservations.follow-up.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-envelope" aria-hidden="true"></i><span>Follow-up &amp; Offers</span></a>
         <a
             href="{{ route('admin.equipment.index') }}"
             class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition

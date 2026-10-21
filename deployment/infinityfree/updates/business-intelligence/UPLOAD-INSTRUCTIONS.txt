@@ -1,0 +1,28 @@
+SUPERSEDED: Use ../bi-decision-support instead. The user chose to improve the existing BI dashboard.
+
+ADMIN BUSINESS INTELLIGENCE
+Prepared locally, not uploaded. Adds /admin/analytics and admin sidebar link.
+Uses the existing DashboardAnalyticsService and DashboardRequest from the current
+release; install the earlier full release and previous updates first.
+
+Back up matching hosted files, especially routes/web.php and the shared sidebar.
+Upload in this order under existing htdocs:
+1. app/Http/Controllers/Admin/BusinessIntelligenceController.php
+2. resources/views/admin/analytics/index.blade.php (create analytics folder)
+3. public/css/business-intelligence.css
+4. routes/web.php (replace matching current-release file)
+5. resources/views/components/sidebar.blade.php
+
+Clear generated .php files INSIDE storage/framework/views, preserving directory,
+subfolders and .gitignore. If routes are cached, back up and remove only generated
+bootstrap/cache/routes-*.php. Keep packages.php, services.php and other files.
+Hard-refresh. Log in as admin and open Business Intelligence.
+No SQL, new dependencies or asset build required. Normal PSR-4 autoloading needed.
+Keep online .env, APP_KEY, vendor, uploads and database records.
+
+Features: date-range, trend grouping and event-type filters; request totals;
+pending review; scheduled utilization; cancellation rate; request trends;
+outcomes, event, weekday and requestor demand; peak periods and review workload;
+CSV through existing audited dashboard export using the same filters.
+Utilization is approved scheduled hours, not actual measured usage.
+

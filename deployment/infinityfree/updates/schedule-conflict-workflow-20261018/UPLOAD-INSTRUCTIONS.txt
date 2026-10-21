@@ -1,0 +1,122 @@
+COMBINED RESERVATION OPERATIONS UPDATE - 2026-10-18
+
+Prepared locally. Nothing has been deployed to the live website.
+All five recommendations are included, along with the earlier pending fixes.
+The htdocs folder contains 63 application files. FILES-SHA256.csv is the complete
+manifest. UPLOAD-FILE-LIST.txt lists the individual file destinations.
+
+DATABASE FIRST
+1. Export a backup of the current website database using phpMyAdmin.
+2. Select the correct website database and run these scripts in order:
+   01-create-schedule-proposals.sql
+   02-create-event-outcomes.sql
+   03-add-equipment-returns-and-follow-up.sql
+   These add four tables and the schedule_proposals.kind column. Existing
+   reservations, attendance and inventory totals are not rewritten or inferred.
+   The scripts do not send any email. Keep SQL files outside hosted /htdocs.
+3. For local Artisan installations, start MySQL and run the three included
+   migrations (100000, 110000, 120000), or run php artisan migrate if all pending
+   project migrations are intended. Local MySQL was off during preparation;
+   the new features were tested against an isolated SQLite database instead.
+
+INDIVIDUAL FILE UPLOAD
+Back up each existing destination file before replacement. Upload during a quiet
+window because multiple files depend on each other. Upload the contents of the
+local htdocs folder into the corresponding hosted /htdocs folders. Do not create
+/htdocs/htdocs. Create new folders where needed. Follow UPLOAD-FILE-LIST.txt:
+new models first, then updated models/mail/services, controllers and routes, and
+views last. Keep migration files for maintenance; hosted SQL installs the schema.
+No Composer install, npm build, .env edit or scheduler endpoint is required.
+
+CLEAR GENERATED CACHES AFTER ALL FILES ARE INSTALLED
+Remove only generated .php files inside /htdocs/storage/framework/views.
+Keep that folder and .gitignore. If route caches exist, remove only routes-*.php
+inside /htdocs/bootstrap/cache. Keep packages.php and services.php. Refresh.
+
+INCLUDED WORKFLOWS
+1. Event outcomes and attendance
+   Approved staff/admin record Completed or No-show only after the event ends.
+   Completed requires 1-2,000 actual attendees; no-show requires zero. Mandatory
+   remarks, recorder, timestamp and revision are kept. Cancelled/unapproved
+   requests cannot become no-shows. No automatic event completion occurs.
+   Admin corrections require a reason and current revision; old values remain
+   in the immutable audit log. Historical schedules with recorded outcomes or
+   returns cannot be moved. AR completion remains separate from event completion.
+
+2. Equipment returns and incidents
+   After the end, staff/admin record actual issued quantity, good returns,
+   damaged and missing quantities. Good + damaged + missing must equal issued,
+   which cannot exceed approved quantity. Recording event completion does not
+   imply equipment was returned. Admins correct/recover/repair with a reason and
+   current revision. Unresolved damaged/missing units reduce usable stock for
+   future requests and approval checks; total inventory is not overwritten.
+   Existing upcoming allocations that exceed usable stock are flagged for
+   admin review on Follow-up & Offers. They are not silently cancelled.
+   An existing incident can still be recovered by admin after booking closure.
+
+3. Reminders and follow-up
+   Admin sidebar > Follow-up & Offers shows reminders due for:
+   - Approved events starting within 24 hours.
+   - Public requests still missing a recorded supporting permit after 24 hours.
+   - Unanswered replacement proposals after 24 hours, or waiting-list offers
+     after 12 hours, while still valid.
+   Each reminder shows recipient/message before an explicit Send click.
+   Delivery status and attempts are recorded. Already sent reminders for the
+   same schedule/recipient/state are blocked. Failed sends can be retried after
+   one hour. Stale, expired or cancelled items are rechecked before sending.
+   IMPORTANT: reminders are MANUAL on this hosting setup. There is no automatic
+   cron/background delivery and no public scheduler URL. A reminder never
+   approves, cancels or changes a reservation.
+
+4. Waiting-list offers and replacement acceptance
+   Follow-up & Offers lists upcoming waiting requests with priority/submission
+   context. Admin opens a request, reviews eligibility/documents, checks the
+   review acknowledgement, provides a reason and previews the offer.
+   A signed private email link requires an explicit Accept/Decline POST.
+   GET/email scanning never applies an offer. No proposed slot is held.
+   Waiting offers expire after 24 hours or at proposed start, whichever is
+   first. Acceptance rechecks slot, cleaning gap, blocks, restrictions and
+   equipment under locks, then confirms approval and creates the AR task.
+   Competing offers cannot displace the winner. Declining/expiry keeps the
+   request waiting. Admin chooses recipients; there is no automatic promotion.
+   Ordinary replacement proposals expire after 48 hours or proposed start and
+   preserve existing approval status on acceptance. New offers supersede old
+   offers; cancelled/changed originals invalidate private links.
+
+5. BI refinement
+   Existing charts and insights are retained. Added verified event completion,
+   no-show, outcome coverage, attendance comparisons, return records/missing
+   returns and incident quantities, with definitions and supporting records.
+   Completion/no-show rates use recorded ended outcomes only. Coverage exposes
+   missing records; cancelled, rejected, unapproved and future events are not
+   assumed to have occurred. Attendance compares the same completed events.
+   Additional completion/no-show/coverage KPI targets are configurable only by
+   administrator review. No benchmark targets are fabricated or enabled by
+   default. Configure agreed MCST targets before the panel demonstration.
+   Free-text cancellation email addresses/phone numbers are masked in BI and
+   its CSV; the original reason remains in the reservation record for review.
+
+EARLIER PENDING FIXES INCLUDED
+- Schedule conflict warnings with affected references and resolve links.
+- Preview block/reschedule impacts and email outcomes before confirmation.
+- Expiring admin-bound preview tokens; stale previews require fresh review.
+- Force assignment cancellation/waiting-list notices; no completed displacement.
+- Full-duration alternative schedules with cleaning separation.
+- Disable updates below one hour with a red explanation.
+- Reject equipment quantities such as 010/001.
+- Preserve valid email verification when going Back with the same email.
+
+VERIFICATION BEFORE REAL USE
+Use test bookings and a controlled mailbox first. Confirm each workflow above:
+no changes on preview/GET, no early finalization, explicit email approval,
+stock reconciliation and audited recovery, stale/repeated actions rejected,
+competing offers leave one winner, and BI counts reconcile with records.
+Verify real hosted mail delivery separately. No real requestor emails were sent
+by the local tests. Hosted schema/mail behavior has not been verified.
+
+TEST RECORD
+The combined operations run passed 240 tests / 1,470 assertions, including the
+previously outdated dashboard checks after fixing invalid fixtures and obsolete
+view expectations. After the final history guards, 78 focused tests passed with
+453 assertions. All five new screens were checked in a local headless browser
+at desktop and 390px phone width. Final run details are recorded separately.

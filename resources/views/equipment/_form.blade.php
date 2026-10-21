@@ -70,6 +70,7 @@
                 {{ $message }}
             </p>
         @enderror
+        <p class="mt-2 text-xs text-slate-500">Total inventory includes recorded damaged/missing units. Usable quantity deducts unresolved incidents automatically; do not subtract the same incident again here. Use the audited return record to restore recovered or repaired stock.</p>
     </div>
 
     <div>

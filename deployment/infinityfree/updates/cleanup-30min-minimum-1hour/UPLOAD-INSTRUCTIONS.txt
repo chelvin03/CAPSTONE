@@ -1,0 +1,32 @@
+RESERVATION TIME UPDATE - 2026-10-17
+Prepared locally. Not uploaded.
+
+For the existing InfinityFree Laravel installation using htdocs/public.
+Requires the previous application release to already be installed.
+
+Rules: minimum booking 1 hour; start/end on :00 or :30; 30-minute cleanup gap.
+No SQL, migrations, vendor changes, or frontend build required for this patch.
+Existing reservations are preserved; new submissions and edits use these rules.
+
+1. Download backups of the matching hosted files before replacing them.
+2. Extract cleanup-30min-minimum-1hour.zip on your computer.
+3. Open the website's actual htdocs in InfinityFree File Manager or FTP.
+4. Upload app/Rules/HalfHourTime.php and app/Rules/MinimumReservationDuration.php
+   first. Create app/Rules if missing. Then upload the remaining packaged files
+   into matching paths under the EXISTING htdocs, replacing matching files.
+   The ZIP contains app/, public/ and resources/ directly. Do not create
+   htdocs/htdocs. If extracting on hosting, delete the ZIP after extraction.
+5. Clear compiled views: remove only generated .php files INSIDE
+   htdocs/storage/framework/views. Keep the directory and .gitignore.
+6. Hard-refresh the reservation page (Ctrl+F5).
+7. Verify: 1:59 PM-3:00 PM rejected; 1:00 PM-1:30 PM rejected;
+   1:00 PM-2:00 PM accepted on a free date; after an event ending at 2:00 PM,
+   2:00 PM-3:00 PM is blocked and 2:30 PM-3:30 PM is accepted if otherwise free.
+
+Keep existing .env, APP_KEY, vendor, storage/uploads and database untouched.
+Do not run the SQL files from the earlier release for this time-rule patch.
+New classes use normal PSR-4 app autoloading, as in the previous release.
+If hosting uses classmap-authoritative autoloading, regenerate production
+Composer autoload files before installing new classes.
+
+Validation: 20 relevant feature tests passed (151 assertions).

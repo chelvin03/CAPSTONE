@@ -14,7 +14,7 @@ class ReservationCancellationService
 {
     public function cancel(Reservation $reservation, int $adminId, string $reason): void
     {
-        if (in_array($reservation->status, ['cancelled', 'rejected', 'completed'], true)) {
+        if (in_array($reservation->status, ['cancelled', 'rejected', 'completed', 'no_show'], true)) {
             return;
         }
         $previous = $reservation->status;
@@ -31,7 +31,7 @@ class ReservationCancellationService
             try {
                 Mail::to($reservation->contact_email)->send(new ReservationCancelled($reservation));
             } catch (\Throwable $exception) {
-                Log::error('Reservation cancellation email failed.', ['reservation_id' => $reservation->id, 'exception' => $exception]);
+                Log::error('Reservation cancellation email failed.', ['reservation_id' => $reservation->id, 'exception_type' => get_class($exception)]);
             }
         });
     }

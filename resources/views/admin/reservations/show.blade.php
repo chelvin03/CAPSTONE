@@ -3,6 +3,7 @@
 @section('title', 'Reservation Details')
 
 @section('content')
+<link rel="stylesheet" href="{{ asset('css/schedule-impact.css') }}?v={{ filemtime(public_path('css/schedule-impact.css')) }}"><script src="{{ asset('js-schedule-impact.js') }}?v={{ filemtime(public_path('js-schedule-impact.js')) }}"></script>
 <div class="mx-auto max-w-6xl">
 
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -65,9 +66,11 @@
         </div>
     @endif
 
-    <div class="grid gap-6 lg:grid-cols-3">
+    <div class="reservation-detail-grid grid gap-6 lg:grid-cols-3">
 
         <div class="space-y-6 lg:col-span-2">
+            @include('reservations.event-outcome')
+            @include('reservations.equipment-returns')
 
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="gym-agreement-heading">
                 <h2 id="gym-agreement-heading" class="mb-5 text-lg font-bold" style="color: #1E3A8A">Gymnasium Use Agreement</h2>
@@ -216,17 +219,90 @@
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-blue-200 bg-blue-50 p-6">
-                <h2 class="mb-2 text-lg font-bold text-blue-900">Reassign or Reschedule</h2><p class="mb-4 text-sm text-blue-700">Administrators may force-assign any slot and resolve affected reservations.</p>
-                <form method="POST" action="{{route('admin.reservations.reschedule',$reservation)}}" class="grid gap-3 sm:grid-cols-2">@csrf @method('PATCH')
+            @if(!in_array($reservation->status, ['cancelled', 'rejected', 'completed', 'no_show'], true))
+            <section id="conflict-resolution" class="rounded-2xl border border-blue-200 bg-blue-50 p-6" style="scroll-margin-top:110px">
+                <h2 class="mb-2 text-lg font-bold text-blue-900">Conflict Resolution / Reschedule</h2><p class="mb-4 text-sm text-blue-700">Move this reservation to an available schedule. If the target schedule is occupied, force assignment requires a choice for the affected bookings. Requestors receive email notices with the outcome and reason.</p>
+                @php
+                    $scheduleMinutes = fn ($time) => (int) substr($time, 0, 2) * 60 + (int) substr($time, 3, 2);
+                    $originalMinutes = $scheduleMinutes($reservation->end_time) - $scheduleMinutes($reservation->start_time);
+                @endphp
+                <form method="POST" action="{{route('admin.reservations.reschedule',$reservation)}}" class="grid gap-3 sm:grid-cols-2"
+                    x-data="{
+                        ...scheduleImpactReview(@js(route('admin.reservations.reschedule-preview', $reservation))),
+                        duration: {{ $originalMinutes }}, closing: {{ $scheduleMinutes(config('gym.reservation.closing_time', '24:00')) }},
+                        start: @js(old('start_time', substr($reservation->start_time, 0, 5))),
+                        end: @js(old('end_time', substr($reservation->end_time, 0, 5))),
+                        adjustDuration: @js((bool) old('adjust_duration', false)),
+                        forceMode: @js((bool) old('force_assign', false)),
+                        get sendProposal() { return !this.forceMode; },
+                        selectedScheduleDate: @js(old('reservation_date', $reservation->reservation_date->format('Y-m-d'))),
+                        originalScheduleDate: @js($reservation->reservation_date->format('Y-m-d')),
+                        originalStart: @js(substr($reservation->start_time, 0, 5)),
+                        originalEnd: @js(substr($reservation->end_time, 0, 5) === '00:00' ? '24:00' : substr($reservation->end_time, 0, 5)),
+                        waitingOffer: @js($reservation->status === 'waiting_list'),
+                        get durationError() {
+                            if (!this.start || !this.end) return 'Choose a start and end time before proceeding.';
+                            const minutes = time => time.split(':').reduce((hours, part) => hours * 60 + Number(part), 0);
+                            const length = minutes(this.end) - minutes(this.start);
+                            if (length &lt;= 0) return 'End time must be after start time.';
+                            if (length &lt; 120) return 'Cannot proceed: reservations must be at least 2 hours. The selected duration is ' + length + ' minutes.';
+                            if (minutes(this.end) &gt; this.closing) return 'Cannot proceed: the reservation must end before closing.';
+                            if (!this.waitingOffer && this.selectedScheduleDate === this.originalScheduleDate && this.start === this.originalStart && this.end === this.originalEnd) return 'No schedule changes detected. Choose a different date or time.';
+                            return '';
+                        },
+                        updateEnd() {
+                            if (this.adjustDuration || !this.start) return;
+                            const [h, m] = this.start.split(':').map(Number);
+                            const finish = h * 60 + m + this.duration;
+                            if (this.duration &lt; 120 || finish &gt; this.closing || finish &gt; 1440) {
+                                this.end = ''; return;
+                            }
+                            this.end = String(Math.floor(finish / 60)).padStart(2, '0') + ':' + String(finish % 60).padStart(2, '0');
+                        }
+                    }" x-init="updateEnd()" @submit.prevent="reviewImpact($event)">@csrf @method('PATCH')
                     <p class="font-semibold">MCST Gymnasium</p>
-                    <input type="date" name="reservation_date" value="{{$reservation->reservation_date->format('Y-m-d')}}" required class="rounded-lg border-slate-300"><input type="time" name="start_time" value="{{substr($reservation->start_time,0,5)}}" required class="rounded-lg border-slate-300"><input type="time" name="end_time" value="{{substr($reservation->end_time,0,5)}}" required class="rounded-lg border-slate-300">
-                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="force_assign" value="1"> Force assign occupied slot</label><select name="conflict_resolution" class="rounded-lg border-slate-300"><option value="waiting_list">Move conflicts to waiting list</option><option value="cancelled">Cancel conflicts</option></select>
-                    <textarea name="reason" required rows="2" placeholder="Reason for schedule adjustment" class="sm:col-span-2 rounded-lg border-slate-300"></textarea><button class="sm:col-span-2 rounded-lg bg-blue-700 p-3 font-semibold text-white">Update Schedule & Notify</button>
+                    <p class="sm:col-span-2 text-sm">Original duration: <strong>{{ intdiv(max(0, $originalMinutes), 60) }} hours {{ max(0, $originalMinutes) % 60 }} minutes</strong>. Preserved automatically unless you enable duration adjustment. The full booking and cleaning gap are checked before saving.</p>
+                    <label>Reservation Date<input type="date" name="reservation_date" x-model="selectedScheduleDate" value="{{ old('reservation_date', $reservation->reservation_date->format('Y-m-d')) }}" required class="block w-full rounded-lg border-slate-300"></label>
+                    <label>Start Time<input type="time" step="1800" name="start_time" value="{{ old('start_time', substr($reservation->start_time, 0, 5)) }}" x-model="start" @input="updateEnd()" required class="block w-full rounded-lg border-slate-300"></label>
+                    <label>End Time<select name="end_time" x-model="end" :disabled="!adjustDuration" required class="block w-full rounded-lg border-slate-300">
+                        <option value="">Choose end time</option>
+                        @foreach(range(1, 48) as $halfHour)
+                            @php($endOption = sprintf('%02d:%02d', intdiv($halfHour, 2), $halfHour % 2 * 30))
+                            <option value="{{ $endOption }}" @selected(old('end_time', substr($reservation->end_time, 0, 5)) === $endOption)>{{ $endOption === '24:00' ? '12:00 midnight (end of selected date)' : \Carbon\Carbon::createFromTime(intdiv($halfHour, 2), $halfHour % 2 * 30)->format('g:i A') }}</option>
+                        @endforeach
+                    </select></label>
+                    <label class="sm:col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" name="adjust_duration" value="1" x-model="adjustDuration" @change="updateEnd()"> Deliberately change the original duration (explain why below)</label>
+                    <p class="sm:col-span-2 text-sm text-red-700" role="alert" aria-live="polite" x-cloak x-show="durationError" x-text="durationError"></p>
+                    <input type="hidden" name="send_proposal" :value="sendProposal ? 1 : 0" value="1">
+                    @if($reservation->status === 'waiting_list')
+                        <p class="sm:col-span-2 text-sm font-semibold">Waiting-list offer: sending a proposal keeps this request waiting. Acceptance will approve the offered slot after checking availability and equipment again. No other booking is displaced. The administrator chooses the recipient after reviewing priority and eligibility.</p>
+                        <label class="sm:col-span-2 text-sm"><input type="checkbox" name="requirements_reviewed" value="1" :required="sendProposal"> I reviewed eligibility, required documents and the reason for offering this requestor a slot.</label>
+                    @endif
+                    <p class="sm:col-span-2 font-semibold" x-show="sendProposal">Send a new schedule proposal for requestor acceptance</p>
+                    <p class="sm:col-span-2 text-sm text-blue-800" x-show="sendProposal">Original booking stays unchanged until accepted. The proposed slot is not held. The requestor has up to {{ $reservation->status === 'waiting_list' ? 24 : 48 }} hours, or until the proposed start time, to reply. Declining or expiry leaves the original booking unchanged. Proposals cannot displace other bookings. Ordinary rescheduling always requires the requestor to accept or decline.</p>
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="force_assign" value="1" x-model="forceMode"> Force assign (direct admin action)</label><label>Conflict resolution<select name="conflict_resolution" :disabled="sendProposal" class="w-full rounded-lg border-slate-300"><option value="cancelled">Cancel affected bookings and email requestors to reschedule</option><option value="waiting_list">Move affected bookings to waiting list and email requestors</option></select></label>
+                    <p class="sm:col-span-2 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700" x-show="forceMode">Force assign applies the schedule immediately after confirmation. The requestor does not accept or decline this action. Conflicting bookings will be cancelled or moved to the waiting list as selected below. Review all affected bookings before confirming.</p>
+                    <p class="sm:col-span-2 text-sm text-blue-800">The selected resolution applies only to conflicting bookings when force assignment is enabled. To move another booking to a specific date/time, open that booking and reschedule it first. Cancelled bookings show the reason in public tracking. Schedule blocks must be released separately.</p>
+                    <textarea name="reason" required rows="2" placeholder="Reason for schedule adjustment" class="sm:col-span-2 rounded-lg border-slate-300"></textarea><button type="submit" :disabled="impactBusy || !!durationError" class="sm:col-span-2 rounded-lg bg-blue-700 p-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" x-text="impactBusy ? 'Reviewing…' : 'Preview Changes & Email Notices'">Preview Changes & Email Notices</button>
+                    @include('admin.schedule.partials.impact-review')
                 </form>
+                @php($scheduleProposals = \App\Models\ScheduleProposal::where('reservation_id', $reservation->id)->latest()->limit(5)->get())
+                @if($scheduleProposals->isNotEmpty())
+                    <div class="mt-5 border-t border-blue-200 pt-4">
+                        <h3 class="font-bold">Replacement proposals</h3>
+                        @foreach($scheduleProposals as $scheduleProposal)
+                            <p class="my-3 text-sm">{{ $scheduleProposal->target['reservation_date'] }} {{ $scheduleProposal->target['start_time'] }}–{{ $scheduleProposal->target['end_time'] }}:
+                                <strong>{{ $scheduleProposal->status === 'pending' ? ($scheduleProposal->expires_at->isPast() ? 'Expired' : ($scheduleProposal->original !== app(\App\Services\ScheduleProposalService::class)->snapshot($reservation) ? 'No longer applicable' : 'Awaiting requestor response')) : ucfirst($scheduleProposal->status) }}</strong>.
+                                Email: {{ $scheduleProposal->mail_status }}. Reply deadline: {{ $scheduleProposal->expires_at->format('M j, Y g:i A') }}.
+                                @if($scheduleProposal->mail_status === 'failed')<span class="text-red-700">Email failed. Check mail settings and send a new proposal.</span>@endif
+                            </p>
+                        @endforeach
+                    </div>
+                @endif
             </section>
 
-            @if (! in_array($reservation->status, ['approved', 'rejected', 'cancelled'], true))
+            @endif
+            @if (! in_array($reservation->status, ['approved', 'rejected', 'cancelled', 'completed', 'no_show'], true))
 
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
@@ -235,7 +311,7 @@
         </h2>
 
         <p class="mb-4 font-bold text-red-600">
-            Current Status: {{ $reservation->status === 'pencil' ? 'Pencil booking — tentative hold' : $reservation->status }}
+            Current Status: {{ $reservation->status === 'pencil' ? 'Pencil booking — not reserved until approved' : $reservation->status }}
         </p>
 
         </h2>

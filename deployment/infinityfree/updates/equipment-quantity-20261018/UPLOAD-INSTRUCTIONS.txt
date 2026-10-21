@@ -1,0 +1,23 @@
+EQUIPMENT QUANTITY VALIDATION — 18 OCTOBER 2026
+Prepared locally only. Existing requestor restrictions and approval-only slot
+availability updates must already be installed. No SQL/routes/build needed.
+
+Back up matching existing hosted files. Individual File Upload in this order:
+1. app/Rules/EquipmentQuantity.php (new rule; upload FIRST).
+2. app/Http/Controllers/PublicReservationController.php.
+3. resources/views/public/reservations/create.blade.php.
+Clear generated .php view files inside storage/framework/views; keep folders
+and .gitignore. Hard refresh the requestor form.
+
+Equipment quantities retain raw text. Leading-zero values such as 010/001,
+zero, signed values, decimals and scientific notation are rejected before
+continuing and by server validation. Valid examples: 1, 10, 100 (within stock).
+Error messages identify equipment by its name rather than internal field paths.
+Optional equipment can remain empty; no requirement to request equipment added.
+Inventory stock limits and internal-requestor restrictions remain enforced.
+Existing quantities, reservations and database records are not changed.
+
+Manual check: choose equipment and type 010; inline error should appear and
+continuation should be blocked. Replace with 10 within stock; error clears.
+Check 001, 0, decimals and a quantity above stock. Existing booking/verification
+and approval-only availability behavior is preserved.

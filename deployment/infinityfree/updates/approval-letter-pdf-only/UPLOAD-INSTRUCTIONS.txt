@@ -1,0 +1,9 @@
+Approval letter upload: PDF only.
+Apply after cleanup-30min-minimum-1hour and capacity-minimum-50 updates.
+Back up matching hosted files. Upload the two packaged files to their matching
+paths in the existing htdocs, replacing them. No SQL or build required.
+Clear generated .php files INSIDE storage/framework/views; keep the directory,
+.gitignore and subfolders. Hard-refresh the reservation page.
+Videos, DOCX and images are rejected by the server, even when renamed to .pdf
+if the detected content type is not PDF. PDF extension is also required.
+Existing uploaded documents are preserved.

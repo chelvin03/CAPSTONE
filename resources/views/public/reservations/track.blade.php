@@ -28,7 +28,7 @@
             <button type="submit" class="tracking-button tracking-danger">Cancel Reservation</button>
         </form>
     </section>
-    @elseif($reservation && $ownsReservation && !in_array($reservation->status, ['cancelled', 'rejected', 'completed'], true))
+    @elseif($reservation && $ownsReservation && !in_array($reservation->status, ['cancelled', 'rejected', 'completed', 'no_show'], true))
         <p class="tracking-message">Online cancellation is closed. Cancellation is allowed within 48 hours after submission and before the event starts. Please contact the administrator for assistance.</p>
     @endif
 </div></div>

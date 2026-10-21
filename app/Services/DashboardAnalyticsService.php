@@ -18,7 +18,7 @@ class DashboardAnalyticsService
     public const STATUS_COLORS = [
         'new' => '#2563eb', 'validated' => '#7c3aed', 'approved' => '#10b981',
         'rejected' => '#ef4444', 'waiting_list' => '#f59e0b', 'cancelled' => '#64748b',
-        'completed' => '#0f766e', 'pending' => '#64748b',
+        'no_show' => '#b45309', 'completed' => '#0f766e', 'pending' => '#64748b',
     ];
 
     public function query(array $filters, bool $withDates = true): Builder
@@ -44,6 +44,15 @@ class DashboardAnalyticsService
     public static function label(?string $value): string
     {
         return $value === null || trim($value) === '' ? 'Not specified' : Str::title(str_replace('_', ' ', trim($value)));
+    }
+
+    public static function redactContact(string $value): string
+    {
+        $value = preg_replace('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[email hidden]', $value);
+        return preg_replace_callback('/\+?\d[\d ().\-]{8,}\d/', function ($match) {
+            $digits = preg_replace('/\D/', '', $match[0]);
+            return strlen($digits) >= 10 && strlen($digits) <= 15 ? '[phone hidden]' : $match[0];
+        }, $value);
     }
 
     public function summarize(array $filters): array

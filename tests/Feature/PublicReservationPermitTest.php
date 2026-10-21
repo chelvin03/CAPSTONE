@@ -22,7 +22,7 @@ function validPublicReservationData(Facility $facility): array
         'contact_person' => 'Juan Dela Cruz',
         'contact_email' => 'juan@example.com',
         'contact_number' => '09123456789',
-        'expected_attendees' => 25,
+        'expected_attendees' => 50,
         'reservation_date' => now()->addDays(3)->format('Y-m-d'),
         'start_time' => '09:00',
         'end_time' => '11:00',
@@ -152,7 +152,7 @@ test('public capacity validation accepts whole numbers up to the boundary', func
     $data['permit'] = UploadedFile::fake()->create('permit.pdf', 50, 'application/pdf');
     $this->post(route('reservation.store'), $data)->assertSessionHasNoErrors();
     expect(Reservation::sole()->expected_attendees)->toBe($attendees);
-})->with([1, 1500, 1999, 2000]);
+})->with([50, 1500, 1999, 2000]);
 
 test('public reservations reject missing or declined gymnasium agreements even with forged timestamps', function ($acceptance) {
     Storage::fake('local');
@@ -322,3 +322,21 @@ test('verified event form submits the calendar date and restores it after valida
     ])->get(route('reservation.create', ['step' => 3]))->assertOk()
         ->assertSee('name="reservation_date" x-model="date" value="'.$date.'"', false);
 });
+
+test('approval letter rejects non pdf uploads including renamed videos', function ($name, $mime) {
+    Storage::fake('local');
+    Mail::fake();
+    $gym = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
+    $data = validPublicReservationData($gym);
+    $data['permit'] = UploadedFile::fake()->create($name, 20, $mime);
+    $this->post(route('reservation.store'), $data)->assertSessionHasErrors('permit');
+    $this->assertDatabaseCount('reservations', 0);
+    expect(Storage::disk('local')->allFiles())->toBe([]);
+    Mail::assertNothingSent();
+})->with([
+    ['letter.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ['video.mp4', 'video/mp4'],
+    ['photo.jpg', 'image/jpeg'],
+    ['video.pdf', 'video/mp4'],
+    ['letter.docx', 'application/pdf'],
+]);

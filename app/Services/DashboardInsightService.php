@@ -23,7 +23,7 @@ class DashboardInsightService
                 'Missing requestor type or facility' => blank($row->reservation_type) || ! $row->facility_id,
                 'Missing contact information' => blank($row->contact_person) || blank($row->contact_number) || ($public && blank($row->contact_email)),
                 'Missing expected attendees' => $row->getRawOriginal('expected_attendees') === null,
-                'Invalid attendee count' => $row->getRawOriginal('expected_attendees') !== null && (! ctype_digit((string) $row->getRawOriginal('expected_attendees')) || $row->expected_attendees < 1),
+                'Invalid attendee count' => $row->getRawOriginal('expected_attendees') !== null && (! ctype_digit((string) $row->getRawOriginal('expected_attendees')) || $row->expected_attendees < \App\Support\GymCapacity::MIN_ATTENDEES),
                 'Attendees exceed gym capacity (2,000)' => $row->expected_attendees > 2000,
                 'Missing or invalid reservation date/time' => ! $row->reservation_date || blank($row->start_time) || blank($row->end_time) || $row->end_time <= $row->start_time,
                 'Missing required approval letter' => $public && ! $row->permit_count,

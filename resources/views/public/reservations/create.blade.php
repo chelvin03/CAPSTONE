@@ -14,6 +14,8 @@
         <p>Provide your reservation details, requestor information, and review your confirmation. All requests are subject to review and approval.</p>
     </div>
 
+    @if(session('success'))<p class="mb-5 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800" role="status">{{ session('success') }}</p>@endif
+
     <!-- Steps nav -->
     <nav class="wizard-progress" aria-label="Reservation progress">
         <ol>
@@ -51,16 +53,12 @@
                 <div>
                     <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">1. Event Schedule</h2>
                     <div class="grid gap-5 md:grid-cols-2">
-                        <div>
-                            <label for="event_name" class="mb-2 block text-sm font-semibold">Event Name *</label>
-                            <input placeholder="e.g. School sports program" name="event_name" id="event_name" aria-describedby="event_name-error" aria-invalid="{{ $errors->has('event_name') ? 'true' : 'false' }}" value="{{ old('event_name') }}" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                            @error('event_name')<p id="event_name-error" class="wizard-field-error">{{ $message }}</p>@enderror
-                        </div>
+                        @include('reservations.event-type-field')
 <input type="hidden" name="facility_id" x-model="facility">
                         <div>
                             <label for="expected_attendees" class="mb-2 block text-sm font-semibold">Expected Number of Attendees *</label>
-                            <input placeholder="Enter expected number of attendees" name="expected_attendees" id="expected_attendees" aria-describedby="expected_attendees-help expected_attendees-error" :aria-invalid="Boolean(fieldErrors.expected_attendees)" type="number" min="1" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees') }}" @input="validateAttendance($event.target)" @invalid="step = 1; validateAttendance($event.target)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
-                            <p id="expected_attendees-help" class="wizard-field-help">Maximum Gymnasium Capacity: 2,000 persons</p>
+                            <input placeholder="Enter expected number of attendees" name="expected_attendees" id="expected_attendees" aria-describedby="expected_attendees-help expected_attendees-error" :aria-invalid="Boolean(fieldErrors.expected_attendees)" type="number" min="{{ \App\Support\GymCapacity::MIN_ATTENDEES }}" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees') }}" @input="validateAttendance($event.target)" @invalid="step = 1; validateAttendance($event.target)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
+                            <p id="expected_attendees-help" class="wizard-field-help">Gymnasium attendance: minimum 50, maximum 2,000 persons</p>
                             <p id="expected_attendees-error" class="wizard-field-error" role="alert" x-show="fieldErrors.expected_attendees" x-text="fieldErrors.expected_attendees">@error('expected_attendees'){{ $message }}@enderror</p>
                         </div>
                     </div>
@@ -78,7 +76,7 @@
         </select></label>
         <label>Year <select aria-label="Calendar year" :value="Number(bookingMonth.slice(0, 4))" @change="bookingChooseMonth($event.target.value, bookingMonth.slice(5, 7))" :disabled="bookingLoading" class="rounded-lg border-slate-300"><template x-for="year in bookingYears" :key="year"><option :value="year" x-text="year"></option></template></select></label>
     </div>
-    <p class="booking-notice">Green: Available. Yellow: Partly reserved, with available times. Red: Unavailable. Select a green or yellow date to see available times.</p>
+    <p class="booking-notice">Submitting a request does not hold the slot. Other requests may use the same time until an administrator approves a booking.</p><p class="booking-notice">Green: Available. Yellow: Partly reserved, with available times. Red: Unavailable. Select a green or yellow date to see available times.</p>
     <div class="booking-month-nav"><button type="button" @click="bookingMoveMonth(-1)" :disabled="!bookingCanMove(-1) || bookingLoading" aria-label="Previous calendar month">&larr;</button><h4 x-text="bookingMonthLabel"></h4><button type="button" @click="bookingMoveMonth(1)" :disabled="!bookingCanMove(1) || bookingLoading" aria-label="Next calendar month">&rarr;</button></div>
     <p x-show="bookingLoading" role="status">Loading date availability...</p>
     <div x-show="bookingError" role="alert"><p x-text="bookingError"></p><button type="button" @click="loadBookingMonth" class="wizard-secondary">Retry availability</button></div>
@@ -87,7 +85,7 @@
         <div class="booking-day-grid"><template x-for="(day, index) in bookingCells" :key="day ? day.date : 'blank-' + index"><div><template x-if="day"><button type="button" class="booking-day" :class="{'day-selected': date === day.date, 'day-full': !!day.status && (!day.selectable || day.status === 'full'), 'day-partial': day.selectable && day.status === 'partial', 'day-available': day.selectable && day.status === 'available'}" :disabled="bookingLoading || !!bookingError || !day.selectable || day.status === 'full'" @click="bookingSelectDate(day)" :aria-pressed="date === day.date" :aria-label="day.date + ': ' + (day.label || 'Loading') + (!day.selectable ? ', outside booking window' : '')"><span class="booking-day-number" x-text="day.number"></span><span class="booking-day-status" x-text="day.status && !day.selectable ? 'Unavailable' : (day.label || 'Loading...')"></span><span x-show="date === day.date">Selected date</span></button></template></div></template></div>
     </div>
     <p class="booking-notice" x-show="bookingOpening && !bookingError">Gymnasium Operating Hours: <span x-text="bookingTime(bookingOpening) + ' - ' + bookingTime(bookingClosing)"></span></p>
-    <p class="booking-notice">Available times allow a one-hour cleaning gap between reservations.</p>
+    <p class="booking-notice">Available times allow a 30-minute cleanup gap between reservations. Book at least 2 hours, with start and end times on the hour or half-hour.</p>
     <div class="booking-slot-section"><h4>Booking Time Slots <span x-show="date" x-text="' - ' + selectedDateLabel"></span></h4>
         <p x-show="!date">Select a date to see available times.</p>
         <p x-show="date && !bookingSelectedDay && !bookingLoading && !bookingError">View the selected date's month to see its time slots.</p>
@@ -95,12 +93,12 @@
         <div class="booking-slot-grid"><template x-for="slot in bookingAvailablePeriods" :key="slot.start_time"><button type="button" class="booking-slot" :class="{'slot-selected': startTime === slot.start_time && endTime === slot.end_time}" :disabled="!slot.available || bookingLoading || !!bookingError || !bookingSelectedDay?.selectable" @click="bookingSelectSlot(slot)" :aria-pressed="startTime === slot.start_time && endTime === slot.end_time"><span class="booking-slot-time" x-text="bookingTime(slot.start_time) + ' - ' + bookingTime(slot.end_time)"></span><span x-text="slot.label"></span><span x-show="slot.available && startTime === slot.start_time && endTime === slot.end_time">Selected time</span></button></template></div>
         <div class="booking-custom-times" x-show="bookingSelectedDay && !bookingLoading && !bookingError">
             <div class="booking-full-period">
-                <div x-show="bookingAvailablePeriods.length > 1"><label for="booking-period">Available period</label><select id="booking-period" x-model="bookingPeriod"><option value="">Choose a period</option><template x-for="period in bookingAvailablePeriods" :key="period.start_time"><option :value="period.start_time" x-text="bookingTime(period.start_time) + ' - ' + bookingTime(period.end_time)"></option></template></select><p>Choose one uninterrupted available period. Each reservation requires one hour afterward for cleaning.</p></div>
+                <div x-show="bookingAvailablePeriods.length > 1"><label for="booking-period">Available period</label><select id="booking-period" x-model="bookingPeriod"><option value="">Choose a period</option><template x-for="period in bookingAvailablePeriods" :key="period.start_time"><option :value="period.start_time" x-text="bookingTime(period.start_time) + ' - ' + bookingTime(period.end_time)"></option></template></select><p>Choose one uninterrupted available period. Each reservation requires 30 minutes afterward for cleanup.</p></div>
                 <button type="button" @click="bookingFullAvailable" :disabled="!bookingAvailablePeriods.length" class="wizard-secondary">Reserve Full Available Time</button>
             </div>
-            <div><label for="start_time">Start Time</label><input type="time" id="start_time" name="start_time" x-model="startTime" min="07:00" max="23:59" step="60" required @change="updateBookingSummary" aria-describedby="booking-time-status"></div>
-                        <div><label for="end_time">End Time</label><input type="time" id="end_time" name="end_time" x-model="endTime" min="07:00" max="23:59" step="60" :required="endTime !== '24:00'" :disabled="endTime === '24:00'" x-show="endTime !== '24:00'" @change="updateBookingSummary" aria-describedby="booking-time-status"><input type="hidden" name="end_time" value="24:00" :disabled="endTime !== '24:00'"><label class="mt-3 flex items-center gap-2" x-show="bookingClosing === '24:00'"><input type="checkbox" :checked="endTime === '24:00'" @change="endTime = $event.target.checked ? '24:00' : ''; updateBookingSummary()">End at 12:00 midnight</label></div>
-            <p id="booking-time-status" class="booking-time-status" role="status" x-text="bookingTimeError ? 'Time Unavailable - ' + bookingTimeError : (bookingCanSubmit ? 'Time Available' : 'Choose your Start Time and End Time.')"></p>
+            <div><label for="start_time">Start Time</label><input type="time" id="start_time" name="start_time" x-model="startTime" min="07:00" max="23:30" step="1800" required @change="updateBookingSummary" aria-describedby="booking-time-status"></div>
+                        <div><label for="end_time">End Time</label><input type="time" id="end_time" name="end_time" x-model="endTime" min="07:00" max="23:30" step="1800" :required="endTime !== '24:00'" :disabled="endTime === '24:00'" x-show="endTime !== '24:00'" @change="updateBookingSummary" aria-describedby="booking-time-status"><input type="hidden" name="end_time" value="24:00" :disabled="endTime !== '24:00'"><label class="mt-3 flex items-center gap-2" x-show="bookingClosing === '24:00'"><input type="checkbox" :checked="endTime === '24:00'" @change="endTime = $event.target.checked ? '24:00' : ''; updateBookingSummary()">End at 12:00 midnight</label></div>
+            <p id="booking-time-status" class="booking-time-status" :style="(bookingTimeError || (!bookingCanSubmit && eventNextError)) ? 'color: #b91c1c; font-weight: 600' : ''" role="status" x-text="(bookingTimeError || (!bookingCanSubmit && eventNextError)) ? 'Time Unavailable - ' + (bookingTimeError || eventNextError) : (bookingCanSubmit ? 'Time Available' : 'Choose your Start Time and End Time.')"></p>
         </div>
         <p class="booking-notice" x-show="startTime && endTime">Selected Reservation Time: <strong x-text="bookingTime(startTime) + ' - ' + bookingTime(endTime)"></strong></p>
         <p class="booking-notice" x-show="date && !bookingCanSubmit && !bookingLoading && !bookingError">Choose an available time slot before submitting.</p>
@@ -111,7 +109,7 @@
                 <div>
                     <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">2. Attachment</h2>
                     <label for="permit" class="mb-2 block text-sm font-semibold">Upload Supporting Letter / Approval Document *</label>
-                    <p class="mb-3">Upload valid approval letter or supporting document</p><input name="permit" id="permit" aria-describedby="permit-error" aria-invalid="{{ $errors->has('permit') ? 'true' : 'false' }}" type="file" accept=".pdf,.jpg,.jpeg,.png" required class="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <p class="mb-3">Upload your approval letter or supporting document as a PDF only. Videos, Word documents, and images are not accepted.</p><input name="permit" id="permit" aria-describedby="permit-error" aria-invalid="{{ $errors->has('permit') ? 'true' : 'false' }}" type="file" @change="$event.target.setCustomValidity(''); $event.target.setAttribute('aria-invalid', 'false'); eventNextError = ''" accept=".pdf,application/pdf" required class="w-full rounded-lg border border-slate-300 p-2 text-sm">
                             @error('permit')<p id="permit-error" class="wizard-field-error">{{ $message }}</p>@enderror
                     <p class="mt-1 text-xs text-slate-500">Supported Formats: PDF, PNG, JPG (Max: 5MB)</p>
                 </div>
@@ -123,9 +121,9 @@
                             @error('purpose')<p id="purpose-error" class="wizard-field-error">{{ $message }}</p>@enderror
                         </div>
 <div><label for="additional_notes" class="mb-2 block font-semibold">Additional Notes</label><textarea name="additional_notes" id="additional_notes" rows="3" class="w-full rounded-lg border-slate-300">{{ old('additional_notes') }}</textarea></div>
-                <p x-show="hasSelectedConflict" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The selected time overlaps a pending or reserved slot. Choose another time.</p>
+                <p x-show="hasSelectedConflict" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The selected time overlaps an approved reservation or cleaning buffer. Choose another time.</p>
 <p class="wizard-info">Please make sure all reservation details are correct before proceeding.</p>
-<div class="wizard-actions"><button type="button" @click="continueToRequestor" :disabled="!bookingCanSubmit || !date || hasSelectedConflict || availabilityLoading || !!availabilityError || !facility" class="wizard-primary">Next &rarr;</button></div>
+<div class="wizard-actions"><button type="button" @click="continueToRequestor" class="wizard-primary">Next &rarr;</button></div>
 </div></section>
         <!-- Step 2: Requestor Information -->
         <section x-show="step === 2 && !verificationOpen" class="wizard-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="requestor-heading">
@@ -145,6 +143,7 @@
                     <label for="contact_email" class="mb-2 block font-semibold">Email Address <span class="required-marker" aria-hidden="true">*</span></label>
                     <input id="contact_email" name="contact_email" type="email" x-model="email" value="{{ old('contact_email') }}" placeholder="you@example.com" autocomplete="email" aria-describedby="contact_email-error" :aria-invalid="Boolean(fieldErrors.contact_email)" required class="w-full rounded-lg border-slate-300 px-3 py-2">
                     <p id="contact_email-error" class="wizard-field-error" x-show="fieldErrors.contact_email" x-text="fieldErrors.contact_email"></p>
+                    <p class="wizard-field-help" x-show="emailVerification.verified">Email verified. You can go Back and edit details without another code while verification remains valid. Changing the email requires verification again.</p>
                 </div>
                 <div>
                     <label for="contact_number" class="mb-2 block font-semibold">Contact Number <span class="required-marker" aria-hidden="true">*</span></label>
@@ -182,14 +181,15 @@
                 </div>
                 <div>
                     <label :for="'equipment-quantity-' + row.key" class="mb-2 block font-semibold">Quantity</label>
-                    <input :id="'equipment-quantity-' + row.key" :name="row.id ? 'equipment[' + row.id + '][quantity_requested]' : null" type="number" x-model="row.quantity" min="1" :max="equipmentStock(row.id)" step="1" :required="!!row.id" :disabled="!row.id || requestorType !== 'internal'" placeholder="Enter quantity" class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <input :id="'equipment-quantity-' + row.key" :name="row.id ? 'equipment[' + row.id + '][quantity_requested]' : null" type="text" inputmode="numeric" pattern="[1-9][0-9]*" maxlength="6" x-model="row.quantity" x-effect="$el.setCustomValidity(equipmentQuantityError(row))" :aria-invalid="equipmentQuantityError(row) ? 'true' : 'false'" :aria-describedby="'equipment-quantity-error-' + row.key" :required="!!row.id" :disabled="!row.id || requestorType !== 'internal'" placeholder="e.g. 10" title="Enter a positive whole number without leading zeros, such as 10 instead of 010." class="w-full rounded-lg border-slate-300 px-3 py-2">
+                    <p :id="'equipment-quantity-error-' + row.key" class="wizard-field-error" role="alert" x-show="equipmentQuantityError(row)" x-text="equipmentQuantityError(row)"></p>
                 </div>
                 <button type="button" class="wizard-secondary equipment-remove" @click="equipmentRows.splice(index, 1)" :aria-label="'Remove equipment choice ' + (index + 1)">Remove</button>
             </div>
         </template>
         <button type="button" class="wizard-secondary equipment-add" @click="equipmentRows.push({key: equipmentNextKey++, id: '', quantity: ''})" :disabled="equipmentRows.length >= equipmentOptions.filter(item => item.total_quantity > 0).length">Add equipment</button>
         <p class="wizard-field-help" x-show="!equipmentOptions.some(item => item.total_quantity > 0)">No equipment is currently available for requests.</p>
-        <p class="wizard-field-help">Choose equipment and enter the quantity needed. Final availability depends on your schedule and administrator approval.</p>
+        <p class="wizard-field-help">Use whole-number quantities without leading zeros: enter 10, not 010 or 0010. Final availability depends on your schedule and administrator approval.</p>
         @foreach ($errors->get('equipment.*') as $messages)
             @foreach ($messages as $error)<p class="wizard-field-error" role="alert">{{ $error }}</p>@endforeach
         @endforeach
@@ -201,7 +201,7 @@
                 <div class="wizard-actions sm:col-span-2 text-right">
                     <span class="wizard-field-help">Fields marked <span class="required-marker">*</span> are required.</span>
                     <button type="button" @click="step = 1; verificationOpen = false" class="wizard-secondary">&larr; Back</button>
-                    <button type="button" @click="goToVerification" class="wizard-primary rounded-lg bg-blue-600 px-6 py-3 font-bold text-white">Next &rarr;</button>
+                    <button type="button" @click="goToVerification" :disabled="emailVerification.checking || emailVerification.sending || emailVerification.verifying" class="wizard-primary rounded-lg bg-blue-600 px-6 py-3 font-bold text-white">Next &rarr;</button>
                 </div>
             </div>
         </section>
@@ -244,7 +244,6 @@
 <h3 class="confirmation-subheading">Gym Information</h3><dl class="facility-information"><div><dt>Gym</dt><dd>MCST Gymnasium</dd></div><div><dt>Location</dt><dd>MCST Gymnasium</dd></div><div><dt>Capacity</dt><dd>{{ number_format(\App\Support\GymCapacity::MAX_ATTENDEES) }} persons</dd></div><div><dt>Gym Status</dt><dd x-text="facilityStatus"></dd></div></dl>
 <h3 class="confirmation-subheading">Reservation Summary</h3><dl class="reservation-summary"><template x-for="item in summary" :key="item.label"><div><dt x-text="item.label"></dt><dd x-text="item.value || '?'"></dd></div></template></dl>
 <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-4 text-blue-900"><input name="agreement" value="1" type="checkbox" required x-model="requestConfirmed" @change="confirmRequest" class="mt-1 rounded border-blue-300"><span>I confirm that the information is correct and understand that this request still requires administrator approval.</span></label>
-<div class="wizard-info"><p x-text="agreementAccepted ? 'Gymnasium Use Agreement accepted.' : 'Read and accept the Gymnasium Use Agreement before submitting.'"></p><button type="button" @click="openAgreement" class="wizard-secondary">Read Gymnasium Use Agreement</button></div>
 <div class="wizard-actions"><button type="button" @click="step = 2" class="wizard-secondary">&larr; Back</button><button type="submit" :disabled="!requestConfirmed || !agreementAccepted || !bookingCanSubmit || hasSelectedConflict || availabilityLoading || !!availabilityError || !emailVerification.verified || facilityStatus !== 'Available'" class="wizard-primary">Submit Reservation</button></div></section>
 <dialog x-ref="agreementDialog" class="gym-use-agreement agreement-dialog" aria-labelledby="gym-use-agreement-heading" @cancel="agreementAccepted = false; requestConfirmed = false">
     <h3 id="gym-use-agreement-heading">MCST Gymnasium Use Agreement</h3>
@@ -291,7 +290,7 @@
         @cancel.prevent="closeConflictWarning" class="w-full max-w-md rounded-2xl border-0 bg-white p-6 shadow-xl"
         style="max-width: min(28rem, calc(100vw - 2rem));">
         <h2 id="conflict-title" class="text-xl font-bold text-red-700">This time is unavailable</h2>
-        <p id="conflict-description" class="mt-3 text-slate-700">The selected time overlaps a pending reservation, confirmed booking, or blocked schedule. Please choose another time.</p>
+        <p id="conflict-description" class="mt-3 text-slate-700">The selected time overlaps an approved reservation, cleaning buffer, or blocked schedule. Please choose another time.</p>
         <button type="button" autofocus @click="closeConflictWarning" class="mt-6 w-full rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700">Choose another time</button>
     </dialog>
     <style>dialog::backdrop { background: rgb(15 23 42 / 60%); } dialog.agreement-dialog { width: min(42rem, calc(100vw - 2rem)); max-height: 85vh; overflow-y: auto; margin: auto; padding: 24px; border: 0; border-radius: 16px; background: white; box-shadow: 0 24px 60px rgb(15 23 42 / 25%); }</style>
@@ -304,10 +303,17 @@ function reservationFlow() {
         bookingAvailabilityUrl: @js(route('reservation.availability')),
         maximumDate: @js(now()->addYearsNoOverflow(15)->toDateString()),
         step: 1,
-        equipmentOptions: @js($equipment->map(fn ($item) => ['id' => (string) $item->id, 'equipment_name' => $item->equipment_name, 'total_quantity' => max(0, $item->total_quantity)])->values()),
+        equipmentOptions: @js($equipment->map(fn ($item) => ['id' => (string) $item->id, 'equipment_name' => $item->equipment_name, 'total_quantity' => $item->usableQuantity()])->values()),
         equipmentRows: @js(collect(old('equipment', []))->filter(fn ($row) => filled($row['quantity_requested'] ?? null))->map(fn ($row, $id) => ['key' => (string) $id, 'id' => (string) $id, 'quantity' => $row['quantity_requested']])->values()),
         equipmentNextKey: 0,
         equipmentStock(id) { return this.equipmentOptions.find(item => String(item.id) === String(id))?.total_quantity || 0; },
+        equipmentQuantityError(row) {
+            if (!row.id || this.requestorType !== 'internal' || row.quantity === '' || row.quantity == null) return '';
+            if (!/^[1-9][0-9]*$/.test(String(row.quantity))) return 'Enter a positive whole number without leading zeros (for example, 10 instead of 010).';
+            const maximum = Math.min(100000, Number(this.equipmentStock(row.id)));
+            if (Number(row.quantity) > maximum) return 'Request no more than ' + maximum + ' of this equipment.';
+            return '';
+        },
 verificationOpen: @js(!$emailVerified && session()->has('public_email_challenge')),
 purpose: @js(old('purpose', $requestorDetails['purpose'] ?? '')),
 summary: [],
@@ -341,10 +347,52 @@ openAgreement() {
     this.$nextTick(() => { if (!this.$refs.agreementDialog.open) this.$refs.agreementDialog.showModal(); });
 },
 get facilityStatus() { return @js($gym?->status ?? 'unavailable') === 'maintenance' ? 'Maintenance' : (this.hasSelectedConflict ? (this.occupied.some(slot => slot.status === 'blackout' && this.startTime < slot.end_time.slice(0,5) && this.endTime > slot.start_time.slice(0,5)) ? 'Maintenance' : 'Reserved') : (@js($gym?->status ?? 'unavailable') === 'available' ? 'Available' : 'Reserved')); },
+eventNextError: '',
 continueToRequestor() {
-    this.message = '';
-    if (!this.bookingCanSubmit) { this.message = 'Select an available date and time before continuing.'; return; }
-    for (const field of this.$refs.reservationForm.querySelector('[aria-labelledby="event-heading"]').querySelectorAll('input,select,textarea')) { if (!field.reportValidity()) return; }
+    this.message = ''; this.eventNextError = '';
+    if (!this.bookingCanSubmit) {
+        this.eventNextError = this.bookingTimeError || this.bookingError || this.availabilityError
+            || (this.bookingLoading || this.availabilityLoading ? 'Please wait while availability is checked.' : 'Choose an available reservation date, start time, and end time.');
+        const status = document.getElementById('booking-time-status');
+        if (status) { status.textContent = this.eventNextError; status.style.color = '#b91c1c'; status.scrollIntoView({block: 'center', behavior: 'smooth'}); }
+        return;
+    }
+    const attendance = this.$refs.reservationForm.elements.namedItem('expected_attendees');
+    this.validateAttendance(attendance);
+    const permit = this.$refs.reservationForm.elements.namedItem('permit');
+    permit.setCustomValidity('');
+    const file = permit.files[0];
+    if (file && (!/\.pdf$/i.test(file.name) || (file.type && file.type !== 'application/pdf'))) {
+        permit.setCustomValidity('Upload a PDF only. Videos, Word documents, and images are not accepted.');
+    }
+    for (const field of this.$refs.reservationForm.querySelector('[aria-labelledby="event-heading"]').querySelectorAll('input,select,textarea')) {
+        if (!field.willValidate) continue;
+        const invalid = !field.checkValidity();
+        field.setAttribute('aria-invalid', String(invalid));
+        let error = field.parentElement.querySelector('[data-event-validation-error]');
+        if (!error) {
+            error = document.createElement('p');
+            error.dataset.eventValidationError = 'true';
+            error.id = 'event-validation-' + field.name;
+            error.className = 'wizard-field-error';
+            error.style.color = '#b91c1c';
+            error.setAttribute('role', 'alert');
+            field.insertAdjacentElement('afterend', error);
+            field.setAttribute('aria-describedby', [field.getAttribute('aria-describedby'), error.id].filter(Boolean).join(' '));
+            field.addEventListener('input', () => {
+                field.setCustomValidity('');
+                field.setAttribute('aria-invalid', 'false');
+                error.textContent = '';
+            });
+            field.addEventListener('change', () => { error.textContent = ''; field.setAttribute('aria-invalid', 'false'); });
+        }
+        error.textContent = invalid ? field.validationMessage : '';
+        if (invalid) {
+            const label = field.labels?.[0]?.textContent?.replace('*', '').trim() || 'Required field';
+            this.eventNextError = label + ': ' + field.validationMessage;
+            field.focus(); return;
+        }
+    }
     this.step = 2; this.verificationOpen = false; this.openPrivacyNotice();
 },
 reviewReservation() {
@@ -357,7 +405,7 @@ const fields = this.$refs.reservationForm.elements;
 const value = name => fields.namedItem(name)?.value || '';
 const time = t => new Date('2000-01-01T' + t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
 if (!this.date) { this.message = "Select a reservation date."; return; }
-this.summary = [ ['Requestor Name',this.contactPerson], ['Requestor Type',fields.namedItem('reservation_type').selectedOptions[0].text], ['Event Name',value('event_name')], ['Reservation Date',this.selectedDateLabel], ['Start Time',time(this.startTime)], ['End Time',time(this.endTime)], ['Number of Participants',value('expected_attendees')], ['Gym','MCST Gymnasium'], ['Uploaded Supporting Document',fields.namedItem('permit').files[0]?.name], ['Purpose',this.purpose], ['Additional Notes',value('additional_notes')] ].map(([label,value])=>({label,value}));
+this.summary = [ ['Requestor Name',this.contactPerson], ['Requestor Type',fields.namedItem('reservation_type').selectedOptions[0].text], ['Event Type',value('event_type')], ['Reservation Date',this.selectedDateLabel], ['Start Time',time(this.startTime)], ['End Time',time(this.endTime)], ['Number of Participants',value('expected_attendees')], ['Gym','MCST Gymnasium'], ['Uploaded Supporting Document',fields.namedItem('permit').files[0]?.name], ['Purpose',this.purpose], ['Additional Notes',value('additional_notes')] ].map(([label,value])=>({label,value}));
 this.step = 3;
 this.agreementAccepted = false;
 this.requestConfirmed = false;
@@ -375,11 +423,12 @@ this.requestConfirmed = false;
                 else if (this.$refs.conflictDialog.open) this.$refs.conflictDialog.close();
             });
             if (this.step === 1) this.openBookingCalendar();
-            for (const name of ['contactPerson', 'contactNumber', 'requestorType']) this.$watch(name, () => { this.emailVerification.verified = false; this.emailVerification.sent = false; });
-            this.$watch('email', () => {
+            this.$watch('email', (value, previous) => {
+                if (String(value).trim().toLowerCase() === String(previous).trim().toLowerCase()) return;
                 this.emailVerification.verified = false;
                 this.emailVerification.sent = false;
                 this.emailVerification.code = '';
+                this.startCooldown(0);
             });
         },
         validateAttendance(field) {
@@ -388,8 +437,8 @@ this.requestConfirmed = false;
             let error = '';
             if (value > @js(\App\Support\GymCapacity::MAX_ATTENDEES)) {
                 error = 'The expected number of attendees exceeds the MCST Gymnasium maximum capacity of 2,000 persons. Please reduce the number of attendees to continue.';
-            } else if (!field.value || !/^[0-9]+$/.test(field.value) || !Number.isInteger(value) || value < 1 || field.validity.badInput || field.validity.stepMismatch) {
-                error = 'Enter a whole number of attendees between 1 and 2,000.';
+            } else if (!field.value || !/^[0-9]+$/.test(field.value) || !Number.isInteger(value) || value < @js(\App\Support\GymCapacity::MIN_ATTENDEES) || field.validity.badInput || field.validity.stepMismatch) {
+                error = 'Enter a whole number of attendees between 50 and 2,000.';
             }
             field.setCustomValidity(error);
             if (error) this.fieldErrors.expected_attendees = error;
@@ -413,7 +462,7 @@ this.requestConfirmed = false;
         email: @js(old('contact_email', $requestorDetails['contact_email'] ?? '')),
         contactNumber: @js(old('contact_number', $requestorDetails['contact_number'] ?? '')),
         requestorType: @js(old('reservation_type', $requestorDetails['reservation_type'] ?? '')),
-        emailVerification: { sent: @js(session()->has('public_email_challenge')), sentTo: '', showNotice: false, verified: @js($emailVerified), sending: false, verifying: false, code: '', cooldown: 0, cooldownTimer: null },
+        emailVerification: { sent: @js(session()->has('public_email_challenge')), sentTo: @js(session('public_email_challenge.email', '')), showNotice: false, verified: @js($emailVerified), checking: false, sending: false, verifying: false, code: '', cooldown: 0, cooldownTimer: null },
         facility: @js((string) ($gym?->id ?? '')),
         date: @js(old('reservation_date', '')),
         startTime: @js(old('start_time', '')),
@@ -431,6 +480,7 @@ this.requestConfirmed = false;
         get hasSelectedConflict() { if (!this.startTime || !this.endTime || this.endTime <= this.startTime) return false; return this.occupied.some(slot => this.startTime < slot.end_time.slice(0, 5) && this.endTime > slot.start_time.slice(0, 5)); },
 
         async goToVerification() {
+            if (this.emailVerification.checking || this.emailVerification.sending || this.emailVerification.verifying) return;
             this.message = '';
             this.fieldErrors = {};
             const fields = this.$refs.reservationForm.elements;
@@ -459,6 +509,22 @@ this.requestConfirmed = false;
             await this.$nextTick();
             if (!this.purpose.trim()) { this.message = 'Enter the purpose of your reservation.'; return; }
             for (const field of this.$refs.reservationForm.querySelector('[aria-labelledby="requestor-heading"]').querySelectorAll('input,select,textarea')) { if (!field.reportValidity()) return; }
+            this.emailVerification.checking = true;
+            const checkedEmail = this.email.trim().toLowerCase();
+            try {
+                const response = await fetch(@js(route('reservation.edit_details')), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': this.$refs.reservationForm.elements.namedItem('_token').value},
+                    body: JSON.stringify({email: checkedEmail, contact_person: this.contactPerson, contact_number: this.contactNumber, reservation_type: this.requestorType, purpose: this.purpose})
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(response.status === 419 ? 'Your session changed. Refresh the page and continue again.' : (data.message || 'Unable to check email verification. Please try again.'));
+                if (this.email.trim().toLowerCase() !== checkedEmail) throw new Error('Your email changed. Click Next again to check the new address.');
+                this.emailVerification.verified = data.verified === true;
+                if (!data.challenge_active) this.emailVerification.sent = false;
+            } catch (error) {
+                this.message = error.message; return;
+            } finally { this.emailVerification.checking = false; }
             if (this.emailVerification.verified) { this.reviewReservation(); return; }
             this.verificationOpen = true;
             if (!this.emailVerification.sent || this.emailVerification.sentTo !== this.email) this.sendCode();
@@ -486,9 +552,9 @@ this.requestConfirmed = false;
                     headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': this.$refs.reservationForm.elements.namedItem('_token').value}
                 });
                 if (!response.ok) throw new Error('Unable to edit details. Please refresh and try again.');
-                this.emailVerification.verified = false;
-                this.emailVerification.sent = false;
-                this.emailVerification.code = '';
+                const data = await response.json();
+                this.emailVerification.verified = data.verified === true;
+                if (!data.challenge_active) this.emailVerification.sent = false;
                 this.step = 2; this.verificationOpen = false;
             } catch (error) { this.message = error.message; }
         },
@@ -505,7 +571,7 @@ this.requestConfirmed = false;
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('input[name="_token"]')?.value || ''
+                        'X-CSRF-TOKEN': this.$refs.reservationForm.elements.namedItem('_token').value
                     },
                     body: JSON.stringify({ email: this.email, contact_person: this.contactPerson, contact_number: this.contactNumber, reservation_type: this.requestorType, purpose: this.purpose })
                 });
@@ -515,6 +581,12 @@ this.requestConfirmed = false;
                 }
                 this.startCooldown(data.retry_after || (res.status === 429 ? 60 : 0));
                 if (!res.ok) throw new Error(data.message || 'Unable to send code');
+                if (data.verified === true) {
+                    this.emailVerification.verified = true;
+                    this.verificationOpen = false;
+                    this.reviewReservation();
+                    return;
+                }
                 this.emailVerification.sent = true;
                 this.emailVerification.sentTo = this.email;
                 this.emailVerification.showNotice = true;
@@ -538,7 +610,7 @@ this.requestConfirmed = false;
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('input[name="_token"]')?.value || ''
+                        'X-CSRF-TOKEN': this.$refs.reservationForm.elements.namedItem('_token').value
                     },
                     body: JSON.stringify({ email: this.email, code: this.emailVerification.code })
                 });

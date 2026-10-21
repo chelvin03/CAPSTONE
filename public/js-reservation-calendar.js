@@ -18,7 +18,10 @@ function gymBookingCalendar() {
         get bookingTimeError() {
             if (!this.startTime || !this.endTime) return '';
             if (this.startTime < (this.bookingOpening || '07:00') || this.endTime > (this.bookingClosing || '24:00')) return 'Reservations must be within 7:00 AM to 12 midnight.';
+            if (![this.startTime, this.endTime].every(time => /^(?:(?:[01][0-9]|2[0-3]):(?:00|30)|24:00)$/.test(time))) return 'Choose start and end times on the hour or half-hour. Reservations must be at least 2 hours.';
             if (this.endTime <= this.startTime) return 'End Time must be after Start Time.';
+            const minutes = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+            if (minutes(this.endTime) - minutes(this.startTime) < 120) return 'Reservations must be at least 2 hours.';
             if (this.hasSelectedConflict) return 'Selected time overlaps with an existing reservation. Please choose from the remaining available time.';
             return '';
         },
@@ -48,7 +51,7 @@ function gymBookingCalendar() {
             const day = this.bookingSelectedDay;
             return Boolean(!this.bookingLoading && !this.bookingError && day?.selectable && day.status !== 'full'
                 && this.startTime && this.endTime > this.startTime && this.startTime >= this.bookingOpening
-                && this.endTime <= this.bookingClosing && !this.hasSelectedConflict);
+                && this.endTime <= this.bookingClosing && !this.bookingTimeError && !this.hasSelectedConflict);
         },
         bookingTime(time) { return time?.startsWith('24:00') ? '12:00 midnight' : (time ? new Date(`2000-01-01T${time}`).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}) : ''); },
         bookingCanMove(offset) {

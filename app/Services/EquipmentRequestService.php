@@ -41,7 +41,7 @@ class EquipmentRequestService
         ksort($events);
         $used = $peak = 0;
         foreach ($events as $delta) { $used += $delta; $peak = max($peak, $used); }
-        return max(0, $equipment->total_quantity - $peak);
+        return max(0, $equipment->usableQuantity() - $peak);
     }
 
     public function validateRequests(string $type, array $requests, ?string $custom = null, bool $checkInventory = true): void
@@ -55,9 +55,9 @@ class EquipmentRequestService
             if (! $item) {
                 throw ValidationException::withMessages(['equipment' => 'Please select equipment from the available inventory.']);
             }
-            if ($row['quantity_requested'] > $item->total_quantity) {
+            if ($row['quantity_requested'] > $item->usableQuantity()) {
                 throw ValidationException::withMessages([
-                    'equipment.'.$id.'.quantity_requested' => $item->equipment_name.' has only '.$item->total_quantity.' in inventory. Request no more than this quantity.',
+                    'equipment.'.$id.'.quantity_requested' => $item->equipment_name.' has only '.$item->usableQuantity().' usable units in inventory. Request no more than this quantity.',
                 ]);
             }
         }
@@ -90,7 +90,7 @@ class EquipmentRequestService
     public function approveQuantity(Reservation $reservation, Equipment $equipment, int $quantity): void
     {
         $item = $reservation->equipment()->where('equipment.id', $equipment->id)->firstOrFail();
-        if ($reservation->reservation_type !== 'internal' || in_array($reservation->status, ['cancelled', 'rejected', 'completed'], true)) {
+        if ($reservation->reservation_type !== 'internal' || in_array($reservation->status, ['cancelled', 'rejected', 'completed', 'no_show'], true)) {
             throw ValidationException::withMessages(['equipment' => 'This reservation cannot receive equipment approvals.']);
         }
         if ($quantity < 1 || $quantity > $item->pivot->quantity_requested || $quantity > $this->available($equipment, $reservation)) {

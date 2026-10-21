@@ -1,5 +1,5 @@
 @php
-    $labels = ['new' => 'Pending', 'validated' => 'Validated', 'approved' => 'Approved', 'waiting_list' => 'Waiting List', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled', 'completed' => 'Completed'];
+    $labels = ['new' => 'Pending', 'validated' => 'Validated', 'approved' => 'Approved', 'waiting_list' => 'Waiting List', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled', 'completed' => 'Completed', 'no_show' => 'No-show'];
     $messages = [
         'new' => 'Your reservation request has been submitted and is waiting for administrator review.',
         'validated' => 'Your reservation request has been reviewed and validated by the administrator.',
@@ -7,11 +7,12 @@
         'waiting_list' => 'The requested schedule is currently occupied. Your reservation has been placed on the waiting list.',
         'rejected' => 'Your reservation request has been rejected by the administrator.',
         'cancelled' => 'Your reservation has been cancelled.',
-        'completed' => 'Your reservation has been completed.',
+        'completed' => 'Your event has been recorded as completed.',
+        'no_show' => 'Your event was recorded as a no-show. Contact the administrator if you believe this is incorrect.',
     ];
     $statusColor = match ($reservation->status) {
         'approved', 'completed' => 'approved',
-        'cancelled', 'rejected' => 'declined',
+        'cancelled', 'rejected', 'no_show' => 'declined',
         default => 'pending',
     };
 @endphp

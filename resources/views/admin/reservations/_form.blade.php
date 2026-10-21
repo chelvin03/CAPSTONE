@@ -16,7 +16,7 @@
             <label for="pencil_booking" class="mb-2 block text-sm font-semibold text-slate-700">Booking option</label>
             <select id="pencil_booking" name="pencil_booking" class="w-full rounded-lg border-slate-300">
                 <option value="0" @selected(!old('pencil_booking', request('pencil_booking', 0)))>Regular reservation</option>
-                <option value="1" @selected(old('pencil_booking', request('pencil_booking', 0)))>Pencil booking (tentative hold)</option>
+                <option value="1" @selected(old('pencil_booking', request('pencil_booking', 0)))>Pencil booking (not reserved until approved)</option>
             </select>
             <p class="mt-2 text-sm text-slate-500">A pencil booking holds the date and time until an admin confirms or cancels it. It does not expire automatically.</p>
             @error('pencil_booking')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
@@ -44,40 +44,8 @@
             </select>
         </div>
 
-        <div>
-            <label for="event_name" class="mb-2 block text-sm font-semibold text-slate-700">
-                Event Name <span class="text-red-500">*</span>
-            </label>
-
-            <input
-                id="event_name"
-                type="text"
-                name="event_name"
-                value="{{ old('event_name') }}"
-                required
-                maxlength="255"
-                class="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                placeholder="Example: Basketball Tryout"
-            >
-        </div>
-
-        <div>
-            <label for="event_type" class="mb-2 block text-sm font-semibold text-slate-700">
-                Event Type
-            </label>
-
-            <input
-                id="event_type"
-                type="text"
-                name="event_type"
-                value="{{ old('event_type') }}"
-                maxlength="100"
-                class="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                placeholder="Example: Sports competition"
-            >
-        </div>
-
-        <div class="md:col-span-2">
+        @include('reservations.event-type-field')
+<div class="md:col-span-2">
             <label for="purpose" class="mb-2 block text-sm font-semibold text-slate-700">
                 Purpose <span class="text-red-500">*</span>
             </label>
@@ -142,7 +110,7 @@
                 type="number"
                 name="expected_attendees"
                 value="{{ old('expected_attendees') }}"
-                min="1" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1"
+                min="{{ \App\Support\GymCapacity::MIN_ATTENDEES }}" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1"
                 required
                 class="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
@@ -151,10 +119,9 @@
                 <div>
                     <h2 class="mb-4 text-xs font-bold uppercase text-blue-700">1. Event Schedule</h2>
                     <div class="grid gap-5 md:grid-cols-2">
-                        <div><label class="mb-2 block text-sm font-semibold">Event Title *</label><input name="event_name" value="{{ old('event_name') }}" required class="w-full rounded-lg border-slate-300"></div>
-                        <div><label class="mb-2 block text-sm font-semibold">Event Type</label><input name="event_type" value="{{ old('event_type') }}" class="w-full rounded-lg border-slate-300" placeholder="Sports Event"></div>
+                        @include('reservations.event-type-field')
                         <div><p class="field-label">Gym</p><p>MCST Gymnasium</p></div>
-                        <div><label class="mb-2 block text-sm font-semibold">Estimated Participants *</label><input name="expected_attendees" type="number" min="1" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300"></div>
+                        <div><label class="mb-2 block text-sm font-semibold">Estimated Participants *</label><input name="expected_attendees" type="number" min="{{ \App\Support\GymCapacity::MIN_ATTENDEES }}" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees') }}" required class="w-full rounded-lg border-slate-300"></div>
                         <div class="md:col-span-2"><label class="mb-2 block text-sm font-semibold">Purpose *</label><textarea name="purpose" rows="3" required class="w-full rounded-lg border-slate-300">{{ old('purpose') }}</textarea></div>
                     </div>
                 </div>
@@ -187,8 +154,8 @@
                         </div>
                     </div>
                     <div class="grid gap-4 border-b border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
-                        <div><label class="mb-2 block text-sm font-semibold">Start Time *</label><input name="start_time" type="time" x-model="startTime" required class="w-full rounded-lg border-slate-300"></div>
-                        <div><label class="mb-2 block text-sm font-semibold">End Time *</label><input name="end_time" type="time" x-model="endTime" required class="w-full rounded-lg border-slate-300"><p x-show="totalHours" class="mt-1 text-xs text-slate-500">Total: <span x-text="totalHours"></span> hours</p></div>
+                        <div><label class="mb-2 block text-sm font-semibold">Start Time *</label><input name="start_time" type="time" step="1800" x-model="startTime" required class="w-full rounded-lg border-slate-300"></div>
+                        <div><label class="mb-2 block text-sm font-semibold">End Time *</label><input name="end_time" type="time" step="1800" x-model="endTime" required class="w-full rounded-lg border-slate-300"><p x-show="totalHours" class="mt-1 text-xs text-slate-500">Total: <span x-text="totalHours"></span> hours</p></div>
                     </div>
                     <div class="p-4">
                         <div class="mb-3 flex items-center gap-4 text-xs"><span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"></i>Available</span><span><i class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-rose-500"></i>Occupied</span></div>
@@ -207,7 +174,7 @@
 
             <input
                 id="start_time"
-                type="time"
+                type="time" step="1800"
                 name="start_time"
                 x-model="startTime"
                 value="{{ old('start_time') }}"
@@ -223,7 +190,7 @@
 
             <input
                 id="end_time"
-                type="time"
+                type="time" step="1800"
                 name="end_time"
                 x-model="endTime"
                 value="{{ old('end_time') }}"

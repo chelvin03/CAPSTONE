@@ -29,7 +29,7 @@ test('public bookings support midnight end and reject invalid hours', function (
     $response = $this->getJson(route('reservation.availability', ['month' => substr($this->date, 0, 7)]))->assertOk();
     $response->assertJsonPath('closing_time', '24:00');
     $slots = $response->json('days.'.$this->date.'.slots');
-    expect($slots)->toHaveCount(1)->and($slots[0]['end_time'])->toBe('22:00')->and($slots[0]['available'])->toBeTrue();
+    expect($slots)->toHaveCount(1)->and($slots[0]['end_time'])->toBe('22:30')->and($slots[0]['available'])->toBeTrue();
     $this->withSession($this->proof)->post(route('reservation.store'), [...$this->payload, 'start_time' => '06:59'])->assertSessionHasErrors('start_time');
     foreach (['24:01', '25:00', '00:00', '22:59'] as $end) {
         $this->withSession($this->proof)->post(route('reservation.store'), [...$this->payload, 'end_time' => $end])->assertSessionHasErrors('end_time');
@@ -65,4 +65,17 @@ test('public calendar and booking accept seven am opening and midnight closing',
     $this->withSession($this->proof)->post(route('reservation.store'), [...$this->payload, 'start_time' => '07:00'])
         ->assertSessionHasNoErrors();
     expect(substr(Reservation::sole()->start_time, 0, 5))->toBe('07:00');
+});
+
+ test('public reservations reject odd minutes and durations below one hour', function () {
+    foreach ([['11:59', '14:00'], ['12:00', '12:01'], ['12:00', '12:29'], ['12:00', '12:30'], ['12:00', '12:59']] as [$start, $end]) {
+        $this->withSession($this->proof)->post(route('reservation.store'), [...$this->payload, 'start_time' => $start, 'end_time' => $end])->assertSessionHasErrors();
+    }
+    $this->withSession($this->proof)->post(route('reservation.store'), [...$this->payload, 'start_time' => '12:00', 'end_time' => '13:00'])->assertSessionHasNoErrors();
+});
+
+ test('cleanup blocks the next booking until exactly thirty minutes after the event', function () {
+    $this->withSession($this->proof)->post(route('reservation.store'), [...$this->payload, 'start_time' => '12:00', 'end_time' => '14:00'])->assertSessionHasNoErrors();
+    $this->withSession($this->proof)->post(route('reservation.store'), [...$this->payload, 'start_time' => '14:00', 'end_time' => '15:00'])->assertSessionHasErrors('reservation_date');
+    $this->withSession($this->proof)->post(route('reservation.store'), [...$this->payload, 'start_time' => '14:30', 'end_time' => '15:30'])->assertSessionHasNoErrors();
 });

@@ -49,6 +49,11 @@ Route::get('/reserve/availability', [PublicReservationController::class, 'availa
 Route::get('/track', [PublicReservationController::class, 'track'])
     ->name('reservation.track');
 
+Route::get('/schedule-proposals/{proposal}', [\App\Http\Controllers\ScheduleProposalController::class, 'show'])
+    ->middleware(['signed', 'throttle:30,1'])->name('reservation.schedule-proposal');
+Route::post('/schedule-proposals/{proposal}', [\App\Http\Controllers\ScheduleProposalController::class, 'respond'])
+    ->middleware(['signed', 'throttle:10,1'])->name('reservation.schedule-proposal.respond');
+
 Route::post('/reservation/{reservation}/cancel', [PublicReservationController::class, 'cancel'])
     ->middleware('throttle:10,1')->name('reservation.cancel');
 
@@ -105,6 +110,11 @@ Route::middleware([
 
             Route::get('/dashboard', DashboardController::class)
                 ->name('dashboard');
+            Route::put('/dashboard/kpi-targets', [\App\Http\Controllers\Admin\KpiTargetController::class, 'update'])->name('dashboard.kpi-targets');
+
+            Route::get('/requestor-restrictions', [\App\Http\Controllers\Admin\RequestorRestrictionController::class, 'index'])->name('requestor-restrictions.index');
+            Route::post('/requestor-restrictions', [\App\Http\Controllers\Admin\RequestorRestrictionController::class, 'store'])->name('requestor-restrictions.store');
+            Route::delete('/requestor-restrictions/{restriction}', [\App\Http\Controllers\Admin\RequestorRestrictionController::class, 'destroy'])->name('requestor-restrictions.destroy');
 
             Route::resource('staff', StaffController::class)
                 ->only(['index', 'create', 'store', 'edit', 'update']);
@@ -121,6 +131,7 @@ Route::middleware([
 
             Route::get('/schedule', [ScheduleController::class, 'index'])->name('schedule.index');
             Route::post('/schedule/blocks', [ScheduleController::class, 'store'])->name('schedule.blocks.store');
+            Route::post('/schedule/blocks/preview', [ScheduleController::class, 'preview'])->name('schedule.blocks.preview');
             Route::delete('/schedule/blocks/{block}', [ScheduleController::class, 'destroy'])->name('schedule.blocks.destroy');
             Route::get('/settings', [SystemSettingsController::class, 'edit'])->name('settings.edit');
             Route::put('/settings', [SystemSettingsController::class, 'update'])->name('settings.update');
@@ -137,6 +148,9 @@ Route::middleware([
 
             Route::resource('equipment', EquipmentController::class)
                 ->except(['show']);
+
+            Route::get('/reservation-follow-up', [\App\Http\Controllers\Admin\ReservationFollowUpController::class, 'index'])->name('reservations.follow-up');
+            Route::post('/reservation-follow-up/send', [\App\Http\Controllers\Admin\ReservationFollowUpController::class, 'send'])->middleware('throttle:20,1')->name('reservations.follow-up.send');
 
             Route::resource('reservations', ReservationController::class)
                 ->only([
@@ -166,6 +180,9 @@ Route::middleware([
                 [ReservationController::class, 'cancel']
             )->name('reservations.cancel');
             Route::patch('/reservations/{reservation}/reschedule', [ReservationController::class, 'reschedule'])->name('reservations.reschedule');
+            Route::post('/reservations/{reservation}/reschedule-preview', [ReservationController::class, 'reschedulePreview'])->name('reservations.reschedule-preview');
+            Route::post('/reservations/{reservation}/outcome', [\App\Http\Controllers\EventOutcomeController::class, 'store'])->name('reservations.outcome');
+            Route::post('/reservations/{reservation}/equipment/{equipment}/return', [\App\Http\Controllers\EquipmentReturnController::class, 'store'])->name('reservations.equipment.return');
         });
 
     /*
@@ -194,6 +211,8 @@ Route::middleware([
 
             Route::get('/equipment', [EquipmentController::class, 'staffIndex'])
                 ->name('equipment.index');
+            Route::post('/reservations/{reservation}/outcome', [\App\Http\Controllers\EventOutcomeController::class, 'store'])->name('reservations.outcome');
+            Route::post('/reservations/{reservation}/equipment/{equipment}/return', [\App\Http\Controllers\EquipmentReturnController::class, 'store'])->name('reservations.equipment.return');
 
             Route::get('/reports', [ReportController::class, 'index'])
                 ->name('reports.index');

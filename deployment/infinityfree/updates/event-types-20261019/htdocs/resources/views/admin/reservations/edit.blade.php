@@ -1,0 +1,78 @@
+@extends('layouts.app')
+
+@section('title', 'Edit Reservation')
+
+@section('content')
+<div class="mx-auto max-w-5xl">
+    <div class="page-header">
+        <div>
+            <p class="text-sm font-medium text-blue-600">Administration</p>
+            <h1 class="page-title">Edit Reservation</h1>
+            <p class="page-description">Update {{ $reservation->reference_number }}.</p>
+        </div>
+        <a href="{{ route('admin.reservations.index') }}" class="btn-secondary">Back to Reservations</a>
+    </div>
+
+    @if ($errors->any())
+        <div class="alert-error">
+            <div>
+                <p class="font-semibold">Please correct the following errors:</p>
+                <ul class="mt-2 list-inside list-disc">
+                    @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                </ul>
+            </div>
+        </div>
+    @endif
+
+    <form method="POST" action="{{ route('admin.reservations.update', $reservation) }}" class="space-y-6">
+        @csrf
+        @method('PUT')
+
+        <section class="card p-6">
+            <h2 class="mb-5 text-lg font-bold text-slate-900">Reservation Information</h2>
+            <div class="grid gap-5 md:grid-cols-2">
+                <div>
+                    <p class="field-label">Gym</p><p>MCST Gymnasium</p>
+                </div>
+                <div>
+                    <label for="reservation_type" class="field-label">Reservation Type *</label>
+                    <select id="reservation_type" name="reservation_type" required class="field">
+                        @foreach (['internal' => 'Internal – MCST', 'external' => 'External'] as $value => $label)
+                            <option value="{{ $value }}" @selected(old('reservation_type', $reservation->reservation_type) === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @include('reservations.event-type-field')
+                <div class="md:col-span-2"><label for="purpose" class="field-label">Purpose *</label><textarea id="purpose" name="purpose" rows="3" required class="field">{{ old('purpose', $reservation->purpose) }}</textarea></div>
+                <div><label for="contact_person" class="field-label">Contact Person *</label><input id="contact_person" name="contact_person" value="{{ old('contact_person', $reservation->contact_person) }}" required class="field"></div>
+                <div><label for="contact_number" class="field-label">Contact Number *</label><input id="contact_number" name="contact_number" type="tel" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" value="{{ old('contact_number', $reservation->contact_number) }}" required class="field"></div>
+                <div><label for="contact_email" class="field-label">Contact Email</label><input id="contact_email" name="contact_email" type="email" value="{{ old('contact_email', $reservation->contact_email) }}" class="field"></div>
+                <div><label for="expected_attendees" class="field-label">Estimated Participants *</label><input id="expected_attendees" name="expected_attendees" type="number" min="{{ \App\Support\GymCapacity::MIN_ATTENDEES }}" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees', $reservation->expected_attendees) }}" required class="field"></div>
+            </div>
+        </section>
+
+        <section class="card p-6">
+            <h2 class="mb-5 text-lg font-bold text-slate-900">Schedule</h2>
+            <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div><label for="reservation_date" class="field-label">Reservation Date *</label><input id="reservation_date" name="reservation_date" type="date" value="{{ old('reservation_date', $reservation->reservation_date->toDateString()) }}" required class="field"></div>
+                <div><label for="start_time" class="field-label">Start Time *</label><input id="start_time" name="start_time" type="time" step="1800" value="{{ old('start_time', substr((string) $reservation->start_time, 0, 5)) }}" required class="field"></div>
+                <div><label for="end_time" class="field-label">End Time *</label><input id="end_time" name="end_time" type="time" step="1800" value="{{ old('end_time', substr((string) $reservation->end_time, 0, 5)) }}" required class="field"></div>
+            </div>
+        </section>
+
+        <section class="card p-6">
+            <h2 class="mb-5 text-lg font-bold text-slate-900">Equipment Request</h2>
+            <div class="grid gap-5 sm:grid-cols-[1fr_10rem]">
+                <div><label for="requested_equipment" class="field-label">Equipment</label><input id="requested_equipment" name="requested_equipment" value="{{ old('requested_equipment', $reservation->requested_equipment) }}" maxlength="255" class="field"></div>
+                <div><label for="requested_equipment_quantity" class="field-label">Quantity</label><input id="requested_equipment_quantity" name="requested_equipment_quantity" type="number" min="1" value="{{ old('requested_equipment_quantity', $reservation->requested_equipment_quantity) }}" class="field"></div>
+            </div>
+        </section>
+
+        <div class="flex justify-end gap-3">
+            <a href="{{ route('admin.reservations.index') }}" class="btn-secondary">Cancel</a>
+            <button type="submit" class="btn-primary">Update Reservation</button>
+        </div>
+    </form>
+</div>
+@include('admin.reservations.partials.capacity-validation')
+@endsection

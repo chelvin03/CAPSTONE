@@ -1,0 +1,39 @@
+REQUESTOR CANCELLATION REVIEW AND TEMPORARY EMAIL RESTRICTIONS
+Prepared locally only. Nothing uploaded or executed online.
+Requires existing dashboard-performance update and current reservation schema.
+
+1. Back up the matching hosted files and export the existing database.
+2. In phpMyAdmin select the EXISTING website database. Run
+   01-create-requestor-restrictions.sql BEFORE uploading PHP files.
+   Alternative with shell access: upload migration and run php artisan migrate --force.
+   Choose ONE method. Never import a local database or use migrate:fresh.
+3. Using File Upload, upload files under htdocs to their matching online paths.
+   Upload model, review service, admin controller, both validation rules and views first.
+   Upload PublicReservationController.php next and routes/web.php LAST.
+   Existing routes require feedback.php and reservation-documents.php already online.
+   Preserve .env, storage, vendor, existing uploads and configuration.
+4. Clear only generated compiled .php files inside storage/framework/views and
+   any generated bootstrap/cache/routes-*.php route cache files. Keep directories.
+5. Admin Dashboard > Operational performance analytics > Cancellation reasons
+   > Review frequent cancellations and restrictions.
+   Direct path: /admin/requestor-restrictions
+6. Confirm review window, supporting records, required reason/expiry and release.
+   Test first with an explicitly designated test email. Existing bookings, tracking
+   and requestor cancellation must remain available. Confirm staff is forbidden.
+
+Default: submission cohort last 90 days. Windows: 30/90/180/365 days.
+Rate denominator: all requests submitted by the email in the selected window.
+Numerator: currently cancelled requests in that cohort with an explicit,
+unattributed-to-staff requestor cancellation history within the same window.
+Admin and unknown/legacy cancellations are excluded. Three cancellations flag
+for review only; no automatic blocking. Email matching ignores case and spaces.
+Admin reasons and end-of-day expiry are required; maximum expiry one year.
+Temporary restrictions prevent new PUBLIC reservation submissions by that email.
+Admins can still manage reservations. Other email addresses are not linked.
+Restriction/release actions are audited. Renewing a restriction updates the row;
+prior reasons remain in the audit trail.
+
+Validation: 63 focused tests passed, 371 assertions.
+No real restriction was applied to your online site during preparation.
+Rollback: restore backed-up files and clear compiled views/routes. Retain additive
+restriction table and audit records; do not delete data as part of file rollback.

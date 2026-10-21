@@ -71,9 +71,9 @@ test('reservation details are available before verification and contact details 
     expect(\Illuminate\Support\Facades\Hash::check($code, session('public_email_challenge.hash')))->toBeTrue();
     $this->postJson('/reserve/verify-code', ['email' => 'public@example.com', 'code' => $code])->assertOk();
     $this->get(route('reservation.create', ['step' => 3]))->assertOk()->assertSee('name="event_name"', false)->assertSee('Public Requestor');
-    $this->postJson('/reserve/edit-details')->assertOk()->assertSessionMissing('public_email_verified');
+    $this->postJson('/reserve/edit-details')->assertOk()->assertJsonPath('verified', true)->assertSessionHas('public_email_verified');
     $this->get(route('reservation.create'))->assertOk()->assertSee('Public Requestor')->assertSee('name="event_name"', false);
-    $this->get(route('reservation.create', ['step' => 3]))->assertRedirect(route('reservation.create'));
+    $this->get(route('reservation.create', ['step' => 3]))->assertOk();
 });
 
 test('resend replaces the old code and limits repeated sends', function () {
@@ -152,6 +152,6 @@ test('reservation confirmation presents facility information without a selector'
         ->assertSee('<option value="external">External</option>', false)
         ->assertDontSee('<option value="student">', false)
         ->assertSee('class="facility-information"', false)
-        ->assertSee('Upload valid approval letter or supporting document')
+        ->assertSee('Upload Supporting Letter / Approval Document')
         ->assertDontSee('<select name="facility_id"', false);
 });

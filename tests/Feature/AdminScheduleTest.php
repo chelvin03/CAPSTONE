@@ -14,7 +14,7 @@ function adminScheduleBooking(Facility $facility, array $overrides = []): Reserv
         'event_name' => 'Test school event', 'event_type' => 'Sports',
         'purpose' => 'Private purpose', 'contact_person' => 'Private contact',
         'contact_email' => 'private-schedule@example.test', 'contact_number' => '09123456789',
-        'expected_attendees' => 30, 'reservation_date' => '2026-10-06',
+        'expected_attendees' => 50, 'reservation_date' => '2026-10-06',
         'start_time' => '09:15:00', 'end_time' => '10:45:00', 'status' => 'approved',
     ], $overrides));
 }
@@ -33,9 +33,9 @@ test('a partial admin block cancels only overlapping approved bookings and email
     $unaffected = adminScheduleBooking($this->facility, ['start_time' => '11:00', 'end_time' => '12:00']);
     $pending = adminScheduleBooking($this->facility, ['status' => 'new']);
     $completed = adminScheduleBooking($this->facility, ['status' => 'completed']);
-    $this->post(route('admin.schedule.blocks.store'), ['title' => 'Emergency maintenance',
+    $this->post(route('admin.schedule.blocks.store'), previewedBlock(['title' => 'Emergency maintenance',
         'reason' => 'Roof repairs are required.', 'starts_on' => '2026-10-06', 'ends_on' => '2026-10-06',
-        'start_time' => '10:00', 'end_time' => '11:00'])->assertSessionHasNoErrors();
+        'start_time' => '10:00', 'end_time' => '11:00']))->assertSessionHasNoErrors();
     expect($affected->refresh()->status)->toBe('cancelled')
         ->and($affected->cancellation_reason)->toContain('Emergency maintenance', 'Roof repairs')
         ->and($affected->cancelled_by)->toBe($this->admin->id)
@@ -58,8 +58,8 @@ test('an all day block cancels approved bookings across its inclusive date range
     $first = adminScheduleBooking($this->facility);
     $last = adminScheduleBooking($this->facility, ['reservation_date' => '2026-10-08']);
     $outside = adminScheduleBooking($this->facility, ['reservation_date' => '2026-10-09']);
-    $this->post(route('admin.schedule.blocks.store'), ['title' => 'Gym closure',
-        'starts_on' => '2026-10-06', 'ends_on' => '2026-10-08'])->assertSessionHasNoErrors();
+    $this->post(route('admin.schedule.blocks.store'), previewedBlock(['title' => 'Gym closure',
+        'starts_on' => '2026-10-06', 'ends_on' => '2026-10-08']))->assertSessionHasNoErrors();
     expect($first->refresh()->status)->toBe('cancelled')->and($last->refresh()->status)->toBe('cancelled')
         ->and($outside->refresh()->status)->toBe('approved');
     \Illuminate\Support\Facades\Mail::assertSentCount(2);
@@ -67,18 +67,18 @@ test('an all day block cancels approved bookings across its inclusive date range
     expect($mail->render())->toContain($first->reference_number, 'Gym closure', 'Please reschedule', route('reservation.create'));
 });
 
-test('calendar colors distinguish available time and fully held pencil bookings', function () {
+test('calendar keeps pencil requests available until approval', function () {
     $response = $this->get(route('admin.schedule.index'));
     expect($response->viewData('days')['2026-10-06']['calendarState'])->toBe('available');
     $booking = adminScheduleBooking($this->facility, ['status' => 'pencil', 'start_time' => '08:00', 'end_time' => '17:00']);
     $response = $this->get(route('admin.schedule.index', ['status' => 'pencil']));
     $day = $response->viewData('days')['2026-10-06'];
-    expect($day['calendarState'])->toBe('full')->and($day['calendarLabel'])->toBe('Fully Booked / Held');
-    $response->assertSee('availability-full', false);
+    expect($day['calendarState'])->toBe('available')->and($day['calendarLabel'])->toBe('Available');
+    $response->assertSee('availability-available', false);
     $booking->update(['end_time' => '10:00']);
     $day = $this->get(route('admin.schedule.index'))->viewData('days')['2026-10-06'];
-    expect($day['calendarState'])->toBe('partial')->and($day['calendarLabel'])->toBe('Partial - Available Time');
-    $response->assertSee('availability-partial', false);
+    expect($day['calendarState'])->toBe('available')->and($day['calendarLabel'])->toBe('Available');
+    $response->assertSee('availability-available', false);
     $booking->update(['status' => 'cancelled']);
     expect($this->get(route('admin.schedule.index'))->viewData('days')['2026-10-06']['calendarLabel'])->toBe('Available');
 });
@@ -104,7 +104,7 @@ test('overlapping pending requests are not confirmed and are split at exact boun
     expect($day['approvedCount'])->toBe(0)->and($day['pendingCount'])->toBe(2)
         ->and($day['conflictCount'])->toBe(1)->and($intervals->where('state', 'occupied'))->toHaveCount(0);
     $overlap = $intervals->where('conflict', true)->sole();
-    expect($overlap['time'])->toBe('10:30 AM – 11:00 AM')->and($overlap['state'])->toBe('pending')
+    expect($overlap['time'])->toBe('10:30 AM – 11:00 AM')->and($overlap['state'])->toBe('available')
         ->and($overlap['pendingCount'])->toBe(2);
 });
 
@@ -211,14 +211,45 @@ test('adjacent bookings do not conflict and full-day approved and pending states
     adminScheduleBooking($this->facility, ['reservation_date' => '2026-10-07', 'status' => 'new', 'start_time' => '08:00', 'end_time' => '17:00']);
     $days = $this->get(route('admin.schedule.index'))->assertOk()->viewData('days');
     expect($days['2026-10-06']['state'])->toBe('occupied')->and($days['2026-10-06']['conflictCount'])->toBe(0)
-        ->and($days['2026-10-06']['hasAvailable'])->toBeFalse()->and($days['2026-10-07']['state'])->toBe('pending')
+        ->and($days['2026-10-06']['hasAvailable'])->toBeFalse()->and($days['2026-10-07']['state'])->toBe('available')
         ->and($days['2026-10-07']['approvedCount'])->toBe(0);
 });
 
-test('a date with approved and pending intervals is mixed even when no free interval remains', function () {
+test('a date with approved and pending intervals retains the unapproved hours as available', function () {
     adminScheduleBooking($this->facility, ['start_time' => '08:00', 'end_time' => '12:00']);
     adminScheduleBooking($this->facility, ['status' => 'new', 'start_time' => '12:00', 'end_time' => '17:00']);
     $day = $this->get(route('admin.schedule.index'))->assertOk()->viewData('days')['2026-10-06'];
-    expect($day['state'])->toBe('partial')->and($day['hasAvailable'])->toBeFalse()
+    expect($day['state'])->toBe('partial')->and($day['hasAvailable'])->toBeTrue()
         ->and($day['approvedCount'])->toBe(1)->and($day['pendingCount'])->toBe(1);
 });
+
+test('schedule blocks accept up to seven inclusive days across month boundaries', function ($start, $end) {
+    $this->post(route('admin.schedule.blocks.store'), ['title' => 'Maintenance', 'starts_on' => $start, 'ends_on' => $end])->assertSessionHasNoErrors();
+    $this->assertDatabaseCount('schedule_blocks', 1);
+})->with([['2026-10-06', '2026-10-12'], ['2026-10-29', '2026-11-04'], ['2026-10-06', '2026-10-06']]);
+
+test('blocks longer than seven days are rejected without cancellations or emails', function ($start, $end) {
+    $booking = adminScheduleBooking($this->facility);
+    $this->post(route('admin.schedule.blocks.store'), ['title' => 'Long closure', 'starts_on' => $start, 'ends_on' => $end])->assertSessionHasErrors('ends_on');
+    $this->assertDatabaseCount('schedule_blocks', 0);
+    expect($booking->fresh()->status)->toBe('approved');
+    \Illuminate\Support\Facades\Mail::assertNothingSent();
+})->with([['2026-10-06', '2026-10-13'], ['2026-10-01', '2026-10-31'], ['2026-02-01', '2026-02-28']]);
+
+function blockSettingsPayload(int $limit): array {
+    return ['maximum_block_days' => $limit, 'maximum_booking_hours' => 8, 'minimum_notice_days' => 3, 'maximum_advance_days' => 365, 'pending_auto_cancel_hours' => 72, 'templates' => ['cancellation' => ['subject' => 'Cancelled', 'body' => 'Cancelled {reference}']]];
+}
+
+test('admin setting changes both the schedule form and enforced block limit', function () {
+    $this->put(route('admin.settings.update'), blockSettingsPayload(3))->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('system_settings', ['key' => 'maximum_block_days', 'value' => '3']);
+    $this->get(route('admin.schedule.index'))->assertOk()->assertViewHas('maximumBlockDays', 3)->assertSee('Maximum 3 days');
+    $data = ['title' => 'Maintenance', 'starts_on' => '2026-10-06'];
+    $this->post(route('admin.schedule.blocks.store'), [...$data, 'ends_on' => '2026-10-09'])->assertSessionHasErrors('ends_on');
+    $this->post(route('admin.schedule.blocks.store'), [...$data, 'ends_on' => '2026-10-08'])->assertSessionHasNoErrors();
+});
+
+test('maximum block setting rejects values outside one to seven', function ($limit) {
+    $this->put(route('admin.settings.update'), blockSettingsPayload($limit))->assertSessionHasErrors('maximum_block_days');
+    $this->assertDatabaseMissing('system_settings', ['key' => 'maximum_block_days']);
+})->with([0, 8, 31]);

@@ -35,6 +35,7 @@ return [
         'rejected',
         'cancelled',
         'completed',
+        'no_show',
         'waiting_list',
     ],
 

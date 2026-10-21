@@ -12,7 +12,8 @@ use Carbon\CarbonImmutable;
 
 class PublicCalendarService
 {
-    public const CLEANING_MINUTES = 60;
+    public const CLEANING_MINUTES = 30;
+    public const BLOCKING_STATUSES = ['approved', 'completed'];
 
     public function bufferedTime(string $time, int $offset): string
     {
@@ -23,7 +24,7 @@ class PublicCalendarService
     public function hasReservationConflict(int $facilityId, string $date, string $start, string $end): bool
     {
         return Reservation::where('facility_id', $facilityId)->whereDate('reservation_date', $date)
-            ->whereNotIn('status', ['rejected', 'cancelled'])
+            ->whereIn('status', \App\Services\PublicCalendarService::BLOCKING_STATUSES)
             ->where('start_time', '<', $this->bufferedTime($end, self::CLEANING_MINUTES))
             ->where('end_time', '>', $this->bufferedTime($start, -self::CLEANING_MINUTES))
             ->exists();
@@ -35,7 +36,7 @@ class PublicCalendarService
         $last = $first->endOfMonth();
         $bookings = Reservation::where('facility_id', $facility->id)
             ->whereBetween('reservation_date', [$first->toDateString(), $last->toDateString()])
-            ->whereNotIn('status', ['rejected', 'cancelled'])->get(['reservation_date', 'start_time', 'end_time'])
+            ->whereIn('status', \App\Services\PublicCalendarService::BLOCKING_STATUSES)->get(['reservation_date', 'start_time', 'end_time'])
             ->groupBy(fn ($row) => $row->reservation_date->toDateString());
         $blocks = ScheduleBlock::whereDate('starts_on', '<=', $last)->whereDate('ends_on', '>=', $first)
             ->where(fn ($q) => $q->whereNull('facility_id')->orWhere('facility_id', $facility->id))->get();
@@ -95,7 +96,15 @@ class PublicCalendarService
                 $segments[$previous]['end'] = $right;
             } else { $segments[] = ['start' => $left, 'end' => $right, 'available' => !$reserved]; }
         }
-        // Return entire contiguous periods; requestors choose their own duration.
+        // Only offer periods that can fit a booking on half-hour boundaries.
+        foreach ($segments as &$segment) {
+            if ($segment['available']) {
+                $segment['start'] = (int) ceil($segment['start'] / 30) * 30;
+                $segment['end'] = (int) floor($segment['end'] / 30) * 30;
+            }
+        }
+        unset($segment);
+        $segments = array_values(array_filter($segments, fn ($segment) => ! $segment['available'] || $segment['end'] - $segment['start'] >= 120));
         return array_map(fn ($segment) => [
             'start_time' => $format($segment['start']), 'end_time' => $format($segment['end']),
             'available' => $segment['available'], 'label' => $segment['available'] ? 'Available' : 'Reserved',

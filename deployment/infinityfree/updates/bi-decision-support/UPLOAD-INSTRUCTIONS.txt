@@ -1,0 +1,30 @@
+BI DECISION SUPPORT - EXISTING ADMIN DASHBOARD
+This replaces the proposed separate business-intelligence page. Use this update,
+not the earlier business-intelligence ZIP. No separate analytics menu is added.
+Prepared locally only. Back up the matching hosted files first.
+
+Upload the six files to matching paths under the existing online htdocs, in order:
+1. app/Services/BusinessDecisionService.php
+2. resources/views/dashboard/partials/decision-support.blade.php
+3. public/css/decision-support.css
+4. app/Http/Controllers/Admin/DashboardController.php
+5. resources/views/dashboard/admin.blade.php
+6. resources/views/components/sidebar.blade.php
+
+Clear generated .php files INSIDE storage/framework/views; keep the folder,
+subfolders and .gitignore. Hard-refresh Admin Dashboard.
+No SQL, route change, dependencies or frontend build required.
+Requires current DashboardAnalyticsService, InsightService and TrendService.
+New service uses normal PSR-4 app autoloading.
+
+Includes demand change vs preceding equal-length calendar window, weekday
+patterns, cancellations, overdue pending workload, evidence and suggested actions.
+Filters apply to findings and export. Comparison queries preserve category,
+status, requestor and facility filters without retaining the selected month.
+All-time and discontinuous all-year/month scopes show comparison unavailable.
+Fewer than five records show a limited-sample notice. No predictions or automatic
+schedule changes are made. Future scheduled dates may be included.
+CSV export includes findings, actions, evidence and sample note.
+Existing dashboard charts are preserved. Navigation label becomes BI Dashboard.
+
+Verification: 84 relevant feature tests passed, 510 assertions.

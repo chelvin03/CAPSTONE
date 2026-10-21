@@ -1,0 +1,34 @@
+CONFLICT RESOLUTION AND SCHEDULE EMAILS — 18 OCTOBER 2026
+Prepared locally only. No live deployment or emails sent.
+Requires current reservation/equipment workflow and existing reschedule route.
+No SQL, routes, environment changes, dependencies or frontend build needed.
+
+Back up matching hosted files. Use individual File Upload to matching paths.
+1. Upload both Rules files, both Mail classes, cancellation service and both email views first.
+2. Upload app/Http/Controllers/Admin/ReservationController.php.
+3. Upload resources/views/admin/reservations/show.blade.php last.
+4. Clear only compiled .php files inside storage/framework/views. Keep folders.
+5. Hard refresh a reservation detail page. Review Conflict Resolution / Reschedule.
+Test using designated test emails; check actual SMTP delivery online.
+
+Reschedule: moved requestor gets old/new schedule and reason.
+Force cancel conflicts: displaced requestors get Cancelled email with reason and
+reschedule instruction; moved requestor gets its new schedule.
+Force waiting list: displaced requestors are told their prior slot is no longer
+confirmed; they should contact admin for a new schedule. Moved requestor gets notice.
+Manual admin cancellation also uses the cancellation email.
+Cancelled public tracking already displays its saved reason.
+Only existing contact emails can receive notices; no guessed address is used.
+Emails send after successful transaction commit. Failed delivery is logged by
+reservation ID and exception type; a saved schedule does not prove SMTP delivery.
+
+Server rechecks locked target bookings, cleaning buffer (30 minutes), operating
+hours, availability, admin blocks and equipment allocation. Force assignment
+cannot displace completed records or override a schedule block.
+Cancelling/rescheduling terminal reservations is refused.
+Move a conflicting booking to a specific free date/time by opening that booking
+and rescheduling it first. Waiting list is not a confirmed replacement time.
+
+Validation: 25 relevant tests passed, 146 assertions, including rollback/no-email,
+SMTP mailable content, moved/waitlisted/cancelled outcomes and staff access denial.
+Restore backed-up files and clear compiled views if file rollback is required.

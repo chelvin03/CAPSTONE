@@ -9,7 +9,7 @@ beforeEach(function () {
     $this->booking = Reservation::create(['reference_number' => 'CANCEL-TEST', 'facility_id' => $gym->id,
         'reservation_type' => 'internal', 'event_name' => 'Practice', 'purpose' => 'Sports',
         'contact_person' => 'Requestor', 'contact_email' => 'requestor@example.com',
-        'contact_number' => '09123456789', 'expected_attendees' => 20,
+        'contact_number' => '09123456789', 'expected_attendees' => 100,
         'reservation_date' => now()->addDays(5)->toDateString(), 'start_time' => '09:00', 'end_time' => '11:00', 'status' => 'approved']);
     $this->proof = ['public_reservation_references' => [$this->booking->reference_number]];
 });

@@ -44,7 +44,7 @@
         >
             <option value="">All Status</option>
 
-            @foreach(['pencil','new','validated','approved','rejected','waiting_list','cancelled','completed','pending'] as $item)
+            @foreach(['pencil','new','validated','approved','rejected','waiting_list','cancelled','completed','no_show','pending'] as $item)
                 <option
                     value="{{ $item }}"
                     @selected(request('status')==$item)

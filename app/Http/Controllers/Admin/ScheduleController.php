@@ -38,7 +38,7 @@ class ScheduleController extends Controller
         $facilities = Facility::gym()->orderBy('facility_name')->get(['id', 'facility_name', 'status']);
         $reservableFacilities = $facilities->where('status', 'available')->values();
         $scope = isset($filters['facility_id']) ? $facilities->where('id', $filters['facility_id'])->values() : $facilities;
-        $reservations = Reservation::with('facility:id,facility_name')->whereBetween('reservation_date', [$start->toDateString(), $end->toDateString()])
+        $reservations = Reservation::with('facility:id,facility_name')->whereDate('reservation_date', '>=', $start->toDateString())->whereDate('reservation_date', '<=', $end->toDateString())
             ->when(isset($filters['facility_id']), fn ($query) => $query->where('facility_id', $filters['facility_id']))
             ->orderBy('reservation_date')->orderBy('start_time')->orderBy('id')
             ->get(['id', 'reference_number', 'facility_id', 'event_name', 'event_type', 'reservation_date', 'start_time', 'end_time', 'setup_time', 'cleanup_time', 'status']);
@@ -53,6 +53,7 @@ class ScheduleController extends Controller
 
         return view('admin.schedule.index', [
             ...$schedule->month($start, $scope, $reservations, $blocks),
+            'maximumBlockDays' => max(1, min(7, (int) \App\Models\SystemSetting::getValue('maximum_block_days', 7))),
             'month' => $month, 'monthLabel' => $start->format('F Y'), 'selectedDate' => $selectedDate,
             'leadingDays' => $start->dayOfWeek, 'filters' => $filters, 'navigationFilters' => $navigationFilters,
             'previousMonth' => $start->subMonth()->format('Y-m'), 'nextMonth' => $start->addMonth()->format('Y-m'),
@@ -63,25 +64,15 @@ class ScheduleController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $request->merge(['facility_id' => Facility::gymId()]);
-        $validated = $request->validate([
-            'facility_id' => ['nullable', 'exists:facilities,id'],
-            'title' => ['required', 'string', 'max:255'],
-            'reason' => ['nullable', 'string'],
-            'starts_on' => ['required', 'date'],
-            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
-            'start_time' => ['nullable', 'required_with:end_time', 'date_format:H:i'],
-            'end_time' => ['nullable', 'required_with:start_time', 'date_format:H:i', 'after:start_time'],
-        ]);
+        $validated = $this->blockDetails($request);
         \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $request): void {
             Facility::whereKey($validated['facility_id'])->lockForUpdate()->firstOrFail();
+            $impact = app(\App\Services\ScheduleImpactService::class);
+            $records = $impact->blockBookings($validated, true);
+            if ($records->isNotEmpty() || $request->filled('impact_token')) $impact->confirm($request->input('impact_token'), 'block', $validated, $records);
             $block = ScheduleBlock::create([...$validated, 'created_by' => $request->user()->id]);
             AuditLog::record('schedule_block.created', $block, $validated);
-            $affected = Reservation::where('facility_id', $block->facility_id)->where('status', 'approved')
-                ->whereDate('reservation_date', '>=', $block->starts_on->toDateString())
-                ->whereDate('reservation_date', '<=', $block->ends_on->toDateString())
-                ->when($block->start_time, fn ($query) => $query->where('start_time', '<', $block->end_time)
-                    ->where('end_time', '>', $block->start_time))->lockForUpdate()->get();
+            $affected = $records->where('status', 'approved');
             $reason = 'Administrator schedule block: '.$block->title;
             if (filled($block->reason)) {
                 $reason .= '. '.$block->reason;
@@ -94,6 +85,45 @@ class ScheduleController extends Controller
         return back()->with('success', 'Blackout period created. Conflicting approved reservations were cancelled and requestors notified by email.');
     }
 
+    public function preview(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $details = $this->blockDetails($request);
+        $impact = app(\App\Services\ScheduleImpactService::class);
+        $records = $impact->blockBookings($details);
+        $rows = $records->map(function ($booking) use ($impact) {
+            $cancel = $booking->status === 'approved';
+            $row = $impact->row($booking, $cancel ? 'Cancel reservation and email the reason with rescheduling instructions.'
+                : ($booking->status === 'completed' ? 'Completed record stays unchanged; review this historical overlap.' : 'Request stays pending/unconfirmed but cannot be approved in this blocked interval. Reschedule it separately.'));
+            if (! $cancel) $row['email'] = 'No cancellation email; status remains unchanged.';
+            return $row;
+        });
+        return response()->json(['summary' => $records->where('status', 'approved')->count().' approved bookings will be cancelled. Other overlapping requests remain unchanged.',
+            'reason' => $details['reason'] ?? $details['title'], 'rows' => $rows->values(),
+            'token' => $impact->token('block', $details, $records)])->header('Cache-Control', 'no-store, private');
+    }
+
+    private function blockDetails(Request $request): array
+    {
+        $request->merge(['facility_id' => Facility::gymId()]);
+        $validated = $request->validate([
+            'impact_token' => ['nullable', 'string'],
+            'facility_id' => ['nullable', 'exists:facilities,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'reason' => ['nullable', 'string'],
+            'starts_on' => ['required', 'date_format:Y-m-d'],
+            'ends_on' => ['required', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
+            'start_time' => ['nullable', 'required_with:end_time', 'date_format:H:i'],
+            'end_time' => ['nullable', 'required_with:start_time', 'date_format:H:i', 'after:start_time'],
+        ]);
+        $maximumBlockDays = max(1, min(7, (int) \App\Models\SystemSetting::getValue('maximum_block_days', 7)));
+        if (CarbonImmutable::parse($validated['ends_on'])->greaterThan(CarbonImmutable::parse($validated['starts_on'])->addDays($maximumBlockDays - 1))) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ends_on' => 'Schedule blocks can cover a maximum of '.$maximumBlockDays.' days, including the start and end dates.',
+            ]);
+        }
+        unset($validated['impact_token']);
+        return $validated;
+    }
     public function destroy(ScheduleBlock $block): RedirectResponse
     {
         AuditLog::record('schedule_block.released', $block, ['title' => $block->title]);

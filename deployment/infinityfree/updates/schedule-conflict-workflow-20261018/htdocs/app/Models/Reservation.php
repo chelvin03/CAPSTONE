@@ -1,0 +1,169 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Reservation extends Model
+{
+    use HasFactory, \Illuminate\Notifications\Notifiable;
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $reservation): void {
+            if ($reservation->exists && $reservation->isDirty(['reservation_date', 'start_time', 'end_time', 'facility_id'])
+                && ($reservation->eventOutcome()->exists() || EquipmentReturn::where('reservation_id', $reservation->id)->exists())) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['reservation_date' => 'This event has recorded outcomes or equipment returns. Its historical schedule cannot be moved.']);
+            }
+            if (! $reservation->exists || $reservation->isDirty(['expected_attendees', 'reservation_date', 'start_time', 'end_time', 'facility_id'])
+                || ($reservation->isDirty('status') && in_array($reservation->status, ['approved', 'completed'], true))) {
+                // Validate the raw value before the integer cast could truncate decimals.
+                \Illuminate\Support\Facades\Validator::make(
+                    ['expected_attendees' => $reservation->getAttributes()['expected_attendees'] ?? null],
+                    ['expected_attendees' => \App\Support\GymCapacity::rules()],
+                    ['expected_attendees.max' => \App\Support\GymCapacity::ERROR],
+                )->validate();
+            }
+        });
+        static::saved(function (self $reservation): void {
+            if ($reservation->status === 'approved') {
+                app(\App\Services\AcknowledgementReceiptService::class)->ensureTask($reservation);
+                if ($reservation->wasChanged(['reference_number', 'contact_person', 'contact_email', 'reservation_type', 'event_name', 'event_type', 'facility_id', 'reservation_date', 'start_time', 'end_time', 'expected_attendees', 'approved_by', 'approved_at'])) {
+                    $reservation->acknowledgementTask()->update(['status' => 'pending', 'completed_by' => null, 'completed_at' => null]);
+                }
+            }
+        });
+    }
+
+    protected $fillable = [
+        'reference_number',
+        'user_id',
+        'contact_email',
+        'facility_id',
+        'reservation_type',
+        'event_name',
+        'event_type',
+        'purpose',
+        'organization_department',
+        'additional_notes',
+        'contact_person',
+        'contact_number',
+        'expected_attendees',
+        'reservation_date',
+        'start_time',
+        'end_time',
+        'setup_time',
+        'cleanup_time',
+        'requested_equipment',
+        'requested_equipment_quantity',
+        'status',
+        'priority_number',
+        'admin_notes',
+        'rejection_reason',
+        'cancellation_reason',
+        'approved_by',
+        'approved_at',
+        'rejected_by',
+        'rejected_at',
+        'cancelled_by',
+        'cancelled_at',
+        'completed_at',
+        'agreement_accepted',
+        'agreement_accepted_at',
+    ];
+
+    protected $casts = [
+        'agreement_accepted' => 'boolean',
+        'agreement_accepted_at' => 'datetime',
+        'reservation_date' => 'date',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'expected_attendees' => 'integer',
+        'priority_number' => 'integer',
+        'requested_equipment_quantity' => 'integer',
+    ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function requestorCancellationAllowed(): bool
+    {
+        return in_array($this->status, ['new', 'pending', 'validated', 'approved', 'waiting_list', 'pencil'], true)
+            && $this->created_at !== null && now()->lte($this->created_at->copy()->addHours(48))
+            && now()->lt($this->reservation_date->copy()->startOfDay()->addMinutes(
+                (int) substr($this->start_time, 0, 2) * 60 + (int) substr($this->start_time, 3, 2)
+            ));
+    }
+
+    public function facility(): BelongsTo
+    {
+        return $this->belongsTo(Facility::class);
+    }
+
+    public function equipment(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Equipment::class,
+            'reservation_equipment'
+        )
+            ->withPivot([
+                'quantity_requested',
+                'quantity_approved',
+                'remarks',
+                'status', 'quantity_offered', 'reply_sent_at', 'requires_response',
+                'latest_offer_id', 'requestor_response', 'requestor_responded_at',
+            ])
+            ->withTimestamps();
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ReservationDocument::class);
+    }
+
+    public function eventOutcome()
+    {
+        return $this->hasOne(ReservationEventOutcome::class);
+    }
+
+    public function acknowledgementTask()
+    {
+        return $this->hasOne(AcknowledgementTask::class);
+    }
+
+    public function acknowledgementReceipt()
+    {
+        return $this->hasOne(AcknowledgementReceipt::class);
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(ReservationStatusHistory::class)
+            ->latest();
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function rejectedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+}

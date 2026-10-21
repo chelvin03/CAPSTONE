@@ -3,7 +3,7 @@
         @include('dashboard.partials.reference-chart', ['rows' => $monthly, 'chartWidth' => 660, 'chartLabel' => 'Monthly Reservation Trend, number of reservations by scheduled event month'])
         <p class="analysis-axis">Number of Reservations · selected event-date period</p>
     </section>
-    <section class="reference-panel admin-panel"><header><div><h2>2. Data Completeness Overview</h2><p>Reservations with complete and incomplete required information.</p></div></header>
+    <section class="reference-panel admin-panel"><header><div><h2>2. Required-field Completeness Overview</h2><p>Required information only; optional event type is excluded. See Event-type Coverage above.</p></div></header>
         <div class="analysis-completeness"><div class="reference-donut"><svg viewBox="0 0 120 120" role="img" aria-label="{{ $completeCount }} complete, {{ $incompleteCount }} incomplete reservations"><circle cx="60" cy="60" r="45" fill="none" stroke="#e2e8f0" stroke-width="19"/>
             @if($totalReservations)<circle cx="60" cy="60" r="45" fill="none" stroke="#0860ff" stroke-width="19" pathLength="100" stroke-dasharray="{{ $completenessRate }} {{ 100-$completenessRate }}" transform="rotate(-90 60 60)"/><circle cx="60" cy="60" r="45" fill="none" stroke="#ff3f45" stroke-width="19" pathLength="100" stroke-dasharray="{{ 100-$completenessRate }} {{ $completenessRate }}" stroke-dashoffset="{{ -$completenessRate }}" transform="rotate(-90 60 60)"/>@endif
             </svg><div><span>Total</span><strong>{{ $totalReservations }}</strong></div></div>

@@ -85,7 +85,7 @@ class ReservationReportService
             'report_type' => ['required', 'in:reservation_detail,summary,priority_history'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'status' => ['nullable', 'in:new,pending,validated,waiting_list,approved,rejected,cancelled,completed'],
+            'status' => ['nullable', 'in:new,pending,validated,waiting_list,approved,rejected,cancelled,completed,no_show'],
             'category' => ['nullable', 'string', 'max:50'],
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);

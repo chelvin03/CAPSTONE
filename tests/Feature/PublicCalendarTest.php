@@ -8,7 +8,7 @@ function calendarReservation(Facility $facility, string $date, string $start, st
 {
     Reservation::create(['reference_number' => 'CAL-'.uniqid(), 'facility_id' => $facility->id,
         'reservation_type' => 'student', 'event_name' => 'Sports', 'purpose' => 'Practice',
-        'contact_person' => 'Requestor', 'contact_number' => '09123456789', 'expected_attendees' => 20,
+        'contact_person' => 'Requestor', 'contact_number' => '09123456789', 'expected_attendees' => 100,
         'reservation_date' => $date, 'start_time' => $start, 'end_time' => $end, 'status' => $status]);
 }
 
@@ -43,7 +43,7 @@ test('calendar distinguishes partial full and empty days while retaining the dat
     expect(array_column($days['2026-03-11']['slots'], 'available'))->not->toContain(true);
     expect(array_column($days['2026-03-10']['slots'], 'available'))->toBe([true]);
     $response->assertDontSee('Requestor')->assertDontSee('09123456789');
-    $this->getJson(route('reservation.availability', ['facility_id' => $this->gym->id, 'date' => '2026-03-10']))->assertOk()->assertJsonCount(2);
+    $this->getJson(route('reservation.availability', ['facility_id' => $this->gym->id, 'date' => '2026-03-10']))->assertOk()->assertJsonCount(1);
 });
 
 test('cleaning buffer removes short free gaps', function () {
@@ -69,20 +69,20 @@ test('global blocks facility blocks and maintenance affect calendar availability
     $this->getJson(route('reservation.availability', ['facility_id' => $this->gym->id, 'month' => '2026-13']))->assertUnprocessable();
 });
 
-test('available periods leave exactly one cleaning hour on either side of a booking', function () {
+test('available periods leave exactly thirty cleaning minutes on either side of a booking', function () {
     config(['gym.reservation.closing_time' => '24:00']);
     calendarReservation($this->gym, '2026-03-10', '15:00', '19:00');
     $day = $this->getJson(route('reservation.availability', ['month' => '2026-03']))
         ->assertOk()->json('days.2026-03-10');
     expect($day['slots'])->toBe([
-        ['start_time' => '08:00', 'end_time' => '14:00', 'available' => true, 'label' => 'Available'],
-        ['start_time' => '20:00', 'end_time' => '24:00', 'available' => true, 'label' => 'Available'],
+        ['start_time' => '08:00', 'end_time' => '14:30', 'available' => true, 'label' => 'Available'],
+        ['start_time' => '19:30', 'end_time' => '24:00', 'available' => true, 'label' => 'Available'],
     ]);
     $calendar = app(\App\Services\PublicCalendarService::class);
-    expect($calendar->hasReservationConflict($this->gym->id, '2026-03-10', '12:00', '14:00'))->toBeFalse()
-        ->and($calendar->hasReservationConflict($this->gym->id, '2026-03-10', '12:00', '14:01'))->toBeTrue()
-        ->and($calendar->hasReservationConflict($this->gym->id, '2026-03-10', '19:59', '21:00'))->toBeTrue()
-        ->and($calendar->hasReservationConflict($this->gym->id, '2026-03-10', '20:00', '21:00'))->toBeFalse();
+    expect($calendar->hasReservationConflict($this->gym->id, '2026-03-10', '12:00', '14:30'))->toBeFalse()
+        ->and($calendar->hasReservationConflict($this->gym->id, '2026-03-10', '12:00', '14:31'))->toBeTrue()
+        ->and($calendar->hasReservationConflict($this->gym->id, '2026-03-10', '19:29', '21:00'))->toBeTrue()
+        ->and($calendar->hasReservationConflict($this->gym->id, '2026-03-10', '19:30', '21:00'))->toBeFalse();
 });
 
 test('verified booking page replaces the original date picker with the availability calendar', function () {
@@ -108,24 +108,27 @@ test('flexible reservations enforce hours and refresh remaining time after submi
     $this->withSession(['public_email_verified' => ['email' => 'requestor@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp]]);
     $payload = ['facility_id' => $this->gym->id, 'reservation_type' => 'internal', 'event_name' => 'Practice',
         'purpose' => 'Sports', 'contact_person' => 'Requestor', 'contact_email' => 'requestor@example.com',
-        'contact_number' => '09123456789', 'expected_attendees' => 20, 'reservation_date' => '2026-03-10',
+        'contact_number' => '09123456789', 'expected_attendees' => 100, 'reservation_date' => '2026-03-10',
         'start_time' => '08:00', 'end_time' => '17:00', 'agreement' => '1', 'agreement_accepted' => '1',
         'permit' => \Illuminate\Http\UploadedFile::fake()->create('letter.pdf', 20, 'application/pdf')];
     $this->post(route('reservation.store'), [...$payload, 'start_time' => '07:59'])->assertSessionHasErrors('start_time');
-    $this->post(route('reservation.store'), [...$payload, 'end_time' => '21:01'])->assertSessionHasErrors('start_time');
+    $this->post(route('reservation.store'), [...$payload, 'end_time' => '21:01'])->assertSessionHasErrors('end_time');
     $this->post(route('reservation.store'), $payload)->assertSessionHasNoErrors();
+    Reservation::latest('id')->first()->update(['status' => 'approved']);
     $day = $this->getJson(route('reservation.availability', ['facility_id' => $this->gym->id, 'month' => '2026-03']))->assertOk()->json('days.2026-03-10');
     expect($day['slots'])->toBe([
-        ['start_time' => '18:00', 'end_time' => '21:00', 'available' => true, 'label' => 'Available'],
+        ['start_time' => '17:30', 'end_time' => '21:00', 'available' => true, 'label' => 'Available'],
     ]);
     $this->withSession(['public_email_verified' => ['email' => 'requestor@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp]]);
     $this->post(route('reservation.store'), [...$payload, 'start_time' => '16:00', 'end_time' => '19:00'])->assertSessionHasErrors('reservation_date');
-    $this->post(route('reservation.store'), [...$payload, 'start_time' => '17:59', 'end_time' => '21:00'])->assertSessionHasErrors('reservation_date');
+    $this->post(route('reservation.store'), [...$payload, 'start_time' => '17:00', 'end_time' => '21:00'])->assertSessionHasErrors('reservation_date');
     $this->post(route('reservation.store'), [...$payload, 'start_time' => '18:00', 'end_time' => '21:00'])->assertSessionHasNoErrors();
+    Reservation::latest('id')->first()->update(['status' => 'approved']);
     $this->getJson(route('reservation.availability', ['facility_id' => $this->gym->id, 'month' => '2026-03']))->assertJsonPath('days.2026-03-10.status', 'full');
     expect(Reservation::whereDate('reservation_date', '2026-03-10')->count())->toBe(2);
     $this->withSession(['public_email_verified' => ['email' => 'requestor@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp]]);
     $this->post(route('reservation.store'), [...$payload, 'reservation_date' => '2026-03-11', 'start_time' => '08:00', 'end_time' => '21:00'])->assertSessionHasNoErrors();
+    Reservation::latest('id')->first()->update(['status' => 'approved']);
     $this->getJson(route('reservation.availability', ['facility_id' => $this->gym->id, 'month' => '2026-03']))->assertJsonPath('days.2026-03-11.status', 'full');
 });
 
@@ -135,4 +138,11 @@ test('reservation details precede requestor information before email verificatio
     expect(strpos($html, 'aria-labelledby="event-heading"'))->toBeLessThan(strpos($html, 'aria-labelledby="requestor-heading"'));
     expect($html)->toContain('step: 1,', '@click="continueToRequestor"', 'this.reviewReservation();')
         ->not->toContain('window.location.assign(data.redirect)');
+});
+
+test('calendar hides gaps that cannot fit a one hour booking', function () {
+    $slots = app(\App\Services\PublicCalendarService::class)->slots([
+        ['start_time' => '08:30', 'end_time' => '09:00'],
+    ], '08:00', '09:30');
+    expect(array_values(array_filter($slots, fn ($slot) => $slot['available'])))->toBe([]);
 });

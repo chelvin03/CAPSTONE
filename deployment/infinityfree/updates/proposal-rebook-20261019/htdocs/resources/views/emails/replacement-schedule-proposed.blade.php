@@ -1,0 +1,9 @@
+<p>Hello {{ $proposal->reservation->contact_person }},</p>
+<p>{{ $proposal->kind === 'waiting_list' ? 'The administrator offers an available slot for your waiting-list request' : 'The administrator proposes a replacement schedule for reservation' }} <strong>{{ $proposal->reservation->reference_number }}</strong>.</p>
+<p>Original: {{ $proposal->original['reservation_date'] }}, {{ $proposal->original['start_time'] }} to {{ $proposal->original['end_time'] === '24:00' ? '12:00 midnight' : $proposal->original['end_time'] }}.</p>
+<p><strong>Proposed:</strong> {{ $proposal->target['reservation_date'] }}, {{ $proposal->target['start_time'] }} to {{ $proposal->target['end_time'] === '24:00' ? '12:00 midnight' : $proposal->target['end_time'] }} ({{ config('app.timezone') }}).</p>
+<p>Reason: {{ $proposal->reason }}</p>
+<p><a href="{{ $link }}">Review and Accept or Decline</a></p>
+<p>Open the review link above and choose <strong>Accept New Schedule</strong> or <strong>Decline New Schedule</strong>. After declining, a Book Again link lets you submit a separate reservation for admin approval. Your original booking remains unchanged.</p>
+<p>Reply before {{ $proposal->expires_at->format('F j, Y g:i A') }} ({{ config('app.timezone') }}). Your original booking remains unchanged while you decide. The proposed slot is not held and availability, cleaning time and equipment will be checked again when you accept. Declining or expiry does not cancel your original booking. A separate administrator cancellation or change invalidates this proposal.</p>
+<p>{{ $proposal->kind === 'waiting_list' ? 'This waiting-list offer will approve your booking only if you accept before the deadline and the schedule and equipment remain available. Declining or expiry keeps the request on the waiting list.' : 'Acceptance changes the schedule only; it does not approve an unapproved reservation.' }} Keep this private link confidential.</p>

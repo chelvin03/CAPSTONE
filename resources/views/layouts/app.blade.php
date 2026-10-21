@@ -9,6 +9,7 @@
     <title>@yield('title', 'MCST Gym Reservation System')</title>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+<link rel="stylesheet" href="{{ asset('css/workspace-shell.css') }}?v={{ filemtime(public_path('css/workspace-shell.css')) }}">
 </head>
 
 <body class="min-h-screen bg-slate-50 text-slate-900 {{ auth()->user()->role === 'staff' ? 'staff-monitoring' : 'admin-workspace' }}" x-data="{ navigationOpen: false }">

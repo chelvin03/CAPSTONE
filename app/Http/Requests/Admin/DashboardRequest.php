@@ -41,7 +41,7 @@ class DashboardRequest extends FormRequest
             'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
             'category' => ['nullable', 'string', 'max:100', Rule::exists('reservations', 'event_type')],
             'requestor_type' => ['nullable', 'string', 'max:50', Rule::exists('reservations', 'reservation_type')],
-            'status' => ['nullable', Rule::in(['new', 'validated', 'approved', 'rejected', 'waiting_list', 'cancelled', 'completed', 'pending', 'pencil'])],
+            'status' => ['nullable', Rule::in(['new', 'validated', 'approved', 'rejected', 'waiting_list', 'cancelled', 'completed', 'no_show', 'pending', 'pencil'])],
             'grouping' => ['nullable', Rule::in(['daily', 'weekly', 'monthly', 'quarterly', 'annual'])],
             'export' => ['nullable', Rule::in(['csv'])],
             'heat_scope' => ['nullable', Rule::in(['approved', 'all'])],

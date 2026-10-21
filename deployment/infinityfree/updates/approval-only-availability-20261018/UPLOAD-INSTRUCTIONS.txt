@@ -1,0 +1,33 @@
+APPROVAL-ONLY SLOT AVAILABILITY — 18 OCTOBER 2026
+Prepared locally only. No online deployment or data changes.
+Requires previous requestor restrictions, conflict-resolution/email and duration
+updates, including RequestorRestriction table/model and schedule mail classes.
+
+Back up matching files. File Upload to matching online paths under /htdocs:
+1. app/Services/PublicCalendarService.php FIRST (adds shared blocking-status constant).
+2. app/Services/AdminScheduleService.php
+3. app/Http/Controllers/PublicReservationController.php
+4. app/Http/Controllers/Admin/ReservationController.php
+5. resources/views/public/reservations/create.blade.php
+6. resources/views/admin/reservations/_form.blade.php
+7. resources/views/admin/reservations/show.blade.php
+8. resources/views/admin/schedule/index.blade.php
+Clear generated .php files inside storage/framework/views; keep folders/.gitignore.
+No SQL, new routes, dependencies, environment changes or build required.
+
+Pending/new/validated/waitlisted/pencil requests DO NOT reserve public time.
+Approved and completed records consume their scheduled period and existing
+30-minute cleaning separation. Admin blocks and facility maintenance still apply.
+Other pending requests remain unchanged when one is approved; attempting to
+approve a competing request is rejected until rescheduled or conflict resolved.
+Admin sees pending requests while that time remains publicly available.
+Pencil booking is now a tentative nonexclusive request, not a slot hold.
+Approval and approved schedule updates recheck availability under a facility lock.
+Priority creation rechecks approved/completed conflicts before displacement;
+completed records cannot be displaced. Existing email and duration behavior retained.
+
+Validation: 84 relevant tests passed, 490 assertions.
+Verify using test requests: submit two overlapping pending requests, approve one,
+confirm public time blocks, then confirm overlapping second approval is rejected.
+Existing production records and statuses are not altered by uploading this update.
+Rollback: restore matching files and clear compiled views; do not change database.

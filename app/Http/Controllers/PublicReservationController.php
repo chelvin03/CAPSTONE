@@ -44,7 +44,7 @@ class PublicReservationController extends Controller
         $occupied = Reservation::query()
             ->where('facility_id', $validated['facility_id'])
             ->whereDate('reservation_date', $validated['date'])
-            ->whereNotIn('status', ['rejected', 'cancelled'])
+            ->whereIn('status', \App\Services\PublicCalendarService::BLOCKING_STATUSES)
             ->orderBy('start_time')
             ->get(['start_time', 'end_time', 'status'])->map(function ($booking) {
                 $calendar = app(\App\Services\PublicCalendarService::class);
@@ -60,10 +60,10 @@ class PublicReservationController extends Controller
     public function create(Request $request): View|RedirectResponse
     {
         if ((int) $request->query('step') === 1) {
-            $request->session()->forget(['public_email_verified', 'public_email_challenge', 'public_reservation_details', '_old_input']);
+            $request->session()->forget('_old_input');
         }
 
-        $emailVerified = $this->emailIsVerified($request);
+        $emailVerified = $this->emailIsVerified($request, $request->old('contact_email', $request->session()->get('public_reservation_details.contact_email')));
         if ((int) $request->query('step') === 3 && ! $emailVerified) {
             return redirect()->route('reservation.create')->withErrors(['contact_email' => 'Please verify your email before continuing to Event Information.']);
         }
@@ -82,11 +82,15 @@ class PublicReservationController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->merge(['facility_id' => Facility::gymId()]);
+        $quantityAttributes = ['equipment.*.quantity_requested' => 'Equipment quantity', 'requested_equipment_quantity' => 'Custom equipment quantity'];
+        $equipmentIds = array_filter(array_keys((array) $request->input('equipment', [])), fn ($id) => ctype_digit((string) $id));
+        foreach (\App\Models\Equipment::whereIn('id', $equipmentIds)->pluck('equipment_name', 'id') as $id => $name) {
+            $quantityAttributes['equipment.'.$id.'.quantity_requested'] = 'Quantity for '.$name;
+        }
         $validated = $request->validate([
             'facility_id' => ['required', 'exists:facilities,id'],
             'reservation_type' => ['required', 'in:internal,external'],
-            'event_name' => ['required', 'string', 'max:255'],
-            'event_type' => ['nullable', 'string', 'max:100'],
+            'event_type' => ['required', \Illuminate\Validation\Rule::in(config('event-types'))],
             'purpose' => ['required', 'string'],
             'organization_department' => ['nullable', 'string', 'max:255'],
             'additional_notes' => ['nullable', 'string', 'max:5000'],
@@ -95,8 +99,8 @@ class PublicReservationController extends Controller
             'contact_number' => ['required', 'digits:11'],
             'expected_attendees' => \App\Support\GymCapacity::rules(),
             'reservation_date' => ['required', 'date', 'after_or_equal:'.now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString(), 'before_or_equal:'.now()->addYearsNoOverflow(15)->toDateString()],
-            'start_time' => ['required', 'date_format:H:i'],
-            'end_time' => ['required', 'string', 'regex:/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$|^24:00$/', function ($attribute, $value, $fail) use ($request) {
+            'start_time' => ['required', 'date_format:H:i', new \App\Rules\HalfHourTime],
+            'end_time' => ['required', new \App\Rules\HalfHourTime, new \App\Rules\MinimumReservationDuration, 'string', 'regex:/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$|^24:00$/', function ($attribute, $value, $fail) use ($request) {
                 if ($value <= (string)$request->input('start_time')) $fail('End time must be after start time. Use 24:00 for the midnight end of the selected date.');
             }],
             'setup_time' => ['nullable', 'date_format:H:i'],
@@ -104,22 +108,24 @@ class PublicReservationController extends Controller
             'permit' => [
                 'required',
                 'file',
-                'mimes:'.implode(',', config('gym.documents.allowed_extensions')),
+                'mimes:pdf',
+                'extensions:pdf',
                 'max:'.config('gym.documents.max_size_kb'),
             ],
             'agreement' => ['accepted'],
             'agreement_accepted' => ['accepted'],
             'equipment' => ['nullable', 'array'],
             'equipment.*' => ['array:quantity_requested'],
-            'equipment.*.quantity_requested' => ['nullable', 'integer', 'min:1', 'max:100000'],
+            'equipment.*.quantity_requested' => ['bail', 'nullable', new \App\Rules\EquipmentQuantity, 'integer', 'min:1', 'max:100000'],
             'requested_equipment' => ['nullable', 'string', 'max:255', 'required_with:requested_equipment_quantity'],
-            'requested_equipment_quantity' => ['nullable', 'integer', 'min:1', 'required_with:requested_equipment'],
+            'requested_equipment_quantity' => ['bail', 'nullable', 'required_with:requested_equipment', new \App\Rules\EquipmentQuantity, 'integer', 'min:1', 'max:100000'],
 
         ], [
             'agreement_accepted.accepted' => 'Please read and accept the MCST Gymnasium Use Agreement before submitting your reservation request.',
             'expected_attendees.max' => \App\Support\GymCapacity::ERROR,
             'reservation_type.required' => 'Please select a requestor type.',
-        ]);
+        ], $quantityAttributes);
+        $validated['event_name'] = $validated['event_type'];
 
         if (! $this->emailIsVerified($request, $validated['contact_email'])) {
             $request->session()->forget(['public_email_verified', 'public_email_challenge']);
@@ -128,9 +134,11 @@ class PublicReservationController extends Controller
             ]);
         }
 
-        if ($request->session()->has('public_reservation_details.reservation_type') && $request->session()->get('public_reservation_details.reservation_type') !== $validated['reservation_type']) {
-            return back()->withInput()->withErrors(['reservation_type' => 'Please verify your requestor details again after changing Requestor Type.']);
+        if ($request->session()->has('public_reservation_details.reservation_type')
+            && $request->session()->get('public_reservation_details.reservation_type') !== $validated['reservation_type']) {
+            return back()->withInput()->withErrors(['reservation_type' => 'Requestor type changed. Return to Requestor Information and click Next to save the updated details. Your verified email remains valid.']);
         }
+        \App\Models\RequestorRestriction::assertCanReserve($validated['contact_email']);
         app(\App\Services\EquipmentRequestService::class)->validateRequests($validated['reservation_type'], $validated['equipment'] ?? [], $validated['requested_equipment'] ?? null);
 
         if (Facility::findOrFail($validated['facility_id'])->status !== 'available') {
@@ -150,7 +158,7 @@ class PublicReservationController extends Controller
             return back()
                 ->withInput()
                 ->withErrors([
-                    'reservation_date' => 'Selected time overlaps with a reservation or its one-hour cleaning buffer. Please choose from the remaining available time.',
+                    'reservation_date' => 'Selected time overlaps with a reservation or its 30-minute cleanup buffer. Please choose from the remaining available time.',
                 ]);
         }
 
@@ -163,6 +171,7 @@ class PublicReservationController extends Controller
 
         try {
             $reservation = DB::transaction(function () use ($validated, $calendar, &$storedPermitPath): Reservation {
+                \App\Models\RequestorRestriction::assertCanReserve($validated['contact_email']);
                 $equipmentService = app(\App\Services\EquipmentRequestService::class);
                 $equipmentService->lockInventory();
                 $equipmentService->validateRequests($validated['reservation_type'], $validated['equipment'] ?? [], $validated['requested_equipment'] ?? null);
@@ -174,7 +183,7 @@ class PublicReservationController extends Controller
                         ->where(fn ($q) => $q->whereNull('facility_id')->orWhere('facility_id', $facility->id))
                         ->where(fn ($q) => $q->whereNull('start_time')->orWhere(fn ($times) => $times->where('start_time', '<', $validated['end_time'])->where('end_time', '>', $validated['start_time'])))->exists();
                 if ($unavailable) {
-                    throw \Illuminate\Validation\ValidationException::withMessages(['reservation_date' => 'Selected time overlaps with a reservation or its one-hour cleaning buffer. Please choose from the remaining available time.']);
+                    throw \Illuminate\Validation\ValidationException::withMessages(['reservation_date' => 'Selected time overlaps with a reservation or its 30-minute cleanup buffer. Please choose from the remaining available time.']);
                 }
                 $reservation = Reservation::create([
                     'reference_number' => $this->generateReferenceNumber(),
@@ -285,7 +294,11 @@ class PublicReservationController extends Controller
         $details = [...$validated, 'contact_email' => $email];
         unset($details['email']);
         $request->session()->put('public_reservation_details', $details);
-        // A changed address immediately invalidates any previous proof, even during cooldown.
+        if ($this->emailIsVerified($request, $email)) {
+            return response()->json(['verified' => true, 'expires_at' => $request->session()->get('public_email_verified.expires_at'),
+                'message' => 'This email is already verified. You may continue without another code.']);
+        }
+        // A changed or expired address proof must be replaced; editing other details does not invalidate it.
         $request->session()->forget('public_email_verified');
         if (($previous['email'] ?? null) !== $email) {
             $request->session()->forget('public_email_challenge');
@@ -368,13 +381,35 @@ class PublicReservationController extends Controller
         $request->session()->put('public_email_verified', [
             'email' => $email, 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp,
         ]);
-        return response()->json(['verified' => true, 'redirect' => route('reservation.create', ['step' => 3])]);
+        return response()->json(['verified' => true, 'expires_at' => $request->session()->get('public_email_verified.expires_at'), 'redirect' => route('reservation.create', ['step' => 3])]);
     }
 
     public function editDetails(Request $request): JsonResponse
     {
-        $request->session()->forget(['public_email_verified', 'public_email_challenge']);
-        return response()->json(['verified' => false]);
+        if ($request->has('email')) {
+            $validated = $request->validate([
+                'email' => ['required', 'email:rfc', 'max:255'],
+                'contact_person' => ['required', 'string', 'max:255'],
+                'contact_number' => ['required', 'digits:11'],
+                'reservation_type' => ['required', 'in:internal,external'],
+                'organization_department' => ['nullable', 'string', 'max:255'],
+                'purpose' => ['nullable', 'string'],
+            ]);
+            $email = Str::lower(trim($validated['email']));
+            $oldEmail = $request->session()->get('public_reservation_details.contact_email');
+            if ($email !== $oldEmail && ! $this->emailIsVerified($request, $email)) {
+                $request->session()->forget(['public_email_verified', 'public_email_challenge']);
+            }
+            $details = [...$validated, 'contact_email' => $email];
+            unset($details['email']);
+            $request->session()->put('public_reservation_details', $details);
+        }
+        $verified = (bool) $this->emailIsVerified($request);
+        if (! $verified) $request->session()->forget('public_email_verified');
+        return response()->json(['verified' => $verified,
+            'expires_at' => $verified ? $request->session()->get('public_email_verified.expires_at') : null,
+            'challenge_active' => $request->session()->get('public_email_challenge.email') === $request->session()->get('public_reservation_details.contact_email')
+                && $request->session()->get('public_email_challenge.expires_at', 0) > now()->timestamp]);
     }
 
     private function emailIsVerified(Request $request, ?string $email = null): bool

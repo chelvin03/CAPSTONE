@@ -1,0 +1,7 @@
+Admin Settings: Maximum block days, 1-7, default 7.
+Back up and replace the four packaged files in matching paths under existing
+online htdocs. Clear generated PHP files INSIDE storage/framework/views;
+keep folder, subfolders and .gitignore. Hard-refresh Settings and Schedule.
+No SQL, build or vendor update needed; existing system_settings stores the value.
+Save Configuration in Admin Settings to change the inclusive per-block limit.
+Existing blocks stay unchanged. Separate submissions remain permitted.

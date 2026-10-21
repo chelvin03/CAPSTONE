@@ -173,17 +173,17 @@ test('staff and strangers cannot review or respond and signed email links grant 
 test('reservation approval and schedule editing recheck equipment and rollback overbooking', function () {
     $occupied = equipmentBooking(['status' => 'approved']);
     $occupied->equipment()->attach($this->chairs, ['quantity_requested' => 100, 'quantity_approved' => 100]);
-    $pending = equipmentBooking(['start_time' => '12:00', 'end_time' => '15:00']);
+    $pending = equipmentBooking(['start_time' => '12:30', 'end_time' => '15:30']);
     $pending->equipment()->attach($this->chairs, ['quantity_requested' => 80, 'quantity_approved' => 80, 'status' => 'approved']);
     $this->actingAs($this->admin)->patch(route('admin.reservations.approve', $pending))->assertSessionHasNoErrors();
-    $this->patch(route('admin.reservations.reschedule', $pending), [
+    $this->patch(route('admin.reservations.reschedule', $pending), previewedReschedule($pending, [
         'facility_id' => $pending->facility_id, 'reservation_date' => $pending->reservation_date->toDateString(),
         'start_time' => '09:00', 'end_time' => '13:00', 'reason' => 'Move schedule',
         'force_assign' => 1, 'conflict_resolution' => 'waiting_list',
-    ])->assertSessionHasNoErrors();
+    ]))->assertSessionHasNoErrors();
     // Forced reassignment releases the occupied reservation's stock, preserving the existing workflow.
     expect($occupied->fresh()->status)->toBe('waiting_list');
-    $this->patch(route('admin.reservations.approve', $occupied))->assertSessionHasErrors('equipment');
+    $this->patch(route('admin.reservations.approve', $occupied))->assertSessionHasErrors('reservation_date');
     expect($occupied->fresh()->status)->toBe('waiting_list');
     $anotherFacility = Facility::create(['facility_name' => 'Other Equipment Gym', 'capacity' => 2000, 'status' => 'available']);
     $another = equipmentBooking(['facility_id' => $anotherFacility->id, 'status' => 'approved', 'start_time' => '16:00', 'end_time' => '18:00']);

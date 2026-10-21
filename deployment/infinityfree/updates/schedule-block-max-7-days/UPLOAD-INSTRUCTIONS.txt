@@ -1,0 +1,9 @@
+ADMIN SCHEDULE BLOCK LIMIT: 7 days inclusive per block.
+Back up and replace the two packaged files in matching paths under the
+existing online htdocs. No SQL, frontend build or vendor update required.
+Clear generated .php files INSIDE storage/framework/views; keep directory,
+subfolders and .gitignore. Hard-refresh admin schedule.
+October 6-12 is allowed. October 6-13 and month-long blocks are rejected.
+Invalid blocks do not cancel reservations or send mail.
+Existing blocks remain. This limit applies per submission; it does not impose
+a monthly quota or prevent admins from creating multiple separate blocks.

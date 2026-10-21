@@ -1,0 +1,33 @@
+DASHBOARD PERFORMANCE UPDATE — 18 OCTOBER 2026
+Prepared locally. NOT uploaded or deployed.
+Target: existing mcst-gym-reservation.gt.tc InfinityFree installation.
+
+1. Back up the matching existing files and export the production database.
+2. Confirm the hosted dashboard already uses DashboardAnalyticsService,
+   DashboardInsightService, DashboardTrendService, status histories and
+   cancellation attribution fields. This update relies on that existing schema.
+3. Upload MCST-dashboard-performance-20261018.zip into the existing htdocs
+   and extract, merging matching folders and replacing the eight packaged files.
+   ZIP contains app/, resources/, public/ directly; do not create htdocs/htdocs.
+4. Clear only generated compiled PHP view files inside storage/framework/views.
+   If production caches configuration/routes, retain them: this update changes neither.
+5. Remove the uploaded ZIP. Sign in as admin and hard-refresh /admin/dashboard.
+6. Verify existing charts remain, then check Operational performance analytics,
+   month/status/event filters, expandable supporting records and CSV export.
+   Check staff access to admin dashboard remains forbidden.
+
+No SQL, dependencies, .env changes, uploads or frontend build included/required.
+New services require normal PSR-4 app autoloading; refresh production autoload
+files first if the installation uses an authoritative Composer classmap.
+Existing dashboard charts and filters are retained.
+Changes: monthly utilization, processing median/average and time bands,
+pending age groups, cancellation trend, attribution, exact recorded reasons,
+linked reservation evidence, and CSV metrics.
+Monthly detail is limited to the final 12 calendar months of the selected range;
+overall summaries retain the entire filtered scope. Missing data remains N/A.
+
+Validation: 11 focused feature/preview tests passed, 75 assertions.
+A broader preexisting DashboardTrendTest expects a previously removed yearly
+chart and fails that assertion; this update does not remove any existing charts.
+If a problem occurs, restore the backed-up matching files and clear compiled views.
+Do not upload this guide into public htdocs.

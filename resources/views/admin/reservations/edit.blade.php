@@ -42,13 +42,12 @@
                         @endforeach
                     </select>
                 </div>
-                <div><label for="event_name" class="field-label">Event Name *</label><input id="event_name" name="event_name" value="{{ old('event_name', $reservation->event_name) }}" maxlength="255" required class="field"></div>
-                <div><label for="event_type" class="field-label">Event Type</label><input id="event_type" name="event_type" value="{{ old('event_type', $reservation->event_type) }}" maxlength="100" class="field"></div>
+                @include('reservations.event-type-field')
                 <div class="md:col-span-2"><label for="purpose" class="field-label">Purpose *</label><textarea id="purpose" name="purpose" rows="3" required class="field">{{ old('purpose', $reservation->purpose) }}</textarea></div>
                 <div><label for="contact_person" class="field-label">Contact Person *</label><input id="contact_person" name="contact_person" value="{{ old('contact_person', $reservation->contact_person) }}" required class="field"></div>
                 <div><label for="contact_number" class="field-label">Contact Number *</label><input id="contact_number" name="contact_number" type="tel" inputmode="numeric" pattern="[0-9]{11}" minlength="11" maxlength="11" value="{{ old('contact_number', $reservation->contact_number) }}" required class="field"></div>
                 <div><label for="contact_email" class="field-label">Contact Email</label><input id="contact_email" name="contact_email" type="email" value="{{ old('contact_email', $reservation->contact_email) }}" class="field"></div>
-                <div><label for="expected_attendees" class="field-label">Estimated Participants *</label><input id="expected_attendees" name="expected_attendees" type="number" min="1" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees', $reservation->expected_attendees) }}" required class="field"></div>
+                <div><label for="expected_attendees" class="field-label">Estimated Participants *</label><input id="expected_attendees" name="expected_attendees" type="number" min="{{ \App\Support\GymCapacity::MIN_ATTENDEES }}" max="{{ \App\Support\GymCapacity::MAX_ATTENDEES }}" step="1" value="{{ old('expected_attendees', $reservation->expected_attendees) }}" required class="field"></div>
             </div>
         </section>
 
@@ -56,8 +55,8 @@
             <h2 class="mb-5 text-lg font-bold text-slate-900">Schedule</h2>
             <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 <div><label for="reservation_date" class="field-label">Reservation Date *</label><input id="reservation_date" name="reservation_date" type="date" value="{{ old('reservation_date', $reservation->reservation_date->toDateString()) }}" required class="field"></div>
-                <div><label for="start_time" class="field-label">Start Time *</label><input id="start_time" name="start_time" type="time" value="{{ old('start_time', substr((string) $reservation->start_time, 0, 5)) }}" required class="field"></div>
-                <div><label for="end_time" class="field-label">End Time *</label><input id="end_time" name="end_time" type="time" value="{{ old('end_time', substr((string) $reservation->end_time, 0, 5)) }}" required class="field"></div>
+                <div><label for="start_time" class="field-label">Start Time *</label><input id="start_time" name="start_time" type="time" step="1800" value="{{ old('start_time', substr((string) $reservation->start_time, 0, 5)) }}" required class="field"></div>
+                <div><label for="end_time" class="field-label">End Time *</label><input id="end_time" name="end_time" type="time" step="1800" value="{{ old('end_time', substr((string) $reservation->end_time, 0, 5)) }}" required class="field"></div>
             </div>
         </section>
 

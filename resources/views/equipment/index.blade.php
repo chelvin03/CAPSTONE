@@ -135,6 +135,7 @@
 
                             <td class="px-5 py-4 text-sm text-slate-600">
                                 {{ number_format($item->total_quantity) }}
+                                <p class="mt-1 text-xs text-slate-500">{{ $item->usableQuantity() }} usable after recorded damage/missing stock; scheduled allocations are checked separately.</p>
                             </td>
 
                             <td class="px-5 py-4 text-sm text-slate-600">

@@ -17,6 +17,10 @@ class Reservation extends Model
     protected static function booted(): void
     {
         static::saving(function (self $reservation): void {
+            if ($reservation->exists && $reservation->isDirty(['reservation_date', 'start_time', 'end_time', 'facility_id'])
+                && ($reservation->eventOutcome()->exists() || EquipmentReturn::where('reservation_id', $reservation->id)->exists())) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['reservation_date' => 'This event has recorded outcomes or equipment returns. Its historical schedule cannot be moved.']);
+            }
             if (! $reservation->exists || $reservation->isDirty(['expected_attendees', 'reservation_date', 'start_time', 'end_time', 'facility_id'])
                 || ($reservation->isDirty('status') && in_array($reservation->status, ['approved', 'completed'], true))) {
                 // Validate the raw value before the integer cast could truncate decimals.
@@ -125,6 +129,11 @@ class Reservation extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(ReservationDocument::class);
+    }
+
+    public function eventOutcome()
+    {
+        return $this->hasOne(ReservationEventOutcome::class);
     }
 
     public function acknowledgementTask()

@@ -1,0 +1,31 @@
+COMBINED EQUIPMENT QUANTITY + EMAIL BACK NAVIGATION UPDATE
+Prepared locally only. Includes both pending changes; no online records changed.
+Requires previous approval-only availability and requestor restriction updates.
+No SQL, route changes, dependencies, environment changes or build needed.
+
+When ready to deploy, back up matching hosted files. Individual File Upload:
+1. app/Rules/EquipmentQuantity.php FIRST.
+2. app/Http/Controllers/PublicReservationController.php.
+3. resources/views/public/reservations/create.blade.php LAST.
+Clear generated .php view files inside storage/framework/views; keep folders
+and .gitignore. Hard refresh the reservation page. Use this combined folder,
+not the older equipment-only package, to retain both features.
+
+Equipment: positive whole numbers without leading zeros. 010, 001, decimals,
+zero, negatives and scientific notation are rejected inline and by the server.
+Named quantity errors and stock limits retained. Optional equipment may be omitted.
+
+Verification: Back/Edit Details and opening step 1 retain the same email proof.
+Editing event/date/time/equipment/name/phone/type does not require a new code.
+Next saves updated details and checks verification with the server before skipping
+OTP. The original 30-minute expiry is NOT extended by editing or back navigation.
+A changed normalized email clears the old proof; expired/missing proof needs a code.
+Case/outer-whitespace changes alone do not change email identity.
+An unexpired, unused code survives editing/back without redundant resend.
+Successful reservation submission still ends that request's verification workflow.
+Final submission continues to verify the email server-side; CSRF remains enabled.
+
+Verification: 73 focused feature tests passed, 489 assertions. Client logic also
+checked for preserving raw equipment input and server-confirmed OTP skipping.
+No real emails were sent or online restrictions changed in these tests.
+Rollback: restore matching controller/view files and clear compiled views.

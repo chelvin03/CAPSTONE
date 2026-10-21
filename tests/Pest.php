@@ -48,3 +48,18 @@ function something()
 {
     // ..
 }
+
+function previewedReschedule(\App\Models\Reservation $reservation, array $data): array
+{
+    $preview = test()->postJson(route('admin.reservations.reschedule-preview', $reservation), $data);
+    if ($preview->status() === 200) $data['impact_token'] = $preview->json('token');
+    return $data;
+}
+
+function previewedBlock(array $data): array
+{
+    $preview = test()->postJson(route('admin.schedule.blocks.preview'), $data);
+    $preview->assertOk();
+    $data['impact_token'] = $preview->json('token');
+    return $data;
+}

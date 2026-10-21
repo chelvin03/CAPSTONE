@@ -1,0 +1,40 @@
+DASHBOARD KPI IMPROVEMENTS — 18 OCTOBER 2026
+Prepared locally only. No files uploaded or production targets changed.
+Requires current dashboard performance, requestor restrictions and latest
+approval-only availability updates. Existing SystemSetting and audit tables used.
+No SQL, dependencies, environment changes or frontend build required.
+
+Back up matching files. Individual File Upload to matching /htdocs paths:
+1. app/Services/DashboardKpiService.php (new)
+2. app/Services/DashboardInsightService.php
+3. app/Services/BusinessDecisionService.php
+4. app/Http/Controllers/Admin/KpiTargetController.php (new)
+5. public/css/dashboard-kpi.css (new)
+6. resources/views/dashboard/partials/kpi-cards.blade.php (new)
+7. resources/views/dashboard/partials/insights-v2.blade.php
+8. app/Http/Controllers/Admin/DashboardController.php
+9. routes/web.php (new target route; upload before dashboard view)
+10. resources/views/dashboard/admin.blade.php LAST
+Clear generated .php views inside storage/framework/views and generated
+bootstrap/cache/routes-*.php route cache files only. Keep folders and all other files.
+
+Primary KPIs: scheduled utilization, average decision time, overdue pending,
+and cancellation rate. Existing counts and charts retained. Required-field
+completeness is distinguished from optional event-type coverage.
+Targets default to NOT CONFIGURED. Admin must review agreed institutional targets;
+blank removes a target, zero is a valid target. Saving targets is audited and has
+no effect on reservation approvals. No targets were invented or set by this update.
+Comparisons use the preceding equal-length event-date window and same filters.
+No growth is claimed without recorded baseline data. Rate changes are percentage
+points. Historical backlog snapshots are unavailable, so no backlog trend claimed.
+Future event dates are explicitly labeled as scheduled/planned utilization.
+Expandable KPI evidence links to reservations. CSV includes KPI targets/definitions.
+Existing recommendation cards remain available inside an expandable section.
+Required attendee validity now reflects the configured minimum of 50.
+
+Verification: 19 focused tests passed, 128 assertions. Desktop preview and
+390px layout checked with headless Chrome. Preview uses isolated sample data.
+After upload: hard refresh Admin Dashboard. Check cards, existing charts, filter
+scope, supporting records, CSV, and target form. Set targets only after agreement
+with MCST; unconfigured is valid. Confirm staff cannot change admin targets.
+Rollback: restore backed-up matching files and clear compiled view/route caches.

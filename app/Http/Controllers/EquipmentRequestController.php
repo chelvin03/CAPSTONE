@@ -33,7 +33,10 @@ class EquipmentRequestController extends Controller
             $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
             $equipment = Equipment::findOrFail($equipment->id);
             $item = $reservation->equipment()->where('equipment.id', $equipment->id)->firstOrFail();
-            if ($reservation->reservation_type !== 'internal' || in_array($reservation->status, ['cancelled', 'rejected', 'completed'], true)) {
+            if (\App\Models\EquipmentReturn::where('reservation_id', $reservation->id)->where('equipment_id', $equipment->id)->exists()) {
+                throw ValidationException::withMessages(['equipment' => 'This allocation has a recorded return. Use the audited return correction form instead of changing the original allocation.']);
+            }
+            if ($reservation->reservation_type !== 'internal' || in_array($reservation->status, ['cancelled', 'rejected', 'completed', 'no_show'], true)) {
                 throw ValidationException::withMessages(['equipment' => 'Only active Internal MCST reservations may have equipment reviewed.']);
             }
             $available = $service->available($equipment, $reservation);
@@ -85,7 +88,7 @@ class EquipmentRequestController extends Controller
             $service->lockInventory();
             $reservation = Reservation::whereKey($reservation->id)->lockForUpdate()->firstOrFail();
             $item = $reservation->equipment()->where('equipment.id', $equipment->id)->firstOrFail();
-            if ($reservation->reservation_type !== 'internal' || in_array($reservation->status, ['cancelled', 'rejected', 'completed'], true)
+            if ($reservation->reservation_type !== 'internal' || in_array($reservation->status, ['cancelled', 'rejected', 'completed', 'no_show'], true)
                 || !$item->pivot->requires_response || $item->pivot->latest_offer_id !== $data['offer_id']
                 || $item->pivot->requestor_response !== null || !in_array($item->pivot->status, ['available', 'partially_available'], true)) {
                 throw ValidationException::withMessages(['equipment' => 'This equipment offer is no longer awaiting a response.']);

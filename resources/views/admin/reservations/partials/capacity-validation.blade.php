@@ -1,12 +1,12 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('input[name="expected_attendees"]').forEach(field => {
-        field.min = '1';
+        field.min = @js((string) \App\Support\GymCapacity::MIN_ATTENDEES);
         field.max = @js((string) \App\Support\GymCapacity::MAX_ATTENDEES);
         field.step = '1';
         const help = document.createElement('p');
         help.className = 'mt-2 text-xs text-slate-500';
-        help.textContent = 'Maximum Gymnasium Capacity: 2,000 persons';
+        help.textContent = 'Gymnasium attendance: minimum 50, maximum 2,000 persons';
         const error = document.createElement('p');
         error.className = 'mt-2 text-sm text-red-700';
         error.setAttribute('role', 'alert');
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const value = Number(field.value);
             const message = value > Number(field.max)
                 ? 'The expected number of attendees exceeds the MCST Gymnasium maximum capacity of 2,000 persons. Please reduce the number of attendees to continue.'
-                : (!field.value || !/^[0-9]+$/.test(field.value) || !Number.isInteger(value) || value < 1 || field.validity.badInput || field.validity.stepMismatch ? 'Enter a whole number of attendees between 1 and 2,000.' : '');
+                : (!field.value || !/^[0-9]+$/.test(field.value) || !Number.isInteger(value) || value < Number(field.min) || field.validity.badInput || field.validity.stepMismatch ? 'Enter a whole number of attendees between 50 and 2,000.' : '');
             field.setCustomValidity(message);
             field.setAttribute('aria-invalid', String(Boolean(message)));
             field.style.borderColor = message ? '#dc2626' : '';

@@ -1,0 +1,15 @@
+config/event-types.php
+resources/views/reservations/event-type-field.blade.php
+resources/views/emails/replacement-schedule-proposed.blade.php
+resources/views/public/reservations/schedule-proposal.blade.php
+resources/views/public/reservations/create.blade.php
+app/Http/Controllers/ScheduleProposalController.php
+public/js-schedule-impact.js
+public/js-reservation-calendar.js
+app/Rules/MinimumReservationDuration.php
+app/Rules/HalfHourTime.php
+app/Services/PublicCalendarService.php
+app/Services/ScheduleProposalService.php
+app/Http/Controllers/PublicReservationController.php
+resources/views/admin/reservations/show.blade.php
+app/Http/Controllers/Admin/ReservationController.php

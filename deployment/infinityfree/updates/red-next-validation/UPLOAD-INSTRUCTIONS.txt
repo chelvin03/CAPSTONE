@@ -1,0 +1,5 @@
+Replace resources/views/public/reservations/create.blade.php under existing online htdocs after backing it up.
+Clear generated PHP files INSIDE storage/framework/views and hard-refresh.
+Red errors now appear under the invalid field, not beside Next.
+Time/date errors appear under the time selectors. No SQL or build required.
+Requires previous PDF, capacity, and time-rule updates.

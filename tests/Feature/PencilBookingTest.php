@@ -17,14 +17,14 @@ beforeEach(function () {
     ];
 });
 
-test('admin pencil booking holds a slot and can be confirmed with history', function () {
+test('admin pencil booking leaves the slot available until confirmed with history', function () {
     $this->actingAs($this->admin)->get(route('admin.reservations.index'))->assertOk()->assertSee('Pencil Booking');
     $this->post(route('admin.reservations.store'), $this->details)->assertSessionHasNoErrors();
     $booking = Reservation::sole();
     expect($booking->status)->toBe('pencil')->and($booking->approved_at)->toBeNull();
     $this->getJson(route('reservation.availability', ['date' => $this->details['reservation_date']]))
-        ->assertOk()->assertJsonCount(1)->assertJsonPath('0.status', 'pencil');
-    $this->post(route('admin.reservations.store'), $this->details)->assertSessionHasErrors('reservation_date');
+        ->assertOk()->assertJsonCount(0);
+    $this->post(route('admin.reservations.store'), $this->details)->assertSessionHasNoErrors();
     $this->get(route('admin.reservations.show', $booking))->assertOk()->assertSee('Confirm Pencil Booking')->assertSee('Cancel Reservation');
     $this->patch(route('admin.reservations.approve', $booking))->assertSessionHasNoErrors();
     expect($booking->fresh()->status)->toBe('approved');
@@ -55,10 +55,10 @@ test('staff cannot create pencil bookings', function () {
     $this->assertDatabaseCount('reservations', 0);
 });
 
-test('regular reservations cannot occupy pencil holds and confirmation rechecks conflicts', function () {
+test('regular requests can share a pencil slot and confirmation rechecks approved conflicts', function () {
     $this->actingAs($this->admin)->post(route('admin.reservations.store'), $this->details)->assertSessionHasNoErrors();
     $booking = Reservation::sole();
-    $this->post(route('admin.reservations.store'), [...$this->details, 'pencil_booking' => 0])->assertSessionHasErrors('reservation_date');
+    $this->post(route('admin.reservations.store'), [...$this->details, 'pencil_booking' => 0])->assertSessionHasNoErrors();
     $other = Reservation::create([
         ...collect($this->details)->except('pencil_booking')->all(),
         'reference_number' => 'PENCIL-CONFLICT', 'status' => 'approved', 'user_id' => $this->admin->id,

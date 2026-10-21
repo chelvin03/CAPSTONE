@@ -23,7 +23,7 @@ class AdminScheduleService
             $segments = collect($panels)->flatMap(fn ($panel) => $panel['intervals']);
             $available = $segments->where('state', 'available')->sum('seconds');
             $approved = $dayBookings->whereIn('status', ['approved', 'completed'])->count();
-            $pending = $dayBookings->whereNotIn('status', ['approved', 'completed', 'rejected', 'cancelled'])->count();
+            $pending = $dayBookings->whereNotIn('status', ['approved', 'completed', 'rejected', 'cancelled', 'no_show'])->count();
             $closed = $segments->where('state', 'closed')->sum('seconds');
             $mixed = $segments->where('withinHours', true)->pluck('state')->unique()->count() > 1;
             $pastDate = $date->lt(CarbonImmutable::today());
@@ -32,9 +32,10 @@ class AdminScheduleService
                 : ($segments->contains('state', 'occupied') ? 'occupied' : ($segments->contains('state', 'pending') ? 'pending' : 'closed')))));
             $held = $segments->where('withinHours', true)->whereIn('state', ['occupied', 'pending'])->sum('seconds');
             $calendarState = $pastDate || ! $hours ? 'closed' : ($available > 0 ? ($held > 0 || $closed > 0 && $mixed ? 'partial' : 'available') : ($held > 0 ? 'full' : 'closed'));
-            $calendarLabel = $calendarState === 'full' ? 'Fully Booked / Held'
+            $calendarLabel = $calendarState === 'full' ? 'Fully Booked'
                 : match ($calendarState) { 'partial' => 'Partial - Available Time', 'available' => 'Available', default => 'Closed / Unavailable' };
             $days[$date->toDateString()] = [
+                'issues' => $this->issues($dayBookings, $dayBlocks),
                 'calendarState' => $calendarState, 'calendarLabel' => $calendarLabel,
                 'date' => $date->toDateString(), 'number' => $date->day, 'label' => $date->format('l, F j, Y'),
                 'today' => $date->isToday(), 'state' => $state,
@@ -63,10 +64,45 @@ class AdminScheduleService
         return ['start' => $this->seconds($open), 'end' => $this->seconds($close), 'label' => $this->label($this->seconds($open)).' – '.$this->label($this->seconds($close))];
     }
 
+    private function issues(Collection $reservations, Collection $blocks): array
+    {
+        $active = $reservations->whereNotIn('status', ['cancelled', 'rejected', 'no_show'])->values();
+        $issues = [];
+        $booking = fn ($r) => ['reference' => $r->reference_number, 'status' => ucwords(str_replace('_', ' ', $r->status)),
+            'time' => $this->label($this->seconds($r->start_time)).' – '.$this->label($this->seconds($r->end_time)),
+            'url' => route('admin.reservations.show', $r->id).'#conflict-resolution'];
+        foreach ($active as $i => $left) {
+            foreach ($active->slice($i + 1) as $right) {
+                if ((int) $left->facility_id !== (int) $right->facility_id) continue;
+                $confirmed = in_array($left->status, PublicCalendarService::BLOCKING_STATUSES, true)
+                    || in_array($right->status, PublicCalendarService::BLOCKING_STATUSES, true);
+                $buffer = PublicCalendarService::CLEANING_MINUTES * 60;
+                if ($this->seconds($left->start_time) >= $this->seconds($right->end_time) + $buffer
+                    || $this->seconds($right->start_time) >= $this->seconds($left->end_time) + $buffer) continue;
+                $both = in_array($left->status, PublicCalendarService::BLOCKING_STATUSES, true)
+                    && in_array($right->status, PublicCalendarService::BLOCKING_STATUSES, true);
+                $issues[] = ['title' => $both ? 'Confirmed booking / cleaning conflict' : ($confirmed ? 'Request conflicts with confirmed time' : 'Unconfirmed requests need schedule review'),
+                    'description' => $both ? 'Confirmed schedules overlap or lack the required cleaning separation. Reschedule one booking or review an authorized force assignment.'
+                        : ($confirmed ? 'The request cannot be approved at this time while the confirmed booking and cleaning gap remain. Choose a new schedule or resolve the confirmed booking first.'
+                            : 'These requests overlap or leave too little cleaning time, but are not a confirmed double booking. Only one conflicting request may be approved; reschedule, waitlist or cancel others as appropriate.'),
+                    'bookings' => [$booking($left), $booking($right)], 'blocked' => false];
+            }
+            foreach ($blocks as $block) {
+                if ($block->facility_id !== null && (int) $block->facility_id !== (int) $left->facility_id) continue;
+                if (($block->start_time ? $this->seconds($block->start_time) : 0) >= $this->seconds($left->end_time)
+                    || ($block->end_time ? $this->seconds($block->end_time) : 86400) <= $this->seconds($left->start_time)) continue;
+                $issues[] = ['title' => 'Booking/request overlaps an administrator block',
+                    'description' => 'Block: '.$block->title.'. Move the booking/request, or review and release the block before approval. Completed records must remain unchanged.',
+                    'bookings' => [$booking($left)], 'blocked' => true];
+            }
+        }
+        return $issues;
+    }
+
     private function facilityDay(CarbonImmutable $date, Facility $facility, Collection $reservations, Collection $blocks, ?array $hours): array
     {
         // Match existing backend overlap semantics: setup/cleanup fields do not extend blocked times.
-        $bookings = $reservations->where('facility_id', $facility->id)->whereNotIn('status', ['rejected', 'cancelled'])
+        $bookings = $reservations->where('facility_id', $facility->id)->whereNotIn('status', ['rejected', 'cancelled', 'no_show'])
             ->filter(fn ($row) => $row->end_time > $row->start_time)->values();
         $locks = $blocks->filter(fn ($block) => $block->facility_id === null || (int) $block->facility_id === (int) $facility->id)->values();
         $points = [0, 86400];
@@ -108,7 +144,7 @@ class AdminScheduleService
                 && ($lock->end_time ? $this->seconds($lock->end_time) : 86400) > $start)) {
                 $reasons[] = 'Administrator schedule block';
             }
-            $state = $reasons ? 'closed' : ($approved ? 'occupied' : ($pending ? 'pending' : ($hours ? 'available' : 'unknown')));
+            $state = $reasons ? 'closed' : ($approved ? 'occupied' : ($hours ? 'available' : 'unknown'));
             $rows = $active->map(fn ($row) => ['reference' => $row->reference_number, 'status' => ucwords(str_replace('_', ' ', $row->status)), 'url' => route('admin.reservations.show', $row->id)])->values()->all();
             $segment = ['start' => $start, 'end' => $end, 'state' => $state, 'withinHours' => (bool) $withinHours,
                 'label' => match ($state) {

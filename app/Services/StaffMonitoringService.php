@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 class StaffMonitoringService
 {
-    public const STATUSES = ['new', 'pending', 'validated', 'pencil', 'approved', 'rejected', 'waiting_list', 'cancelled', 'completed'];
+    public const STATUSES = ['new', 'pending', 'validated', 'pencil', 'approved', 'rejected', 'waiting_list', 'cancelled', 'completed', 'no_show'];
 
     public function records(): Builder
     {

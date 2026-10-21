@@ -26,6 +26,12 @@ class Equipment extends Model
         'total_quantity' => 'integer',
     ];
 
+    public function usableQuantity(): int
+    {
+        $held = EquipmentReturn::where('equipment_id', $this->id)->selectRaw('COALESCE(SUM(damaged + missing - restored), 0) as held')->value('held');
+        return max(0, $this->total_quantity - (int) $held);
+    }
+
     public function reservations(): BelongsToMany
     {
         return $this->belongsToMany(

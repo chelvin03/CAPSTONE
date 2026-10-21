@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Mail;
 test('admin creation and editing enforce capacity for browser and JSON requests', function ($attendees) {
     Mail::fake();
     $admin = User::factory()->create(['role' => 'admin']);
-    $facility = Facility::create(['facility_name' => 'Capacity Gym', 'capacity' => 2000, 'status' => 'available']);
+    $facility = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 2000, 'status' => 'available']);
     $data = ['facility_id' => $facility->id, 'reservation_type' => 'community', 'event_name' => 'Capacity Event',
         'purpose' => 'Sports', 'contact_person' => 'Capacity Tester', 'contact_number' => '09123456789',
         'expected_attendees' => 1850, 'reservation_date' => now()->addDays(5)->toDateString(),
@@ -21,7 +21,7 @@ test('admin creation and editing enforce capacity for browser and JSON requests'
         ->assertUnprocessable()->assertJsonValidationErrors('expected_attendees');
     expect($reservation->fresh()->expected_attendees)->toBe(1850);
     Mail::assertNothingSent();
-})->with([2001, 3000, 0, -1, '1.5']);
+})->with([49, 1, 2001, 3000, 0, -1, '1.5']);
 
 test('admin can save exactly 2000 and views use 2000 for attendance capacity', function () {
     $admin = User::factory()->create(['role' => 'admin']);
@@ -42,4 +42,13 @@ test('admin can save exactly 2000 and views use 2000 for attendance capacity', f
 test('model rejects decimals before integer casting and blocks oversized model writes', function ($value) {
     $reservation = new Reservation(['expected_attendees' => $value]);
     expect(fn () => $reservation->save())->toThrow(\Illuminate\Validation\ValidationException::class);
-})->with(['1.5', 2001, 0]);
+})->with(['1.5', 2001, 0, 49]);
+
+test('attendance accepts fifty and two thousand and rejects forty nine', function () {
+    foreach ([49 => false, 50 => true, 2000 => true, 2001 => false] as $count => $valid) {
+        expect(\Illuminate\Support\Facades\Validator::make(
+            ['expected_attendees' => $count],
+            ['expected_attendees' => \App\Support\GymCapacity::rules()]
+        )->passes())->toBe($valid);
+    }
+});

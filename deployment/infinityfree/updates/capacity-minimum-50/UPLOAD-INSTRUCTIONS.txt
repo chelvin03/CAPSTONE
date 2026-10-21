@@ -1,0 +1,8 @@
+Attendance minimum update: 50 minimum, 2,000 maximum.
+Apply after the cleanup-30min-minimum-1hour update.
+Back up matching online files; upload the contents of htdocs into the existing
+online htdocs, replacing only packaged files. Upload views first and
+app/Support/GymCapacity.php last. Clear generated PHP files inside
+storage/framework/views, keeping the directory and .gitignore. Hard-refresh.
+No SQL needed. Existing reservations are preserved. New submissions and
+schedule/attendance edits must meet the new minimum.

@@ -1,0 +1,15 @@
+DURATION PRESERVATION FIX
+Re-upload app/Http/Controllers/Admin/ReservationController.php and
+resources/views/admin/reservations/show.blade.php from this htdocs directory.
+No SQL or other files needed if the previous conflict-resolution update is installed.
+Clear compiled .php views inside storage/framework/views after upload.
+
+Original duration is preserved by default. Start-time changes calculate end time.
+Admin must enable Deliberately change the original duration to edit the end.
+Shared required reason records the schedule/duration adjustment.
+Server recalculates from the locked reservation, not the browser's submitted end.
+If duration cannot fit before closing, save is rejected without changes or emails.
+The full calculated period plus existing cleaning gap is checked for conflicts.
+Midnight remains 24:00 at the end of the selected date; no next-day rollover.
+Verification: 30 relevant tests passed, 167 assertions.
+Prepared locally only; no online records or emails changed.
