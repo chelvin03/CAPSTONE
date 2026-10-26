@@ -98,7 +98,7 @@ class DashboardRequest extends FormRequest
         $to = CarbonImmutable::parse($filters['date_to'] ?? $now->endOfYear()->toDateString());
         if ($to->lt($from) || (! $calendarFilters && $from->diffInDays($to) > 1095)) {
             throw ValidationException::withMessages(['date_to' => 'Choose an end date on or after the start date, within three years.'])
-                ->redirectTo(route('admin.dashboard'));
+                ->redirectTo(route($this->redirectRoute));
         }
         unset($filters['export']);
 

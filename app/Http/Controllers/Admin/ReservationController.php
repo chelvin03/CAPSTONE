@@ -23,6 +23,7 @@ class ReservationController extends Controller
     {
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->trim()->toString();
+        $dateOrder = $request->string('date_order')->toString();
         $dashboardFilters = $request->validate([
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
@@ -54,6 +55,7 @@ class ReservationController extends Controller
             ->when($status !== '', function ($query) use ($status): void {
                 $query->where('status', $status);
             })
+            ->when(in_array($dateOrder, ['asc', 'desc'], true), fn ($query) => $query->orderBy('reservation_date', $dateOrder))
             ->latest()
             ->paginate(10)
             ->withQueryString();

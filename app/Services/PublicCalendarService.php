@@ -43,7 +43,7 @@ class PublicCalendarService
         $opening = config('gym.reservation.opening_time', '07:00');
         $closing = config('gym.reservation.closing_time', '24:00');
         $minimum = now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString();
-        $maximum = now()->addYearsNoOverflow(15)->toDateString();
+        $maximum = \App\Support\PublicBookingWindow::maximumDate();
         $days = [];
         for ($day = $first; $day <= $last; $day = $day->addDay()) {
             $date = $day->toDateString();

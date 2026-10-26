@@ -1,10 +1,11 @@
 <section class="bi-section" aria-labelledby="overview-heading">
-    <h2 id="overview-heading">1. Reservation Overview</h2>
+    <h2 id="overview-heading">Reservation Overview</h2>
     <div class="bi-overview">
         @foreach([
             ['Total Reservations', $totalReservations, 'bi-calendar2-check', '#eef6ff', '#0864ff', 'All reservation requests'],
             ['Approved', $approvedReservations, 'bi-check-circle-fill', '#eafaf3', '#00a76b', 'Currently approved'],
             ['Pending Review', $pendingReservations, 'bi-clock', '#fff8e7', '#ffa800', 'Awaiting administrator review'],
+            ['Waiting List', $statusBreakdown->firstWhere('status', 'waiting_list')['count'] ?? 0, 'bi-hourglass-split', '#fff4e8', '#e78a00', 'Waiting for an available schedule'],
             ['Cancelled', $cancelledReservations, 'bi-x-circle-fill', '#fff0f2', '#ff334e', 'Cancelled reservations'],
             ['Rejected', $statusBreakdown->firstWhere('status', 'rejected')['count'] ?? 0, 'bi-chat-square-text-fill', '#f4efff', '#7d36f4', 'Rejected reservations']
         ] as [$overviewTitle, $overviewCount, $overviewIcon, $overviewBg, $overviewInk, $overviewDescription])
@@ -14,8 +15,8 @@
     @if(!$totalReservations)<p class="decision-note" role="status">No reservations match these filters.</p>@endif
     @if($availableHours <= 0)<p class="decision-note" role="status">No bookable hours in this period. Utilization cannot be calculated.</p>@endif
 </section>
-<section class="bi-section" id="bi-kpis"><h2>2. Key Performance Indicators</h2>@include('dashboard.partials.kpi-cards')</section>
-<section class="bi-section"><h2>3. Reservation Trends</h2><div class="bi-two-column">
+<section class="bi-section" id="bi-kpis"><h2>Key Performance Indicators</h2>@include('dashboard.partials.kpi-cards')</section>
+<section class="bi-section"><h2>Reservation Trends</h2><div class="bi-two-column">
     @include('dashboard.partials.workspace-charts')
     <section class="reference-panel"><header><h2>Reservation Status Overview</h2><p>All matching statuses, including completed, waiting-list and no-show records.</p></header>
         <div class="bi-status-body"><div class="reference-donut"><svg viewBox="0 0 120 120" role="img" aria-label="Reservation status distribution: {{ $totalReservations }} total">
@@ -30,7 +31,7 @@
         <ul>@foreach($statusBreakdown->where('count', '>', 0) as $statusSegment)<li><i style="background:{{ \App\Services\DashboardAnalyticsService::STATUS_COLORS[$statusSegment['status']] ?? '#64748b' }}"></i><span>{{ $label($statusSegment['status']) }}</span><strong>{{ $statusSegment['count'] }}</strong><small>{{ $totalReservations ? round($statusSegment['count'] / $totalReservations * 100, 1) : 0 }}%</small></li>@endforeach</ul></div>
     </section>
 </div></section>
-<section class="bi-section"><h2>4. Facility Utilization</h2><div class="bi-two-column">
+<section class="bi-section"><h2>Facility Utilization</h2><div class="bi-two-column bi-facility-layout">
     <section class="reference-panel"><header><h2>Gym Utilization by Month</h2><p>Scheduled occupied hours / bookable operating hours. Blocks excluded; scheduled use is not actual attendance.</p></header>
         <div class="bi-util-chart"><svg class="admin-chart" viewBox="0 0 660 220" role="img" aria-label="Monthly scheduled utilization percentage">
             @foreach(range(0, 5) as $tick)<line x1="45" x2="640" y1="{{ 180 - $tick * 30 }}" y2="{{ 180 - $tick * 30 }}" class="chart-grid"/><text x="37" y="{{ 184 - $tick * 30 }}" text-anchor="end" class="chart-axis">{{ $tick * 20 }}%</text>@endforeach
@@ -45,22 +46,13 @@
     </section>
     @include('dashboard.partials.workspace-heat')
 </div></section>
-<section class="bi-section"><h2>5. Cancellation Analysis</h2>@include('dashboard.partials.workspace-cancellation')</section>
-<section class="bi-section"><h2>6. Operational Performance</h2><div class="reference-panel bi-processing">
-    <div><h3>Reservation Processing and Review Delays</h3><p><strong>Median: {{ $performance['processingMedian'] === null ? 'N/A' : $performance['processingMedian'].' hours' }}</strong> &nbsp; Average: {{ $performance['processingAverage'] === null ? 'N/A' : $performance['processingAverage'].' hours' }}</p><p>Submission to first recorded approval, rejection or cancellation. {{ $performance['processingSample'] }} valid records; {{ $performance['processingMissing'] }} without a valid decision timestamp are excluded.</p>
-    @foreach($performance['bands'] as $band => $bandRows)<details><summary>{{ $band }} — {{ $bandRows->count() }} requests</summary>@include('dashboard.partials.performance-records', ['evidenceRows' => $bandRows])</details>@endforeach</div>
-    <div><h3>Pending Request Aging</h3>@php($agingMax = max(1, $performance['pending']->max(fn ($bucket) => $bucket->count())))
-        @foreach($performance['pending'] as $ageLabel => $ageRows)<div class="bi-aging-row"><span>{{ $ageLabel }}</span><i style="width:{{ $ageRows->count() / $agingMax * 100 }}%"></i><strong>{{ $ageRows->count() }}</strong></div>@endforeach
-        <p>Age as of now, for requests matching the selected filters.</p>
-    </div>
-    <div class="bi-action"><strong>Decision supported</strong><p>Inspect older pending requests and long decision times to identify missing requirements and review delays. A long elapsed time alone does not establish the cause.</p></div>
-</div></section>
-<section class="bi-section"><h2>7. Event Outcomes and Attendance</h2>@include('dashboard.partials.event-outcomes')</section>
-<section class="bi-section"><h2>8. Insights and Recommendations</h2><div class="bi-recommendations">
+<section class="bi-section"><h2>Cancellation Analysis</h2>@include('dashboard.partials.workspace-cancellation')</section>
+<section class="bi-section"><h2>Event Outcomes and Attendance</h2>@include('dashboard.partials.event-outcomes')</section>
+<section class="bi-section"><h2>Insights and Recommendations</h2><div class="bi-recommendations">
     <article><h3><i class="bi bi-lightbulb text-amber-500" aria-hidden="true"></i> Key Insights</h3><ul>@foreach($decisionCards as $insightCard)<li>{{ $insightCard['finding'] }}</li>@endforeach<li>{{ $eventResults['unknown']->count() }} past events still need a verified outcome.</li></ul></article>
     <article><h3><i class="bi bi-check-circle-fill text-green-600" aria-hidden="true"></i> Recommended Actions</h3><ul>@foreach($decisionCards as $insightCard)<li>{{ $insightCard['action'] }}</li>@endforeach<li>Record verified outcomes and actual attendance after events end.</li></ul></article>
 </div><details class="bi-secondary"><summary>Insights and suggested actions — evidence and interpretation</summary>@include('dashboard.partials.decision-support')</details></section>
-<section class="bi-section"><h2>9. Administrative Tools</h2><div class="bi-tool-grid">
+<section class="bi-section"><h2>Administrative Tools</h2><div class="bi-tool-grid">
     @foreach([
         ['#kpi-target-settings', 'bi-gear', 'Configure KPI Targets', 'Set agreed performance goals'],
         [route('admin.reservations.index', \Illuminate\Support\Arr::except($filters, ['year', 'grouping', 'heat_scope'])), 'bi-file-earmark-text', 'View Supporting Records', 'Inspect matching reservations'],

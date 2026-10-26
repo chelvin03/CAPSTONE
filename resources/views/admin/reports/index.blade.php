@@ -20,7 +20,7 @@
                 <thead class="border-y border-slate-200 bg-slate-50 text-slate-600"><tr>@foreach ($data['headers'] as $heading)<th scope="col" class="whitespace-nowrap px-5 py-3 font-semibold">{{ $heading }}</th>@endforeach</tr></thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($data['rows'] ?? $records as $record)
-                        <tr>@foreach ($data['rows'] !== null ? $record : $service->reportRow($record) as $cell)<td class="px-5 py-3 text-slate-700">{{ $cell }}</td>@endforeach</tr>
+                        <tr>@foreach ($data['rows'] !== null ? $record : $service->reportRow($record, $filters['report_type']) as $cell)<td class="px-5 py-3 text-slate-700">{{ $cell }}</td>@endforeach</tr>
                     @empty
                         <tr><td colspan="{{ count($data['headers']) }}" class="p-8 text-center text-slate-500">No records to display.</td></tr>
                     @endforelse

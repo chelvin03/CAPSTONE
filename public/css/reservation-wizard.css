@@ -242,3 +242,4 @@ section[aria-labelledby=equipment-request-heading] { padding: 16px; border: 1px 
 .equipment-request-list .equipment-add { background: #2563eb; border-color: #2563eb; color: #fff; }
 .equipment-request-list .equipment-add:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
 .equipment-request-list .equipment-add:disabled { opacity: .5; cursor: not-allowed; }
+.reservation-wizard .wizard-intro .booking-window-notice{display:flex;align-items:flex-start;gap:10px;margin:16px 0 0;padding:14px 16px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;color:#1e40af;font-size:15px;line-height:1.6;text-align:left}.booking-window-notice>i{flex-shrink:0;margin-top:3px}

@@ -26,6 +26,7 @@ class EventOutcomeService
     public function record(Reservation $booking, User $actor, array $data): void
     {
         abort_unless(in_array($actor->role, ['admin', 'staff'], true) && $actor->status === 'approved', 403);
+        $data['remarks'] = $data['remarks'] ?? '';
         DB::transaction(function () use ($booking, $actor, $data): void {
             app(EquipmentRequestService::class)->lockInventory();
             Facility::whereKey($booking->facility_id)->lockForUpdate()->firstOrFail();

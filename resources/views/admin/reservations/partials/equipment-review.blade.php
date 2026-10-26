@@ -6,7 +6,7 @@
     @endif
     <div class="overflow-x-auto">
     <table class="min-w-full text-left text-sm">
-        <thead class="bg-slate-50"><tr>@foreach(['Equipment','Requested','Available','Approved','Status','Action'] as $heading)<th class="p-3">{{ $heading }}</th>@endforeach</tr></thead>
+        <thead class="bg-slate-50"><tr>@foreach(['Equipment','Requested','Available','Approved','Status','Remarks'] as $heading)<th class="p-3">{{ $heading }}</th>@endforeach</tr></thead>
         <tbody>
         @forelse($reservation->equipment as $item)
             @php
@@ -19,10 +19,10 @@
                 <td class="p-3 font-semibold">{{ $item->equipment_name }}</td>
                 <td class="p-3">{{ $item->pivot->quantity_requested }}</td>
                 <td class="p-3">{{ $available }}</td>
-                <td class="p-3">{{ $item->pivot->quantity_approved ?? 'Pending' }}@if($item->pivot->quantity_offered !== null)<small class="block">Offered: {{ $item->pivot->quantity_offered }}</small>@endif</td>
+                <td class="p-3">{{ $item->pivot->quantity_approved ?? '-' }}@if($item->pivot->quantity_offered !== null)<small class="block">Offered: {{ $item->pivot->quantity_offered }}</small>@endif</td>
                 <td class="p-3"><span @class(['inline-flex rounded-full px-3 py-1 text-xs font-semibold', 'bg-emerald-100 text-emerald-800' => in_array($status,['approved','available','accepted_by_requestor']), 'bg-amber-100 text-amber-800' => $status === 'partially_available', 'bg-red-100 text-red-800' => in_array($status,['unavailable','rejected','declined_by_requestor']), 'bg-blue-50 text-blue-800' => $status === 'pending'])>{{ ucwords(str_replace('_',' ', $status)) }}</span></td>
                 <td class="p-3">
-                @if($canReview)
+                @if($canReview)<details class="detail-equipment-controls"><summary>For admin approval</summary>
                     <form method="POST" action="{{ route('admin.reservations.equipment.review', [$reservation, $item]) }}" class="flex flex-wrap gap-2">
                         @csrf<input type="hidden" name="action" value="approve">
                         <label class="sr-only" for="approve-{{ $item->id }}">Quantity approved for {{ $item->equipment_name }}</label>
@@ -42,7 +42,7 @@
                             </div>
                         </form>
                     </details>
-                @else
+                </details>@else
                     <span class="text-slate-500">Review unavailable</span>
                 @endif
                 </td>
@@ -54,10 +54,10 @@
         </tbody>
     </table>
     </div>
-    <h3 class="mt-5 font-semibold">Messages / Equipment Updates</h3>
+    @if($reservation->notifications->isNotEmpty())<details class="detail-equipment-messages"><summary>Messages / Equipment Updates</summary>
     @forelse($reservation->notifications as $notification)
         <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"><p>{{ $notification->data['message'] ?? '' }}</p><small>{{ $notification->created_at->format('M d, Y g:i A') }}</small></div>
     @empty
         <p class="mt-2 text-sm text-slate-500">No equipment messages yet.</p>
-    @endforelse
+    @endforelse</details>@endif
 </section>

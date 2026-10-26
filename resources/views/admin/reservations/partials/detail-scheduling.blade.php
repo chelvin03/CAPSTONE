@@ -40,6 +40,8 @@
 
     <section id="conflict-resolution" class="detail-card detail-reschedule-card">
         <header class="detail-card-heading"><h2><i class="bi bi-calendar-range" aria-hidden="true"></i> Conflict Resolution / Reschedule</h2></header>
+        <p class="detail-scheduling-help">Move this reservation to an available schedule if there is a conflict or the original schedule is not feasible.</p>
+        <details class="detail-proposal-options"><summary class="detail-proposal-button"><i class="bi bi-calendar3" aria-hidden="true"></i> Propose New Schedule</summary>
         <p class="detail-schedule-error" role="alert" aria-live="polite" x-show="durationError" x-text="durationError"></p>
         <h3 class="detail-reschedule-title">Reschedule Options</h3>
         <div class="detail-reschedule-inputs">
@@ -75,6 +77,7 @@
                     </div>
                 @endif
 
+        </details>
     </section>
     <section class="detail-card detail-force-card">
         <header class="detail-card-heading"><h2><i class="bi bi-person-fill-gear" aria-hidden="true"></i> Force Assign (Direct Admin Action)</h2></header>

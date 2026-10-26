@@ -110,6 +110,8 @@ Route::middleware([
 
             Route::get('/dashboard', DashboardController::class)
                 ->name('dashboard');
+            Route::get('/analytics/{section?}', \App\Http\Controllers\Admin\AnalyticsController::class)
+                ->where('section', 'reservations|operations|utilization')->name('analytics');
             Route::put('/dashboard/kpi-targets', [\App\Http\Controllers\Admin\KpiTargetController::class, 'update'])->name('dashboard.kpi-targets');
 
             Route::get('/requestor-restrictions', [\App\Http\Controllers\Admin\RequestorRestrictionController::class, 'index'])->name('requestor-restrictions.index');
@@ -131,6 +133,8 @@ Route::middleware([
                 ->name('reports.show');
 
             Route::get('/schedule', [ScheduleController::class, 'index'])->name('schedule.index');
+            Route::get('/planning-schedule', [\App\Http\Controllers\Admin\PlanningScheduleController::class, 'index'])->name('planning.index');
+            Route::patch('/planning-schedule/{reservation}/preparation', [\App\Http\Controllers\Admin\PlanningScheduleController::class, 'update'])->name('planning.update');
             Route::post('/schedule/blocks', [ScheduleController::class, 'store'])->name('schedule.blocks.store');
             Route::post('/schedule/blocks/preview', [ScheduleController::class, 'preview'])->name('schedule.blocks.preview');
             Route::delete('/schedule/blocks/{block}', [ScheduleController::class, 'destroy'])->name('schedule.blocks.destroy');

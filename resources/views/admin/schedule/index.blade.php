@@ -3,7 +3,7 @@
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/admin-schedule.css') }}?v={{ filemtime(public_path('css/admin-schedule.css')) }}">
 <link rel="stylesheet" href="{{ asset('css/schedule-impact.css') }}?v={{ filemtime(public_path('css/schedule-impact.css')) }}"><script src="{{ asset('js-schedule-impact.js') }}?v={{ filemtime(public_path('js-schedule-impact.js')) }}"></script>
-<div class="admin-schedule page-shell" x-data="adminSchedule(@js($days), @js($selectedDate), @js($reservations->pluck('reservation_date')->map(fn ($date) => $date->toDateString())->values()))">
+<div class="admin-schedule page-shell" x-data="adminSchedule(@js($viewDays), @js($selectedDate), @js($reservations->pluck('reservation_date')->map(fn ($date) => $date->toDateString())->values()), @js($scheduleView), @js($hours))">
     <div class="page-header"><div><p class="schedule-eyebrow">ADMIN · SCHEDULE MANAGEMENT</p><h1 class="page-title">Gymnasium Schedule</h1><p class="page-description">Monitor approved reservations, pending requests, and available gymnasium time slots.</p></div><a class="btn-secondary" href="{{ route('admin.reservations.index') }}"><i class="bi bi-list-check" aria-hidden="true"></i> Manage Reservations</a></div>
     @if($errors->any())<div class="alert-error" role="alert"><div><strong>Please correct the following:</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>@endif
     <form class="schedule-filters card" method="GET" action="{{ route('admin.schedule.index') }}" @submit="loading = true">
@@ -14,6 +14,8 @@
     </form>
     <p class="schedule-context"><i class="bi bi-info-circle" aria-hidden="true"></i> Status and event filters apply to the details table. Availability always includes all active requests for the gym. Pending requests and waiting-list entries are not confirmed bookings.</p>
     <div x-show="loading" x-cloak class="schedule-loading" role="status"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Loading schedule…</div>
+    @include('admin.schedule.partials.views')
+    <details class="schedule-technical-details"><summary>Detailed intervals and conflict review</summary>
     <div class="schedule-workspace">
         <section class="card calendar-panel" aria-labelledby="calendar-heading">
             <div class="schedule-panel-heading"><div><h2 id="calendar-heading">{{ $monthLabel }}</h2><p>{{ $facilities->count() ? (isset($filters['facility_id']) ? $facilities->firstWhere('id', (int)$filters['facility_id'])?->facility_name : 'MCST Gymnasium') : 'Gym information unavailable' }}</p></div><div class="calendar-controls"><a class="schedule-icon-button" aria-label="Previous month" href="{{ route('admin.schedule.index', [...$navigationFilters, 'month' => $previousMonth]) }}" @click="loading = true"><i class="bi bi-chevron-left" aria-hidden="true"></i></a><a class="today-button" href="{{ route('admin.schedule.index', [...$navigationFilters, 'month' => now()->format('Y-m'), 'date' => now()->toDateString()]) }}">Today</a><a class="schedule-icon-button" aria-label="Next month" href="{{ route('admin.schedule.index', [...$navigationFilters, 'month' => $nextMonth]) }}" @click="loading = true"><i class="bi bi-chevron-right" aria-hidden="true"></i></a></div></div>
@@ -52,6 +54,7 @@
             <p class="calendar-footnote">Pending requests may overlap. They are not temporary holds or guaranteed reservations. Review conflicts through reservation management.</p>
         </section>
     </div>
+    </details>
     <section class="card schedule-table-panel" aria-labelledby="details-heading"><div class="schedule-panel-heading"><div><h2 id="details-heading">Reservation Details</h2><p x-text="showMonthTable ? 'Filtered reservations for {{ $monthLabel }}' : day.label"></p></div><button type="button" class="btn-secondary" @click="showMonthTable = !showMonthTable" :aria-pressed="showMonthTable" x-text="showMonthTable ? 'Show Selected Date' : 'Show Entire Month'"></button></div><div class="schedule-table-scroll"><table class="schedule-details-table"><thead><tr><th>Reference Number</th><th>Event Name</th><th>Event Type</th><th>Reservation Date</th><th>Start Time</th><th>End Time</th><th>Status</th><th>Action</th></tr></thead><tbody>
         @foreach($reservations as $reservation)<tr x-show="showMonthTable || selected === @js($reservation->reservation_date->toDateString())"><td class="reference-cell">{{ $reservation->reference_number }}</td><td>{{ $reservation->event_name }}<small>{{ $reservation->facility?->facility_name ?? 'Unassigned' }}</small></td><td>{{ $reservation->event_type ?: 'Not specified' }}</td><td>{{ $reservation->reservation_date->format('M j, Y') }}</td><td>{{ \Carbon\Carbon::parse($reservation->start_time)->format('g:i A') }}</td><td>{{ \Carbon\Carbon::parse($reservation->end_time)->format('g:i A') }}</td><td><span class="schedule-status {{ in_array($reservation->status, ['approved', 'completed']) ? 'occupied' : (in_array($reservation->status, ['rejected', 'cancelled']) ? 'closed' : 'pending') }}">{{ ucwords(str_replace('_', ' ', $reservation->status)) }}</span></td><td><a class="schedule-detail-link" href="{{ route('admin.reservations.show', $reservation) }}" aria-label="View details for {{ $reservation->reference_number }}">View Details <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></td></tr>@endforeach
         <tr x-show="showMonthTable ? !tableDates.length : !tableDates.includes(selected)"><td colspan="8" class="schedule-empty">No reservations match the selected date and filters. This does not override the availability intervals shown above.</td></tr>
@@ -67,6 +70,7 @@
     </form></details>
     <div class="block-list">@forelse($blocks as $block)<div class="block-row"><div><h3>{{ $block->title }}</h3><p>{{ $block->starts_on->format('M j, Y') }} – {{ $block->ends_on->format('M j, Y') }} · {{ $block->facility?->facility_name ?? 'MCST Gymnasium' }} · {{ $block->start_time && $block->end_time ? \Carbon\Carbon::parse($block->start_time)->format('g:i A').' – '.\Carbon\Carbon::parse($block->end_time)->format('g:i A') : 'All day' }}</p></div><form method="POST" action="{{ route('admin.schedule.blocks.destroy', $block) }}" @submit="if (!confirm('Release this schedule block? Reservation conflicts and operating hours still apply.')) $event.preventDefault()">@csrf @method('DELETE')<button type="submit" class="btn-secondary">Release Block</button></form></div>@empty<p class="schedule-empty">No blocked dates or intervals in this month.</p>@endforelse</div></section>
 </div>
+<script src="{{ asset('js-admin-schedule-views.js') }}?v={{ filemtime(public_path('js-admin-schedule-views.js')) }}"></script>
 <script>
 function scheduleBlockDates(start, end, limit = 7) {
     return {
@@ -81,18 +85,6 @@ function scheduleBlockDates(start, end, limit = 7) {
             if (!this.start || !this.end) return '';
             if (this.end < this.start) return 'End date must be on or after the start date.';
             return this.end > this.maximumEnd ? 'Schedule blocks can cover a maximum of ' + this.limit + ' days, including the start and end dates.' : '';
-        }
-    };
-}
-function adminSchedule(days, selected, tableDates) {
-    return { days, selected, tableDates, loading: false, showMonthTable: false,
-        get day() { return this.days[this.selected]; },
-        selectDate(date) {
-            if (!this.days[date]) return;
-            this.selected = date;
-            const url = new URL(window.location.href);
-            url.searchParams.set('date', date);
-            history.replaceState(null, '', url);
         }
     };
 }

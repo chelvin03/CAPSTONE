@@ -99,7 +99,7 @@ class PublicReservationController extends Controller
             'contact_email' => ['required', 'email:rfc', 'max:255'],
             'contact_number' => ['required', 'digits:11'],
             'expected_attendees' => \App\Support\GymCapacity::rules(),
-            'reservation_date' => ['required', 'date', 'after_or_equal:'.now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString(), 'before_or_equal:'.now()->addYearsNoOverflow(15)->toDateString()],
+            'reservation_date' => ['required', 'date', 'after_or_equal:'.now()->addDays(max(0, (int) SystemSetting::getValue('minimum_notice_days', config('gym.reservation.minimum_notice_days', 3))))->toDateString(), 'before_or_equal:'.\App\Support\PublicBookingWindow::maximumDate()],
             'start_time' => ['required', 'date_format:H:i', new \App\Rules\HalfHourTime],
             'end_time' => ['required', new \App\Rules\HalfHourTime, new \App\Rules\MinimumReservationDuration, 'string', 'regex:/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$|^24:00$/', function ($attribute, $value, $fail) use ($request) {
                 if ($value <= (string)$request->input('start_time')) $fail('End time must be after start time. Use 24:00 for the midnight end of the selected date.');
@@ -125,6 +125,7 @@ class PublicReservationController extends Controller
             'agreement_accepted.accepted' => 'Please read and accept the MCST Gymnasium Use Agreement before submitting your reservation request.',
             'expected_attendees.max' => \App\Support\GymCapacity::ERROR,
             'reservation_type.required' => 'Please select a requestor type.',
+            'reservation_date.before_or_equal' => 'Choose a reservation date within two months of today (on or before :date).',
         ], $quantityAttributes);
         $validated['event_name'] = $validated['event_type'];
 

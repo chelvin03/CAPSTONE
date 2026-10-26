@@ -26,7 +26,7 @@ test('all five previews and both exports match real reservation date totals', fu
     adminReportFixture(['reference_number' => 'BOUNDARY-END', 'reservation_date' => '2026-09-30', 'status' => 'cancelled', 'event_type' => 'Ceremony']);
     adminReportFixture(['reference_number' => 'OUTSIDE', 'reservation_date' => '2026-10-01']);
     $filters = ['report_type' => $type, 'date_from' => '2026-09-01', 'date_to' => '2026-09-30'];
-    $expected = match ($type) { 'utilization', 'cancellation' => 1, 'no_show', 'equipment' => 0, default => 2 };
+    $expected = match ($type) { 'utilization', 'cancellation' => 1, 'attendance', 'no_show', 'equipment' => 0, default => 2 };
     $this->actingAs($admin)->get(route('admin.reports.index', $filters))->assertOk()
         ->assertViewHas('data', fn ($data) => $data['total'] === $expected)
         ->assertDontSee('private@example.com')->assertDontSee('Private Person')->assertDontSee('OUTSIDE');

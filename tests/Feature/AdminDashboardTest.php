@@ -48,7 +48,7 @@ test('dashboard reporting presets select calendar ranges and clear other filters
             ->assertViewHas('filters', ['date_from' => $from, 'date_to' => $to, 'grouping' => $grouping])
             ->assertViewHas('selectedPeriod', $period)
             ->assertViewHas('totalReservations', match ($period) { 'today' => 1, 'month' => 2, 'year' => 3 })
-            ->assertSee('Gymnasium Business Intelligence')->assertSee('name="year"', false)->assertSee('name="month"', false);
+            ->assertSee('<title>Dashboard</title>', false)->assertSee('name="year"', false)->assertSee('name="month"', false);
     } finally {
         Carbon::setTestNow();
     }

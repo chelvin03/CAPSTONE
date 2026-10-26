@@ -18,6 +18,7 @@ class ReservationReportService
         'event_type' => 'Event Type Report',
         'cancellation' => 'Cancellation Report',
         'no_show' => 'No-show Report',
+        'attendance' => 'Attendance & No-show Report',
         'equipment' => 'Equipment Request Report',
     ];
 
@@ -35,7 +36,10 @@ class ReservationReportService
 
     public function reportQuery(array $filters): Builder
     {
-        return app(DashboardAnalyticsService::class)->records($filters)->with('eventOutcome')
+        return app(DashboardAnalyticsService::class)->records($filters)->with('eventOutcome.recorder')
+            ->when($filters['report_type'] === 'attendance', fn ($query) => $query
+                ->whereIn('status', ['completed', 'no_show'])
+                ->whereHas('eventOutcome', fn ($outcome) => $outcome->whereColumn('outcome', 'reservations.status')))
             ->when($filters['report_type'] === 'cancellation', fn ($query) => $query->where('status', 'cancelled'))
             ->when($filters['report_type'] === 'utilization', fn ($query) => $query->where('status', 'approved'))
             ->when($filters['report_type'] === 'no_show', fn ($query) => $query->where('status', 'no_show'))
@@ -50,6 +54,11 @@ class ReservationReportService
         $metrics = ['Reservations' => $total];
         $rows = null;
         $note = 'Reporting uses the reservation/event date, including both selected dates. Statuses reflect the current record status.';
+        if ($filters['report_type'] === 'attendance') {
+            $metrics += ['Attended / Completed' => (int) $counts->get('completed', 0), 'No-show' => (int) $counts->get('no_show', 0),
+                'Actual attendees' => (int) \App\Models\ReservationEventOutcome::whereIn('reservation_id', (clone $query)->reorder()->select('reservations.id'))->sum('actual_attendees')];
+            $note .= ' Includes recorded completed and no-show outcomes only. Missing attendance is never assumed to be a no-show. Expected attendance is captured when the outcome is first recorded.';
+        }
         if ($filters['report_type'] === 'equipment') {
             $rows = (clone $query)->with('equipment')->get()->flatMap(fn ($record) => $record->equipment->map(fn ($item) => [
                 $record->reference_number, $record->reservation_date->format('Y-m-d'), $item->equipment_name,
@@ -77,11 +86,20 @@ class ReservationReportService
 
         return ['title' => self::TYPES[$filters['report_type']], 'filters' => $filters, 'metrics' => $metrics, 'rows' => $rows, 'total' => $total, 'note' => $note,
             'headers' => $filters['report_type'] === 'equipment' ? ['Reference', 'Reservation date', 'Equipment', 'Requested', 'Approved', 'Status'] : ($rows !== null ? [$filters['report_type'] === 'status' ? 'Status' : 'Event type', 'Reservations'] : ['Reference', 'Event', 'Reservation date', 'Start', 'End', 'Facility', 'Status', 'Expected attendees', 'Actual attendees']),
-            'generatedAt' => now()];
+            'generatedAt' => now(),
+            ...($filters['report_type'] === 'attendance' ? ['headers' => ['Reference', 'Event', 'Event type', 'Facility', 'Scheduled date', 'Start', 'End', 'Expected attendees', 'Actual attendees', 'Attendance status', 'Recorded by', 'Remarks']] : [])];
     }
 
-    public function reportRow(Reservation $record): array
+    public function reportRow(Reservation $record, string $type = 'reservation'): array
     {
+        if ($type === 'attendance') {
+            $outcome = $record->eventOutcome;
+            return [$record->reference_number, $record->event_name, $record->event_type ?: 'Not specified',
+                $record->facility?->facility_name ?? 'Unassigned', $record->reservation_date->format('Y-m-d'),
+                substr($record->start_time, 0, 5), substr($record->end_time, 0, 5), $outcome->expected_attendees,
+                $outcome->actual_attendees, $outcome->outcome === 'completed' ? 'Attended / Completed' : 'No-show',
+                $outcome->recorder?->full_name ?? 'Unknown', $outcome->remarks];
+        }
         return [$record->reference_number, $record->event_name, $record->reservation_date->format('Y-m-d'), substr($record->start_time, 0, 5), substr($record->end_time, 0, 5), $record->facility?->facility_name ?? 'Unassigned', DashboardAnalyticsService::label($record->status), $record->expected_attendees,
             $record->eventOutcome && $record->eventOutcome->outcome === $record->status ? $record->eventOutcome->actual_attendees : 'Not recorded'];
     }
@@ -92,7 +110,7 @@ class ReservationReportService
             yield from $data['rows'];
         } else {
             foreach ($this->reportQuery($data['filters'])->lazy(500) as $record) {
-                yield $this->reportRow($record);
+                yield $this->reportRow($record, $data['filters']['report_type']);
             }
         }
     }

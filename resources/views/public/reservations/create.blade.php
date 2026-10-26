@@ -12,6 +12,7 @@
     <div class="wizard-intro">
         <h1>RESERVE THE GYMNASIUM</h1>
         <p>Provide your reservation details, requestor information, and review your confirmation. All requests are subject to review and approval.</p>
+        <p class="booking-window-notice"><i class="bi bi-info-circle" aria-hidden="true"></i> <span><strong>Booking limit: 2 months in advance (approximately 60 days).</strong> Reservation dates must be within two months of the day you submit your request. The latest date you can currently book is <strong>{{ \Carbon\Carbon::parse(\App\Support\PublicBookingWindow::maximumDate())->format('F j, Y') }}</strong>.</span></p>
     </div>
 
     @if(session('success'))<p class="mb-5 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800" role="status">{{ session('success') }}</p>@endif
@@ -68,7 +69,7 @@
 <div class="booking-calendar" aria-labelledby="booking-calendar-heading" :aria-busy="bookingLoading">
     <h3 id="booking-calendar-heading">Reservation Calendar / Gym Availability</h3>
     <p class="booking-notice">If your selected schedule is occupied, your submitted request will automatically be placed on the waiting list for administrator review. Administrator closures remain unavailable.</p>
-    <p>Select a date, then choose your preferred time. Your selection updates the summary below.</p>
+    <p>Select a date within two months of today, then choose your preferred time. Your selection updates the summary below.</p>
     <div class="flex flex-wrap items-center justify-center gap-3 mb-4">
         <label>Month <select aria-label="Calendar month" :value="Number(bookingMonth.slice(5, 7))" @change="bookingChooseMonth(bookingMonth.slice(0, 4), $event.target.value)" :disabled="bookingLoading" class="rounded-lg border-slate-300">
             @foreach (range(1, 12) as $monthNumber)
@@ -302,7 +303,7 @@
 function reservationFlow() {
     return Object.defineProperties({
         bookingAvailabilityUrl: @js(route('reservation.availability')),
-        maximumDate: @js(now()->addYearsNoOverflow(15)->toDateString()),
+        maximumDate: @js(\App\Support\PublicBookingWindow::maximumDate()),
         step: 1,
         equipmentOptions: @js($equipment->map(fn ($item) => ['id' => (string) $item->id, 'equipment_name' => $item->equipment_name, 'total_quantity' => $item->usableQuantity()])->values()),
         equipmentRows: @js(collect(old('equipment', []))->filter(fn ($row) => filled($row['quantity_requested'] ?? null))->map(fn ($row, $id) => ['key' => (string) $id, 'id' => (string) $id, 'quantity' => $row['quantity_requested']])->values()),

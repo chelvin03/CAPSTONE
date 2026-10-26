@@ -15,6 +15,6 @@ html{scrollbar-gutter:stable}body.admin-workspace,body.staff-monitoring{--worksp
 :is(body.admin-workspace,body.staff-monitoring) #main-content :is(.detail-action-button strong,.detail-status strong,.reports-quick-card h3,.reports-export h3){font-size:16px!important}
 :is(body.admin-workspace,body.staff-monitoring) #main-content :is(.detail-action-button small,.detail-status small,.reports-quick-card p,.reports-export p,.reports-history td,.reports-history th){font-size:14px!important;line-height:1.5!important}
 :is(body.admin-workspace,body.staff-monitoring) #main-content .reports-date-range{min-width:0}
-:is(body.admin-workspace,body.staff-monitoring) #main-content .reports-date-range>div{height:auto;min-height:46px;flex-wrap:wrap}
-:is(body.admin-workspace,body.staff-monitoring) #main-content .reports-date-range input{flex:1 1 130px}
+:is(body.admin-workspace,body.staff-monitoring) #main-content .reports-date-range>div{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);height:46px;min-height:46px;gap:6px}
+:is(body.admin-workspace,body.staff-monitoring) #main-content .reports-date-range input{width:100%;min-width:0;max-width:100%;min-height:44px;margin:0}
 @media(max-width:760px){:is(body.admin-workspace,body.staff-monitoring) #main-content{font-size:16px}}

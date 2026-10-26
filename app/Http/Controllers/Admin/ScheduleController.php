@@ -23,12 +23,13 @@ class ScheduleController extends Controller
         $filters = $request->validate([
             'month' => ['nullable', 'date_format:Y-m'],
             'date' => ['nullable', 'date_format:Y-m-d'],
+            'view' => ['nullable', Rule::in(['month', 'week', 'day'])],
             'status' => ['nullable', Rule::in([...config('gym.statuses'), 'pending', 'pencil'])],
             'event_type' => ['nullable', 'string', 'max:100'],
             'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
         ]);
         $filters['facility_id'] = Facility::gym()->value('id');
-        $month = $filters['month'] ?? now()->format('Y-m');
+        $month = $filters['month'] ?? (isset($filters['date']) ? substr($filters['date'], 0, 7) : now()->format('Y-m'));
         $start = CarbonImmutable::createFromFormat('!Y-m', $month);
         $end = $start->endOfMonth();
         $selectedDate = $filters['date'] ?? ($month === now()->format('Y-m') ? now()->toDateString() : $start->toDateString());
@@ -38,26 +39,36 @@ class ScheduleController extends Controller
         $facilities = Facility::gym()->orderBy('facility_name')->get(['id', 'facility_name', 'status']);
         $reservableFacilities = $facilities->where('status', 'available')->values();
         $scope = isset($filters['facility_id']) ? $facilities->where('id', $filters['facility_id'])->values() : $facilities;
-        $reservations = Reservation::with('facility:id,facility_name')->whereDate('reservation_date', '>=', $start->toDateString())->whereDate('reservation_date', '<=', $end->toDateString())
+        $rangeStart = $start->subDays(6);
+        $rangeEnd = $end->addDays(6);
+        $reservations = Reservation::with('facility:id,facility_name')->whereDate('reservation_date', '>=', $rangeStart->toDateString())->whereDate('reservation_date', '<=', $rangeEnd->toDateString())
             ->when(isset($filters['facility_id']), fn ($query) => $query->where('facility_id', $filters['facility_id']))
             ->orderBy('reservation_date')->orderBy('start_time')->orderBy('id')
             ->get(['id', 'reference_number', 'facility_id', 'event_name', 'event_type', 'reservation_date', 'start_time', 'end_time', 'setup_time', 'cleanup_time', 'status']);
-        $blocks = ScheduleBlock::with('facility:id,facility_name')->whereDate('starts_on', '<=', $end)->whereDate('ends_on', '>=', $start)
+        $blocks = ScheduleBlock::with('facility:id,facility_name')->whereDate('starts_on', '<=', $rangeEnd)->whereDate('ends_on', '>=', $rangeStart)
             ->when(isset($filters['facility_id']), fn ($query) => $query->where(fn ($scope) => $scope->whereNull('facility_id')->orWhere('facility_id', $filters['facility_id'])))
             ->orderBy('starts_on')->get();
         $tableReservations = $reservations
+            ->filter(fn ($row) => $row->reservation_date->format('Y-m') === $month)
             ->when(! empty($filters['status']), fn ($rows) => $rows->where('status', $filters['status']))
             ->when(! empty($filters['event_type']), fn ($rows) => $rows->where('event_type', $filters['event_type']));
         $eventTypes = Reservation::whereNotNull('event_type')->where('event_type', '!=', '')->distinct()->orderBy('event_type')->pluck('event_type');
         $navigationFilters = array_filter($filters, fn ($value, $key) => ! in_array($key, ['month', 'date'], true) && $value !== null && $value !== '', ARRAY_FILTER_USE_BOTH);
+        $monthData = $schedule->month($start, $scope, $reservations, $blocks);
+        $viewDays = $monthData['days'];
+        foreach ([$rangeStart->startOfMonth(), $rangeEnd->startOfMonth()] as $edgeMonth) {
+            if ($edgeMonth->format('Y-m') !== $month) {
+                $viewDays += $schedule->month($edgeMonth, $scope, $reservations, $blocks)['days'];
+            }
+        }
 
         return view('admin.schedule.index', [
-            ...$schedule->month($start, $scope, $reservations, $blocks),
+            ...$monthData, 'viewDays' => $viewDays, 'scheduleView' => $filters['view'] ?? 'month',
             'maximumBlockDays' => max(1, min(7, (int) \App\Models\SystemSetting::getValue('maximum_block_days', 7))),
             'month' => $month, 'monthLabel' => $start->format('F Y'), 'selectedDate' => $selectedDate,
             'leadingDays' => $start->dayOfWeek, 'filters' => $filters, 'navigationFilters' => $navigationFilters,
             'previousMonth' => $start->subMonth()->format('Y-m'), 'nextMonth' => $start->addMonth()->format('Y-m'),
-            'reservations' => $tableReservations, 'blocks' => $blocks, 'facilities' => $facilities,
+            'reservations' => $tableReservations, 'blocks' => $blocks->filter(fn ($block) => $block->starts_on->toDateString() <= $end->toDateString() && $block->ends_on->toDateString() >= $start->toDateString()), 'facilities' => $facilities,
             'reservableFacilities' => $reservableFacilities, 'eventTypes' => $eventTypes,
         ]);
     }

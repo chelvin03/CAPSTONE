@@ -1,8 +1,8 @@
 @extends('layouts.app')
-@section('title', 'Reservation Follow-up')
+@section('title', 'Follow-up Requests')
 @section('content')
 <div class="mx-auto max-w-6xl">
-    <h1 class="text-2xl font-bold">Reservation follow-up and waiting-list offers</h1>
+    <h1 class="text-2xl font-bold">Follow-up Requests</h1>
     <p class="my-4">Review each reminder before sending. Upcoming approved events within 24 hours, supporting documents missing after 24 hours, and unanswered replacement proposals older than 24 hours appear here. Waiting-list offers become eligible for a reminder after 12 hours. Sending a reminder does not change status. This page works without a hosting scheduler.</p>
     @if(session('success'))<p class="my-3 rounded bg-green-50 p-3 text-green-800" role="status">{{ session('success') }}</p>@endif
     @if($errors->any())<div class="my-3 rounded bg-red-50 p-3 text-red-700" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif

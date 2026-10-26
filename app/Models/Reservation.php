@@ -145,6 +145,11 @@ class Reservation extends Model
         return $this->hasOne(AcknowledgementTask::class);
     }
 
+    public function preparations(): HasMany
+    {
+        return $this->hasMany(ActivityPreparation::class);
+    }
+
     public function acknowledgementReceipt()
     {
         return $this->hasOne(AcknowledgementReceipt::class);

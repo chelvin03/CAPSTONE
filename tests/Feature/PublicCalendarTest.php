@@ -18,13 +18,34 @@ beforeEach(function () {
     $this->gym = Facility::create(['facility_name' => 'MCST Gymnasium', 'capacity' => 500, 'status' => 'available']);
 });
 
-test('calendar supports a rolling fifteen year booking horizon', function () {
-    $this->getJson(route('reservation.availability', ['month' => '2041-03']))
-        ->assertOk()->assertJsonPath('days.2041-03-01.selectable', true)
-        ->assertJsonPath('days.2041-03-02.selectable', false);
+test('calendar supports a rolling two month booking horizon', function () {
+    $this->getJson(route('reservation.availability', ['month' => '2026-05']))
+        ->assertOk()->assertJsonPath('days.2026-05-01.selectable', true)
+        ->assertJsonPath('days.2026-05-02.selectable', false);
     $this->travelTo(now()->setDate(2026, 4, 1));
-    $this->getJson(route('reservation.availability', ['month' => '2041-04']))
-        ->assertOk()->assertJsonPath('days.2041-04-01.selectable', true);
+    $this->getJson(route('reservation.availability', ['month' => '2026-06']))
+        ->assertOk()->assertJsonPath('days.2026-06-01.selectable', true)
+        ->assertJsonPath('days.2026-06-02.selectable', false);
+});
+
+test('two month window handles december to february and validates direct submissions', function () {
+    $this->travelTo(now()->setDate(2026, 12, 31));
+    expect(\App\Support\PublicBookingWindow::maximumDate())->toBe('2027-02-28');
+    $this->getJson(route('reservation.availability', ['month' => '2027-02']))
+        ->assertOk()->assertJsonPath('days.2027-02-28.selectable', true);
+    $this->getJson(route('reservation.availability', ['month' => '2027-03']))
+        ->assertOk()->assertJsonPath('days.2027-03-01.selectable', false);
+    \Illuminate\Support\Facades\Mail::fake();
+    \Illuminate\Support\Facades\Storage::fake('local');
+    $this->withSession(['public_email_verified' => ['email' => 'requestor@example.com', 'verified' => true, 'expires_at' => now()->addMinutes(30)->timestamp]]);
+    $payload = ['facility_id' => $this->gym->id, 'reservation_type' => 'internal', 'event_type' => 'Sports Activities',
+        'purpose' => 'Practice', 'contact_person' => 'Requestor', 'contact_email' => 'requestor@example.com',
+        'contact_number' => '09123456789', 'expected_attendees' => 100, 'start_time' => '08:00', 'end_time' => '10:00',
+        'agreement' => '1', 'agreement_accepted' => '1', 'permit' => \Illuminate\Http\UploadedFile::fake()->create('letter.pdf', 20, 'application/pdf')];
+    $this->post(route('reservation.store'), $payload + ['reservation_date' => '2027-03-01'])->assertSessionHasErrors('reservation_date');
+    $this->assertDatabaseCount('reservations', 0);
+    $this->post(route('reservation.store'), $payload + ['reservation_date' => '2027-02-28'])->assertSessionHasNoErrors();
+    $this->assertDatabaseCount('reservations', 1);
 });
 
 test('calendar distinguishes partial full and empty days while retaining the date endpoint', function () {

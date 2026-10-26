@@ -19,6 +19,17 @@ function adminScheduleBooking(Facility $facility, array $overrides = []): Reserv
     ], $overrides));
 }
 
+test('schedule view options include adjacent month bookings for boundary weeks', function (string $view) {
+    $previous = adminScheduleBooking($this->facility, ['reservation_date' => '2026-09-30']);
+    $current = adminScheduleBooking($this->facility, ['reservation_date' => '2026-10-01']);
+    $response = $this->get(route('admin.schedule.index', ['date' => '2026-10-01', 'view' => $view]))
+        ->assertOk()->assertViewHas('scheduleView', $view)->assertViewHas('month', '2026-10')
+        ->assertSee('Hourly Availability')->assertSee('Weekly Schedule')->assertSee('Pending');
+    expect($response->viewData('viewDays')['2026-09-30']['approvedCount'])->toBe(1);
+    expect($response->viewData('days'))->not->toHaveKey('2026-09-30');
+    expect($response->viewData('reservations')->pluck('id')->all())->toBe([$current->id]);
+})->with(['month', 'week', 'day']);
+
 beforeEach(function () {
     \Illuminate\Support\Facades\Mail::fake();
     $this->travelTo(Carbon::parse('2026-10-05 10:00:00', config('app.timezone')));

@@ -1,4 +1,4 @@
-﻿.reservation-details{font-family:Arial,Helvetica,sans-serif;color:#080d32;font-size:14px;max-width:none!important}
+.reservation-details{font-family:Arial,Helvetica,sans-serif;color:#080d32;font-size:14px;max-width:none!important}
 body:has(.reservation-details){background:linear-gradient(120deg,#f5faff,#fff 65%)}
 body:has(.reservation-details) #main-content{padding:16px 24px 30px 28px}
 body:has(.reservation-details)>div>div>header{height:52px}
@@ -61,3 +61,200 @@ body:has(.reservation-details)>div>div>header{height:52px}
 .detail-header-badge.detail-badge-validated{background:#ffedd5;color:#c2410c}.reservation-details:has(.detail-badge-validated) .detail-status.is-current .detail-status-number{background:#f97316;border-color:#f97316;box-shadow:0 0 0 5px #fff7ed;outline-color:#fed7aa}.reservation-details:has(.detail-badge-validated) .detail-status.is-current strong{color:#c2410c}
 .detail-action-orange{background:linear-gradient(100deg,#f97316,#ea580c);border-color:#ea580c;color:#fff}
 .detail-scheduling-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(285px,28.1%);gap:16px;align-items:start;margin-top:12px}.reservation-details .detail-reschedule-card{padding:16px;scroll-margin-top:75px}.reservation-details .detail-force-card{padding:16px}.detail-reschedule-card .detail-card-heading,.detail-force-card .detail-card-heading{margin-bottom:12px}.detail-force-card .detail-card-heading h2{font-size:14px;gap:12px}.detail-force-card .detail-card-heading i{font-size:21px}.detail-schedule-error{background:#fff0f1;color:#e21d2d;border-radius:7px;padding:10px 12px;font-size:11px;margin-bottom:12px}.detail-reschedule-title{font-size:12px;font-weight:600;margin-bottom:10px}.detail-reschedule-inputs{display:grid;grid-template-columns:1.15fr 1fr 1.15fr .95fr;align-items:end;gap:18px}.detail-reschedule-inputs label,.detail-resolution-select{font-size:11px;color:#5a6d96}.detail-reschedule-inputs input,.detail-reschedule-inputs select,.detail-resolution-select select{display:block;width:100%;min-width:0;border:1px solid #dbe3f2;border-radius:7px;font-size:12px;padding:8px 10px;margin-top:4px;background:#fff}.detail-check-availability,.detail-force-submit{background:#06f;color:#fff;border-radius:8px;border:1px solid #06f;min-height:35px;padding:8px 14px;font-size:12px;font-weight:600}.detail-check-availability:hover,.detail-force-submit:hover{background:#0057dc}.detail-check-availability:disabled,.detail-force-submit:disabled{opacity:.5;cursor:not-allowed}.detail-duration-toggle,.detail-force-toggle{display:flex;align-items:center;gap:9px;font-size:11px;margin:12px 0 6px}.detail-force-toggle{margin-top:0}.detail-scheduling-help{font-size:11px;color:#5a6d96;line-height:1.5;margin:6px 0}.detail-force-warning{display:flex;gap:12px;align-items:flex-start;font-size:11px;line-height:1.5;background:#fff2ca;color:#675019;border-radius:8px;padding:9px 12px;margin:8px 0}.detail-force-warning i{font-size:20px;color:#efa600}.detail-schedule-reason{display:block;font-size:11px;color:#53668f;margin:8px 0 4px}.detail-force-card textarea{display:block;width:100%;border:1px solid #dce5f3;border-radius:7px;font-size:12px;padding:9px 11px}.detail-force-submit{width:100%;margin-top:10px}.detail-resolution-select{display:block;margin:10px 0}.detail-scheduling-grid>.schedule-impact-error{grid-column:1/-1}.detail-scheduling-grid .schedule-impact-dialog h2{margin-bottom:15px}.detail-reschedule-card .mt-5{font-size:12px}@media(max-width:1150px){.detail-scheduling-grid{grid-template-columns:minmax(0,1fr) 285px}.detail-reschedule-inputs{grid-template-columns:1fr 1fr;gap:12px}}@media(max-width:760px){.detail-scheduling-grid{grid-template-columns:1fr}.detail-reschedule-inputs{grid-template-columns:1fr 1fr}.detail-force-card{grid-column:1}}@media(max-width:420px){.detail-reschedule-inputs{grid-template-columns:1fr}}
+
+/* Keep cards at their natural height and make attendance a prominent full row. */
+.reservation-details .reservation-detail-grid{align-items:start;gap:12px}.detail-information{gap:12px;align-items:start}.reservation-details .detail-action-card{height:auto}.detail-information>#event-outcome{grid-column:1/-1;grid-row:3}.detail-information>.equipment-review{grid-row:4}.detail-event,.detail-requester,.detail-schedule,.detail-information>section[x-data]{min-height:0}.detail-header{min-height:0;margin-bottom:14px}.detail-back{margin-bottom:8px}.detail-statuses{min-height:0;padding:14px 18px;gap:12px}.reservation-details section{padding:16px}.detail-card-heading{margin-bottom:12px}.detail-fields{gap:10px}.detail-requester-fields{gap:12px}.detail-information #event-outcome .attendance-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0}.attendance-fields>label>input,.attendance-fields textarea{margin-top:5px}.attendance-fields:disabled{opacity:.65}.attendance-fields button:disabled,.attendance-fields:disabled button{cursor:not-allowed}.reservation-details .detail-scheduling-grid{grid-template-columns:minmax(0,1fr);gap:12px}.detail-force-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 18px}.detail-force-card .detail-card-heading,.detail-force-card .detail-force-submit{grid-column:1/-1}.detail-force-card .detail-scheduling-help,.detail-force-card .detail-force-warning{margin:0}.detail-more{margin-top:12px;padding:14px}
+@media(max-width:760px){.detail-force-card,.detail-information #event-outcome .attendance-fields{grid-template-columns:minmax(0,1fr)}.attendance-fields>*{grid-column:1!important}}
+
+.reservation-details .detail-force-card{display:block}.detail-force-card textarea{min-height:70px}.detail-force-card .detail-force-warning{margin:8px 0}.detail-force-card .detail-force-submit{width:auto;min-width:240px}
+
+/* Reservation details reference layout. Scoped to this screen. */
+body:has(.reservation-details) #main-content{padding:12px 22px 20px;font-size:13px;line-height:1.4}
+body.admin-workspace #main-content .reservation-details :is(p,small,dt,dd,label,input,select,textarea,button,th,td,legend,.text-sm,.text-xs,.detail-fields,.detail-scheduling-help,.detail-delivery-note){font-size:13px!important;line-height:1.4!important}
+body.admin-workspace #main-content .reservation-details h2{font-size:16px!important;line-height:1.3!important}
+body.admin-workspace #main-content .reservation-details h3{font-size:14px!important}
+body.admin-workspace #main-content .reservation-details :is(input:not([type=radio]):not([type=checkbox]):not([type=hidden]),select){min-height:32px}
+.reservation-details .detail-header h1{font-size:30px!important}.detail-header{margin-bottom:14px}.detail-back{font-size:13px;margin-bottom:4px}.detail-header-badge{padding:5px 12px;border-radius:6px}.detail-reference small{padding-right:12px}
+.reservation-details .reservation-detail-grid{grid-template-columns:minmax(0,1fr) 335px;gap:12px}.detail-information{grid-template-columns:minmax(0,1.44fr) minmax(0,1fr);gap:12px}
+.detail-information>.detail-statuses{grid-column:1/-1;grid-row:1;margin:0;grid-template-columns:repeat(6,minmax(0,1fr));padding:12px 16px;gap:10px;overflow:visible}.detail-status{gap:9px;padding-right:9px}.detail-status-number{width:34px;height:34px}.detail-status strong{margin:3px 0;font-size:12px}.detail-status small{font-size:11px!important}.detail-status:not(:last-child)::after{font-size:20px}
+.detail-information>.detail-event{grid-column:1;grid-row:2}.detail-information>.detail-requester{grid-column:2;grid-row:2}.detail-information>.detail-schedule{grid-column:1;grid-row:3}.detail-information>section[x-data]{grid-column:2;grid-row:3}.detail-information>.equipment-review{grid-column:1/-1;grid-row:4}.detail-information>#event-outcome{grid-column:1/-1;grid-row:5}
+.reservation-details section{border-radius:9px;padding:14px}.detail-card-heading{margin-bottom:12px}.detail-event-columns{gap:16px}.detail-fields{gap:9px}.detail-fields dt{margin-bottom:3px}.detail-requester-fields{gap:14px 10px}.detail-event-type{padding:3px 10px}.detail-capacity-track{height:10px;margin-top:6px}.detail-schedule-fields{gap:12px}.detail-actions>*+*{margin-top:10px!important}.detail-action-note{display:none}.reservation-details .detail-action-card{padding:12px;background:linear-gradient(120deg,#fff,#f7faff)}.detail-action-button{min-height:54px;padding:9px 12px;gap:15px;border-radius:8px}.detail-action-button strong{font-size:13px!important}.detail-action-button small{font-size:11px!important}.detail-reason-label{margin:10px 0 5px}.detail-reason{min-height:52px;padding:8px;}.detail-delivery-note{margin-top:9px}.detail-action-orange{background:#e5f1ff;color:#005bff;border-color:#d8e8ff}
+.reservation-details .detail-scheduling-grid{margin:0;display:block}.detail-scheduling-grid>section+section{margin-top:10px}.detail-reschedule-inputs{grid-template-columns:1fr 1fr;gap:8px}.detail-reschedule-card .detail-card-heading h2,.detail-force-card .detail-card-heading h2{font-size:14px!important}.detail-proposal-button{list-style:none;cursor:pointer;border:1px solid #9dbfff;color:#005bff;border-radius:6px;padding:9px;text-align:center;margin-top:9px;font-weight:600}.detail-proposal-options[open]>.detail-proposal-button{margin-bottom:12px}.detail-force-warning{padding:8px!important}.detail-force-submit{min-width:0!important;width:100%!important}.detail-force-card textarea{min-height:45px}.detail-force-toggle{margin:8px 0}
+.equipment-review>p:not(:has(+.overflow-x-auto)){margin-bottom:8px}.equipment-review>p:first-of-type{display:none}.equipment-review>h3{margin-top:10px}.reservation-details table th,.reservation-details table td{padding:7px 10px}.equipment-review table input{max-width:65px}.equipment-review table button{padding:5px 8px!important}
+.reservation-details #event-outcome h2:before{content:'\f4d0'!important;font-family:bootstrap-icons;color:#06f;font-size:24px}.reservation-details #event-outcome>p[role=status]{background:#e6f1ff;color:#005bff;border-radius:6px;padding:9px 12px}.detail-information #event-outcome .attendance-fields{grid-template-columns:1.1fr 1fr 1.1fr;gap:14px;border:1px solid #e0eafd;border-radius:8px;padding:12px;opacity:1}.attendance-fields .attendance-status{grid-column:1;grid-row:1/4;border-right:1px solid #e0eafd;padding-right:12px}.attendance-status label{display:flex;gap:10px;align-items:flex-start;margin:8px 0 16px}.attendance-status small{display:block;color:#61759c;margin-top:4px}.attendance-fields>label[x-show]{grid-column:2;grid-row:1/4}.attendance-fields .attendance-remarks{grid-column:3;grid-row:1}.attendance-fields>button{grid-column:3;grid-row:2;padding:9px 12px;justify-self:end}.attendance-fields>p.text-green-800{display:none}.attendance-fields>.sm\:col-span-2:not(button){grid-column:1/-1}.attendance-fields textarea{padding:8px}.attendance-fields>label>input{padding:7px}.attendance-fields:disabled button{opacity:.55}.detail-notes{margin-top:12px}
+@media(max-width:1200px){.reservation-details .reservation-detail-grid{grid-template-columns:minmax(0,1fr) 300px}.detail-information{grid-template-columns:1fr}.detail-information>section,.detail-information>.detail-statuses{grid-column:1!important;grid-row:auto!important}.detail-information>.detail-statuses{grid-template-columns:repeat(6,125px);overflow:auto}.detail-information #event-outcome .attendance-fields{grid-template-columns:1fr}.attendance-fields>*{grid-column:1!important;grid-row:auto!important}.attendance-fields .attendance-status{border:0}}
+@media(max-width:760px){.reservation-details .reservation-detail-grid{grid-template-columns:1fr}.detail-actions{grid-row:auto}.detail-reference{text-align:left}.detail-header{display:block}}
+/* Screenshot proportions: 190px navigation, 48px toolbar, 3:1 content/action columns. */
+body:has(.reservation-details)>div>div>header{height:48px;background:#eaf5ff;border-color:#e0edff}
+body:has(.reservation-details) #main-content{padding:12px 22px 20px 28px}
+.reservation-details .detail-header{margin-bottom:14px;min-height:68px}
+.reservation-details .detail-header h1{line-height:1.05!important}
+.detail-header p{margin-top:0}
+.reservation-details .detail-header-badge.detail-badge-validated{background:#fff3c1;color:#e49100;border:1px solid #ffe79a;padding:3px 10px}
+.reservation-details .reservation-detail-grid{grid-template-columns:minmax(0,1fr) 335px;align-items:start}
+.detail-information{grid-template-columns:minmax(0,1.44fr) minmax(0,1fr);align-items:stretch}
+.detail-information>.detail-statuses{grid-template-columns:1.25fr 1.06fr .86fr .86fr .77fr;min-height:84px;padding:12px 21px;gap:16px;align-items:start}
+.detail-status-number{width:37px;height:37px;font-size:17px}
+.reservation-details:has(.detail-badge-validated) .detail-status.is-current .detail-status-number,.detail-status.is-current .detail-status-number{background:#005bff;border-color:#005bff;box-shadow:none;outline:none;color:white}
+.reservation-details:has(.detail-badge-validated) .detail-status.is-current strong{color:#005bff}
+body.admin-workspace #main-content .reservation-details .detail-status small{font-size:11px!important;line-height:1.3!important}
+.detail-status strong{font-weight:700;color:#07135d;margin:4px 0}
+.reservation-details section{padding:10px 14px;border-radius:8px;border-color:#dfedff}
+body.admin-workspace #main-content .reservation-details section h2{color:#002bff!important;gap:14px}
+.reservation-details .detail-action-card h2{color:#081049!important}
+.detail-card-heading{margin-bottom:12px}
+.detail-card-heading h2 i{font-size:24px}
+.detail-small-button{border-radius:5px;padding:4px 11px;color:#005bff;border-color:#d5e4ff}
+.detail-information>.detail-event,.detail-information>.detail-requester{min-height:229px}
+.detail-information>.detail-schedule,.detail-information>.detail-documents{min-height:149px}
+.detail-event-columns{grid-template-columns:1fr 1fr;gap:24px}
+.detail-fields{gap:7px;align-content:start}
+body.admin-workspace #main-content .reservation-details .detail-fields dd{font-size:14px!important;line-height:1.4!important}
+body.admin-workspace #main-content .reservation-details .detail-fields dt{font-size:12px!important;color:#566799}
+.detail-purpose{margin-top:6px}
+.detail-event-type{border-radius:7px;padding:2px 10px;font-size:12px}
+.detail-capacity-value{display:flex;align-items:center;gap:10px}
+.detail-capacity-track{flex:1;height:11px;margin:0}
+.detail-requester-fields{gap:10px 14px}
+.detail-schedule-fields{grid-template-columns:1fr 1.1fr .58fr;gap:9px 14px}
+.detail-day{border-radius:6px}
+.detail-document-file{padding:7px 12px;gap:12px;margin-top:8px}
+.detail-document-file p{color:#003cff}
+.reservation-details .detail-documents .detail-card-heading h2{font-size:16px!important;align-items:flex-start}
+.reservation-details .detail-action-card{padding:10px 12px;background:linear-gradient(120deg,#fff,#fbfdff)}
+.detail-action-button{min-height:54px;margin-bottom:7px;padding:8px 12px;gap:17px;border:0}
+.detail-action-button>i{font-size:32px}
+.detail-action-green{background:linear-gradient(110deg,#079349,#10944f)}
+.detail-action-orange{background:#e5f0ff;color:#005bff}
+.detail-action-orange>i{color:#005bff}
+.detail-action-yellow{background:#ffeba2;color:#080b20}
+.detail-action-red{background:#ffd7d9;color:red}
+.detail-reason-label{font-weight:600;margin:9px 0 4px}
+.detail-reason{min-height:52px;border-radius:6px;padding:6px 12px}
+.reservation-details .detail-reschedule-card,.reservation-details .detail-force-card{padding:10px 12px}
+.detail-reschedule-card .detail-card-heading,.detail-force-card .detail-card-heading{margin-bottom:5px}
+body.admin-workspace #main-content .reservation-details .detail-scheduling-help,body.admin-workspace #main-content .reservation-details .detail-force-warning,body.admin-workspace #main-content .reservation-details .detail-schedule-reason{font-size:11px!important;line-height:1.4!important}
+.detail-proposal-button{padding:8px;margin-top:8px;font-size:12px}
+.detail-proposal-button i{margin-right:8px}
+.detail-force-submit{height:38px;border-radius:6px;margin-top:10px}
+.detail-force-card textarea{min-height:43px}
+.reservation-details .equipment-review{padding:9px 14px 10px;font-family:Arial,Helvetica,sans-serif!important}
+.reservation-details .equipment-review>h2{margin-bottom:7px}
+.reservation-details table{text-align:center;border-collapse:separate;border-spacing:0;width:100%}
+body.admin-workspace #main-content .reservation-details table :is(th,td){font-size:11px!important;padding:6px 10px}
+.reservation-details table th{color:#00166b}
+.reservation-details table td:first-child{text-align:left;font-weight:400}
+.equipment-review table .bg-blue-50{background:#fff1bc;color:#d17b00;border-radius:7px}
+.reservation-details #event-outcome{padding:10px 13px}
+.reservation-details #event-outcome>p:first-of-type{margin:4px 0 10px 48px;color:#566799;font-size:12px!important}
+.reservation-details #event-outcome>p[role=status]{padding:8px 12px;margin:0 0 10px;font-size:12px!important}
+#event-outcome>p[role=status] i{margin-right:10px}
+#event-outcome>form{margin-top:0}
+.detail-information #event-outcome .attendance-fields{grid-template-columns:1.13fr 1.05fr 1.04fr;gap:12px;padding:10px 12px}
+.attendance-fields .attendance-status{grid-row:1/4;padding-right:10px}
+.attendance-fields label{font-weight:600;color:#081049}
+.attendance-status label{font-weight:400;margin:8px 0 14px;gap:14px}
+.attendance-status input{width:22px;height:22px;color:#005bff;border-color:#b2bfd9;flex-shrink:0}
+.attendance-status label:has(input:checked){color:#005bff}
+body.admin-workspace #main-content .reservation-details .attendance-status small,body.admin-workspace #main-content .reservation-details .attendance-help{display:block;font-size:11px!important;color:#566799;font-weight:400;margin-top:4px}
+.attendance-fields input[type=number],.attendance-fields textarea{border:1px solid #d5e0f1;border-radius:6px;font-weight:400}
+.attendance-fields .attendance-remarks{border-left:1px solid #e1ebfc;padding-left:13px}
+.attendance-fields>button{background:#005bff;border-radius:6px;font-size:12px!important;min-height:35px;align-self:end;white-space:nowrap}
+.attendance-fields:disabled button{opacity:1}
+@media(max-width:1250px){.reservation-details .reservation-detail-grid{grid-template-columns:minmax(0,1fr) 300px}.detail-information>.detail-statuses{grid-template-columns:repeat(5,145px);overflow:auto}.detail-information{grid-template-columns:1fr}.detail-information>section{grid-column:1!important;grid-row:auto!important}.detail-information #event-outcome .attendance-fields{grid-template-columns:1fr}.attendance-fields>*{grid-column:1!important;grid-row:auto!important}.attendance-fields .attendance-remarks{border:0;padding:0}}
+@media(max-width:760px){body:has(.reservation-details) #main-content{padding:14px}.reservation-details .reservation-detail-grid{grid-template-columns:1fr}.detail-schedule-fields{grid-template-columns:1fr 1fr}.detail-reference{white-space:normal}.detail-information>.detail-event,.detail-information>.detail-requester,.detail-information>.detail-schedule,.detail-information>.detail-documents{min-height:0}.detail-event-columns{gap:14px}}
+
+/* Let the information cards use the height of the adjacent action column. */
+@media(min-width:1251px){
+    .reservation-details .reservation-detail-grid{align-items:stretch}
+    .reservation-details .detail-information{align-content:stretch;row-gap:20px}
+    .reservation-details .detail-information>section{padding:18px 16px}
+    .reservation-details .detail-information .detail-card-heading{margin-bottom:18px}
+    .reservation-details .detail-information .detail-fields{row-gap:14px}
+    .reservation-details .detail-information .detail-purpose{margin-top:10px}
+    .reservation-details .detail-information>.equipment-review>h2{margin-bottom:14px}
+    .reservation-details .detail-information #event-outcome>p:first-of-type{margin-top:10px;margin-bottom:16px}
+    .reservation-details .detail-information #event-outcome .attendance-fields{padding:16px 14px;row-gap:18px}
+    .reservation-details .attendance-status label{margin-top:14px;margin-bottom:22px}
+    .reservation-details .attendance-fields .attendance-remarks textarea{min-height:90px}
+}
+
+/* Use the shared sidebar and readable reservation detail typography. */
+body.admin-workspace #main-content .reservation-details{font-size:16px;line-height:1.5}
+body.admin-workspace #main-content .reservation-details :is(p,dd,label,input,select,textarea,button,legend,.detail-fields,.detail-back,.detail-reference,.detail-action-button strong){font-size:16px!important;line-height:1.5!important}
+body.admin-workspace #main-content .reservation-details :is(small,dt,th,td,.detail-status small,.detail-status strong,.detail-action-button small,.detail-scheduling-help,.detail-force-warning,.detail-schedule-reason,.attendance-status small,.attendance-help,.detail-delivery-note,.detail-event-type,.detail-day,.detail-small-button){font-size:14px!important;line-height:1.5!important}
+body.admin-workspace #main-content .reservation-details .detail-fields dd{font-size:16px!important;line-height:1.5!important}
+body.admin-workspace #main-content .reservation-details :is(section h2,.detail-documents .detail-card-heading h2,.detail-reschedule-card .detail-card-heading h2,.detail-force-card .detail-card-heading h2){font-size:19px!important;line-height:1.4!important}
+body.admin-workspace #main-content .reservation-details #event-outcome>p{font-size:14px!important;line-height:1.5!important}
+body.admin-workspace #main-content .reservation-details table :is(th,td){font-size:14px!important;line-height:1.5!important;padding:10px}
+body.admin-workspace #main-content .reservation-details .attendance-fields>button{font-size:14px!important;white-space:normal}
+.reservation-details .detail-status strong{white-space:normal}
+.reservation-details .detail-action-button{min-height:66px}
+.reservation-details .detail-small-button{white-space:nowrap}
+.reservation-details .detail-force-submit{height:auto;min-height:42px}
+@media(min-width:1251px) and (max-width:1550px){
+    .reservation-details .detail-information>.detail-statuses{grid-template-columns:repeat(5,150px);overflow-x:auto}
+    .reservation-details .detail-information #event-outcome .attendance-fields{grid-template-columns:1fr 1fr}
+    .reservation-details .attendance-fields .attendance-status{grid-column:1/-1;grid-row:auto;border-right:0;border-bottom:1px solid #e1ebfc}
+    .reservation-details .attendance-fields>label[x-show]{grid-column:1;grid-row:auto}
+    .reservation-details .attendance-fields .attendance-remarks{grid-column:2;grid-row:auto}
+    .reservation-details .attendance-fields>button{grid-column:2;grid-row:auto}
+}
+/* Reservation summary and tabbed details; existing Admin Actions retain their styles. */
+.reservation-details [x-cloak]{display:none!important}
+.reservation-details .detail-summary{display:grid;grid-template-columns:1.15fr 1.15fr 1fr 1.1fr 1.35fr;gap:18px;padding:20px 18px;margin:0 0 16px}
+.detail-summary>div{display:flex;gap:14px;min-width:0;align-items:flex-start}
+.detail-summary>div+div{border-left:1px solid #e0eafd;padding-left:18px}
+.detail-summary>div>i{font-size:22px;color:#005bff;flex-shrink:0}
+.detail-summary>div>div{min-width:0;flex:1}
+.detail-summary>div>div>span,.detail-summary-event>span{color:#536693;font-size:14px}
+.detail-summary .detail-summary-event{display:block}
+.detail-summary-event>strong{display:block;font-size:24px;line-height:1.3;margin:2px 0 8px;overflow-wrap:anywhere}
+.detail-summary p{margin:2px 0 0;overflow-wrap:anywhere}
+.detail-summary small{color:#536693}
+.detail-summary-type{display:inline-block;border-radius:20px;padding:4px 14px;background:#eef0f5;font-size:13px;margin-left:8px}
+.detail-summary .detail-capacity-value{margin-top:6px;gap:10px;display:flex;align-items:center}
+.detail-summary .detail-capacity-track{flex:1;min-width:40px}
+.detail-tabs{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 16px}
+.detail-tabs button{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #dfe9fc;border-radius:14px;padding:10px 22px;color:#182c63;cursor:pointer}
+.detail-tabs button.is-active{background:#005bff;border-color:#005bff;color:#fff}
+.detail-tabs button:focus-visible{outline:3px solid #92baff;outline-offset:3px}
+.detail-main{min-width:0}
+.reservation-details .reservation-detail-grid{align-items:start}
+.reservation-details .detail-overview-layout{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);align-content:start;gap:14px}
+.reservation-details .detail-overview-layout>.detail-event{grid-column:1;grid-row:1;min-height:0}
+.reservation-details .detail-overview-layout>.detail-requester{grid-column:2;grid-row:1;min-height:0}
+.reservation-details .detail-overview-layout>.detail-documents{grid-column:1/-1!important;grid-row:2!important;min-height:0}
+.reservation-details .detail-overview-layout>.detail-card{padding:16px}
+.reservation-details .detail-overview-layout .detail-event-columns{grid-template-columns:1fr 1fr}
+.reservation-details .detail-overview-layout .detail-card-heading{margin-bottom:14px}
+.reservation-details .detail-overview-layout .detail-fields{row-gap:12px}
+.reservation-details .detail-overview-layout .detail-purpose{margin-top:0}
+.detail-tab-content{min-width:0}
+.detail-main .detail-statuses{grid-template-columns:1fr;min-height:0}
+.detail-main .detail-status:not(:last-child)::after{display:none}
+@media(max-width:1250px){.reservation-details .detail-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.detail-summary>div+div{border-left:0;padding-left:0}.reservation-details .detail-overview-layout{grid-template-columns:1fr}.reservation-details .detail-overview-layout>.detail-card{grid-column:1!important;grid-row:auto!important}}
+@media(max-width:760px){.reservation-details .detail-summary{grid-template-columns:1fr 1fr;padding:16px;gap:20px}.detail-summary .detail-summary-event{grid-column:1/-1}.detail-tabs{gap:8px}.detail-tabs button{padding:9px 12px}.reservation-details .detail-overview-layout .detail-event-columns{grid-template-columns:1fr}.detail-reference{white-space:normal}}
+/* Keep reservation progress visible above the summary on every detail tab. */
+.reservation-details>.detail-statuses-top{display:grid;grid-template-columns:repeat(6,minmax(155px,1fr));overflow-x:auto;gap:16px;padding:16px 18px;margin-bottom:16px;min-height:0}
+.reservation-details>.detail-statuses-top .detail-status{min-width:0}
+.reservation-details>.detail-statuses-top .detail-status strong{white-space:normal}
+@media(max-width:760px){.reservation-details>.detail-statuses-top{grid-template-columns:repeat(6,165px);padding:14px;gap:12px}}
+/* Landscape scheduling tools below the detail cards and Admin Actions. */
+.reservation-details>.detail-scheduling-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;align-items:start;margin-top:16px}
+.reservation-details>.detail-scheduling-grid>.detail-card{min-width:0;padding:18px}
+.reservation-details>.detail-scheduling-grid .detail-reschedule-inputs{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.reservation-details>.detail-scheduling-grid .detail-check-availability{grid-column:1/-1;justify-self:start}
+.reservation-details>.detail-scheduling-grid .detail-force-warning{margin:10px 0}
+@media(max-width:1000px){.reservation-details>.detail-scheduling-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.reservation-details>.detail-scheduling-grid .detail-reschedule-inputs{grid-template-columns:1fr}}
+/* Overview reads vertically: event details, requester information, documents. */
+.reservation-details .detail-overview-layout{grid-template-columns:minmax(0,1fr)}
+.reservation-details .detail-overview-layout>.detail-event{grid-column:1!important;grid-row:1!important}
+.reservation-details .detail-overview-layout>.detail-requester{grid-column:1!important;grid-row:2!important}
+.reservation-details .detail-overview-layout>.detail-documents{grid-column:1!important;grid-row:3!important}
+/* Larger text in the Overview cards without changing the Admin Actions panel. */
+body.admin-workspace #main-content .reservation-details .detail-overview-layout .detail-fields dd{font-size:18px!important;line-height:1.6!important}
+body.admin-workspace #main-content .reservation-details .detail-overview-layout .detail-fields :is(dt,.detail-event-type,.detail-day,small){font-size:16px!important;line-height:1.5!important}
+body.admin-workspace #main-content .reservation-details .detail-overview-layout .detail-card-heading h2{font-size:21px!important;line-height:1.4!important}
+.reservation-details .detail-overview-layout .detail-fields{row-gap:16px}

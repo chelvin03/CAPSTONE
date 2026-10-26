@@ -24,7 +24,7 @@
     </div>
 
     <form method="GET" class="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(12rem,1fr)_12rem_auto_auto]" role="search">
-        @foreach (['date_from', 'date_to', 'month', 'category', 'facility_id', 'requestor_type'] as $filter)
+        @foreach (['date_from', 'date_to', 'month', 'category', 'facility_id', 'requestor_type', 'date_order'] as $filter)
             @if(request()->filled($filter))<input type="hidden" name="{{ $filter }}" value="{{ request($filter) }}">@endif
         @endforeach
 
@@ -78,7 +78,14 @@
                     <th class="px-4 py-3 text-left">Reference</th>
                     <th class="px-4 py-3 text-left">Facility</th>
                     <th class="px-4 py-3 text-left">Event</th>
-                    <th class="px-4 py-3 text-left">Date</th>
+                    <th class="px-4 py-3 text-left" aria-sort="{{ request('date_order') === 'asc' ? 'ascending' : (request('date_order') === 'desc' ? 'descending' : 'none') }}">
+                        <span class="inline-flex items-center gap-2">Date
+                            <span class="inline-flex items-center gap-1">
+                                <a href="{{ request()->fullUrlWithQuery(['date_order' => 'asc', 'page' => null]) }}" class="rounded px-1 {{ request('date_order') === 'asc' ? 'text-blue-600' : 'text-slate-400' }}" aria-label="Sort reservation dates oldest first" title="Oldest first"><i class="bi bi-arrow-up" aria-hidden="true"></i></a>
+                                <a href="{{ request()->fullUrlWithQuery(['date_order' => 'desc', 'page' => null]) }}" class="rounded px-1 {{ request('date_order') === 'desc' ? 'text-blue-600' : 'text-slate-400' }}" aria-label="Sort reservation dates newest first" title="Newest first"><i class="bi bi-arrow-down" aria-hidden="true"></i></a>
+                            </span>
+                        </span>
+                    </th>
                     <th class="px-4 py-3 text-left">Status</th>
                     <th class="px-4 py-3 text-center">Action</th>
                 </tr>

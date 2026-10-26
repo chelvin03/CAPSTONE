@@ -1,9 +1,9 @@
 <section class="detail-action-card detail-card">
     <header class="detail-card-heading"><h2><i class="bi bi-gear-fill" aria-hidden="true"></i> Admin Actions</h2></header>
     <div class="detail-action-note"><i class="bi bi-info-circle-fill" aria-hidden="true"></i><p>Review the reservation details and attached documents. Click the appropriate action based on the gymnasium’s policies and schedule availability.</p></div>
-    @if(in_array($reservation->status, ['new', 'pending', 'pencil'], true))
+    @if(in_array($reservation->status, ['new', 'pending', 'validated', 'pencil'], true))
     <form method="POST" action="{{ route('admin.reservations.review', $reservation) }}">@csrf @method('PATCH')<input type="hidden" name="action" value="validate">
-        <button class="detail-action-button detail-action-orange"><i class="bi bi-check-circle-fill" aria-hidden="true"></i><span><strong>Validate Request</strong><small>Mark as validated after reviewing the details</small></span></button>
+        <button class="detail-action-button detail-action-orange" @disabled($reservation->status === 'validated')><i class="bi bi-eye-fill" aria-hidden="true"></i><span><strong>Validate Request</strong><small>Mark as validated after reviewing the details</small></span></button>
     </form>
     @endif
     @if(in_array($reservation->status, ['new', 'validated', 'waiting_list', 'pencil'], true))
@@ -21,8 +21,8 @@
     <form id="detail-reject-form" method="POST" action="{{ route('admin.reservations.reject', $reservation) }}" onsubmit="return confirm('Reject this reservation with the entered reason?')">@csrf @method('PATCH')
         <button class="detail-action-button detail-action-red"><i class="bi bi-x-circle-fill" aria-hidden="true"></i><span><strong>Reject Reservation</strong><small>Decline the request with a reason</small></span></button>
     </form>
-    <label class="detail-reason-label" for="detail-action-reason">Reason (for rejection or waiting list)</label>
-    <textarea id="detail-action-reason" class="detail-reason" name="rejection_reason" form="detail-reject-form" required rows="4" placeholder="Enter the reason here...">{{ old('rejection_reason', old('reason')) }}</textarea>
+    <label class="detail-reason-label" for="detail-action-reason">Rejection Reason</label>
+    <textarea id="detail-action-reason" class="detail-reason" name="rejection_reason" form="detail-reject-form" required rows="2" placeholder="Enter the reason for rejection...">{{ old('rejection_reason', old('reason')) }}</textarea>
     @if(in_array($reservation->status, ['new', 'pending', 'validated', 'pencil'], true))<input form="detail-waitlist-form" type="hidden" name="reason" value="{{ old('reason', old('rejection_reason')) }}">@endif
     <p class="detail-delivery-note"><i class="bi bi-envelope-check" aria-hidden="true"></i> An approval email is sent when the requestor has an email address.</p>
     @else

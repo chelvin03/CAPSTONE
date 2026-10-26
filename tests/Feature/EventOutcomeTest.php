@@ -37,6 +37,26 @@ test('no show is a separate outcome with zero attendees and no cancellation time
     $this->get(route('admin.reservations.show', $this->booking))->assertOk()->assertSee('No-show');
 });
 
+test('attendance preview and exports include recorded outcomes and optional remarks', function () {
+    $this->post(route('admin.reservations.outcome', $this->booking), [...$this->data, 'remarks' => null])->assertSessionHasNoErrors();
+    $missing = ($this->make)(['status' => 'completed']);
+    $noShow = ($this->make)();
+    $this->post(route('admin.reservations.outcome', $noShow), [...$this->data, 'outcome' => 'no_show', 'actual_attendees' => 0])->assertSessionHasNoErrors();
+    $filters = ['report_type' => 'attendance', 'date_from' => '2026-10-01', 'date_to' => '2026-10-31'];
+    $this->get(route('admin.reports.index', $filters))->assertOk()
+        ->assertSee('Attendance &amp; No-show Report', false)->assertSee('Attended / Completed')->assertSee('Recorded by')
+        ->assertSee($noShow->reference_number)->assertDontSee($missing->reference_number)
+        ->assertViewHas('data', fn ($data) => $data['total'] === 2 && $data['metrics']['Actual attendees'] === 80);
+    $excel = $this->get(route('admin.reports.excel', $filters))->assertOk()->assertDownload();
+    $path = $excel->baseResponse->getFile()->getPathname();
+    $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+    expect($book->getSheetByName('Records')->getCell('L1')->getValue())->toBe('Remarks');
+    $book->disconnectWorksheets();
+    unlink($path);
+    $pdf = $this->get(route('admin.reports.pdf', $filters))->assertOk()->assertDownload();
+    unlink($pdf->baseResponse->getFile()->getPathname());
+});
+
 test('future and ongoing events cannot be finalized even by an administrator', function ($date, $start, $end) {
     $this->booking->update(['reservation_date' => $date, 'start_time' => $start, 'end_time' => $end]);
     $this->post(route('admin.reservations.outcome', $this->booking), $this->data)->assertSessionHasErrors('outcome');

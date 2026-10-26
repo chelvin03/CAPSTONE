@@ -94,13 +94,26 @@ class AdminReportExportService
         $pdf->MultiCell(0, 5, $data['note']);
         $pdf->Ln(4);
         // Landscape A4 provides 277 mm between the default 10 mm margins.
-        $widths = count($data['headers']) === 2 ? [210, 67] : [32, 51, 27, 15, 15, 47, 32, 28, 30];
+        $widths = match (count($data['headers'])) {
+            2 => [210, 67],
+            12 => [25, 32, 25, 28, 26, 14, 14, 32, 29, 30, 25, 40],
+            default => [32, 51, 27, 15, 15, 47, 32, 28, 30],
+        };
         $scale = 277 / array_sum($widths);
         $widths = array_map(fn ($width) => $width * $scale, $widths);
         $header = function () use ($pdf, $widths, $data): void {
             $pdf->SetFillColor(238, 242, 255);
-            foreach ($data['headers'] as $index => $label) $pdf->Cell($widths[$index], 8, $label, 1, 0, 'L', true);
-            $pdf->Ln();
+            $height = count($data['headers']) === 12 ? 16 : 8;
+            if ($pdf->GetY() + $height > 190) $pdf->AddPage();
+            $x = 10;
+            $y = $pdf->GetY();
+            foreach ($data['headers'] as $index => $label) {
+                $pdf->Rect($x, $y, $widths[$index], $height, 'DF');
+                $pdf->SetXY($x, $y);
+                $pdf->MultiCell($widths[$index], 4, $label);
+                $x += $widths[$index];
+            }
+            $pdf->SetXY(10, $y + $height);
         };
         $header();
         foreach ($service->exportRows($data) as $values) {

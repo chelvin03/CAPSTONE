@@ -62,7 +62,11 @@
                     : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"
         >
             <i class="bi bi-house" aria-hidden="true"></i>
-            <span>BI Dashboard</span>
+            <span>Dashboard</span>
+        </a>
+
+        <a href="{{ route('admin.analytics') }}" @if(request()->routeIs('admin.analytics')) aria-current="page" @endif class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition {{ request()->routeIs('admin.analytics') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}">
+            <i class="bi bi-pie-chart" aria-hidden="true"></i><span>Analytics</span>
         </a>
 
         {{-- Reservations --}}
@@ -78,8 +82,10 @@
         </a>
         <a href="{{ route('admin.schedule.index') }}" class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition {{ request()->routeIs('admin.schedule.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-calendar3" aria-hidden="true"></i><span>Schedule</span></a>
 
+        <a href="{{ route('admin.planning.index') }}" @if(request()->routeIs('admin.planning.*')) aria-current="page" @endif class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition {{ request()->routeIs('admin.planning.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-calendar2-week" aria-hidden="true"></i><span>Planning Schedule</span></a>
+
         {{-- Equipment --}}
-        <a href="{{ route('admin.reservations.follow-up') }}" @if(request()->routeIs('admin.reservations.follow-up', 'admin.reservations.follow-up.*')) aria-current="page" @endif class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition {{ request()->routeIs('admin.reservations.follow-up', 'admin.reservations.follow-up.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-envelope" aria-hidden="true"></i><span>Follow-up &amp; Offers</span></a>
+        <a href="{{ route('admin.reservations.follow-up') }}" @if(request()->routeIs('admin.reservations.follow-up', 'admin.reservations.follow-up.*')) aria-current="page" @endif class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition {{ request()->routeIs('admin.reservations.follow-up', 'admin.reservations.follow-up.*') ? 'bg-white/10 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white' }}"><i class="bi bi-envelope" aria-hidden="true"></i><span>Follow-up Requests</span></a>
         <a
             href="{{ route('admin.equipment.index') }}"
             class="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition

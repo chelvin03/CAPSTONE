@@ -209,6 +209,11 @@ class DashboardAnalyticsService
         $bookingsByDay = $bookingQuery->get(['reservation_date', 'facility_id', 'start_time', 'end_time'])
             ->groupBy(fn ($row) => $row->reservation_date->toDateString());
         $available = $occupied = 0;
+        $weekdayHours = array_fill(0, 7, 0);
+        $hourly = [];
+        for ($slot = $operating['start']; $slot < $operating['end']; $slot += 7200) {
+            $hourly[] = ['start' => $slot / 60, 'end' => min($slot + 7200, $operating['end']) / 60, 'counts' => array_fill(0, 7, 0)];
+        }
         for ($day = $from; $day->lte($to); $day = $day->addDay()) {
             if (isset($filters['month']) && $day->month !== (int) $filters['month']) {
                 continue;
@@ -224,12 +229,23 @@ class DashboardAnalyticsService
                 $available += $this->intervalDuration($windows);
                 $intervals = $bookings->get($facility->id, collect())
                     ->map(fn ($row) => [$this->timeSeconds($row->start_time), $this->timeSeconds($row->end_time)])->all();
-                $occupied += $this->intervalDuration($this->subtractIntervals($intervals, $closed));
+                $usable = $this->subtractIntervals($intervals, $closed);
+                $duration = $this->intervalDuration($usable);
+                $occupied += $duration;
+                $weekdayHours[$day->dayOfWeekIso - 1] += $duration / 3600;
+                foreach ($hourly as &$slot) {
+                    $clipped = array_map(fn ($interval) => [max($interval[0], $slot['start'] * 60), min($interval[1], $slot['end'] * 60)], $usable);
+                    $slot['counts'][$day->dayOfWeekIso - 1] += $this->intervalDuration(array_values(array_filter($clipped, fn ($interval) => $interval[1] > $interval[0]))) / 3600;
+                }
+                unset($slot);
             }
         }
 
         return ['utilizationRate' => $available ? round($occupied / $available * 100, 1) : null,
-            'utilizedHours' => round($occupied / 3600, 2), 'availableHours' => round($available / 3600, 2)];
+            'utilizedHours' => round($occupied / 3600, 2), 'availableHours' => round($available / 3600, 2),
+            'utilizationWeekdays' => collect($weekdayHours)->map(fn ($hours, $index) => ['label' => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][$index], 'count' => round($hours, 2)]),
+            'utilizationHeat' => collect($hourly)->map(fn ($slot) => $slot + ['label' => CarbonImmutable::today()->addMinutes($slot['start'])->format('g:i A').'–'.CarbonImmutable::today()->addMinutes($slot['end'])->format('g:i A')])->all(),
+        ];
     }
 
     private function timeSeconds(string $time): int

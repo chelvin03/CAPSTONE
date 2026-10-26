@@ -20,6 +20,7 @@
             ['event_type', 'Event Type Report', 'Analyze reservations by event type, including sports, ceremonies and other activities.', 'calendar2-event-fill', 'purple'],
             ['cancellation', 'Cancellation Report', 'View cancelled bookings within the selected date range.', 'x-circle-fill', 'red'],
             ['no_show', 'No-show Report', 'Identify no-show events and affected time slots.', 'clock', 'amber'],
+            ['attendance', 'Attendance & No-show Report', 'Review actual attendees, event outcomes, recorded by and administrator remarks.', 'people-fill', 'blue'],
             ['equipment', 'Equipment Request Report', 'View equipment requests and their approval status.', 'file-earmark-text-fill', 'blue'],
         ] as [$type, $name, $description, $icon, $color])
         <a class="reports-quick-card reports-tone-{{ $color }}" href="{{ route('admin.reports.index', array_merge($filters, ['report_type' => $type])) }}"><span class="reports-card-icon"><i class="bi bi-{{ $icon }}" aria-hidden="true"></i></span><div><h3>{{ $name }}</h3><p>{{ $description }}</p></div><i class="bi bi-chevron-right" aria-hidden="true"></i></a>

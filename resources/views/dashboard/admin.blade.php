@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Gymnasium Business Intelligence')
+@section('title', 'Dashboard')
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/dashboard-reference.css') }}?v={{ filemtime(public_path('css/dashboard-reference.css')) }}">
 @php
@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="{{ asset('css/bi-workspace.css') }}?v={{ filemtime(public_path('css/bi-workspace.css')) }}">
 <div class="reference-dashboard admin-bi-dashboard bi-workspace"><div class="admin-topbar">
     <header class="reference-heading">
-        <div><p class="reference-eyebrow">MCST GYMNASIUM</p><h1>Business Intelligence Dashboard</h1><p>Monitor reservation activity, gym utilization, and key insights for decision-making.</p></div>
+        <div><p class="reference-eyebrow">MCST GYMNASIUM</p><h1>Dashboard</h1><p>Monitor reservation activity, gym utilization, and key insights for decision-making.</p></div>
 
     </header>
     @if ($errors->any())

@@ -1,5 +1,11 @@
 # Admin reports
 
+## Attendance and no-shows
+
+Select **Attendance & No-show Report** to preview or export recorded event attendance for the selected event dates, event type, status, and facility. Records include reference, event, event type, facility, schedule, expected and actual attendees, attendance status, recorder, and remarks. Totals show completed events, no-shows, and actual attendees. Legacy completed statuses without an attendance record are excluded; missing attendance is never treated as a no-show.
+
+The reservation details page shows **Event Attendance & Outcome** in its main information column. Approved events can be recorded only after their scheduled end, including closing midnight. Choose attended/completed and enter actual attendees, or choose no-show to record zero. Administrator remarks are optional (500 characters). Existing audit, revision, and administrator-only correction checks apply. This uses the existing `reservation_event_outcomes` table and requires no new migration.
+
 Open `/admin/reports` as an administrator. The existing role, verified-account, authentication, and Staff restrictions remain in force. The page retains the shared sidebar/navigation, Poppins, and Tailwind styling; no Bootstrap UI is introduced.
 
 ## Period and definitions
